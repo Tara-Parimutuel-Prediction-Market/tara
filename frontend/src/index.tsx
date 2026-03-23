@@ -17,10 +17,19 @@ import './mockEnv.ts';
 const root = ReactDOM.createRoot(document.getElementById('root')!);
 
 try {
-  const launchParams = retrieveLaunchParams();
-  const { tgWebAppPlatform: platform } = launchParams;
-  const debug = (launchParams.tgWebAppStartParam || '').includes('debug')
-    || import.meta.env.DEV;
+  // Try to retrieve launch params, but don't fail if Telegram version is too old
+  let launchParams;
+  let platform = 'unknown';
+  let debug = import.meta.env.DEV;
+  
+  try {
+    launchParams = retrieveLaunchParams();
+    platform = launchParams.tgWebAppPlatform;
+    debug = (launchParams.tgWebAppStartParam || '').includes('debug') || import.meta.env.DEV;
+  } catch (versionError) {
+    // If version check fails, use defaults and continue anyway
+    console.warn('Telegram version check failed, using defaults:', versionError);
+  }
 
   // Configure all application dependencies.
   await init({
@@ -36,5 +45,6 @@ try {
       );
     });
 } catch (e) {
+  console.error('Initialization error:', e);
   root.render(<EnvUnsupported/>);
 }

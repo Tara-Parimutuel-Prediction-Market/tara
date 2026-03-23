@@ -80,5 +80,11 @@ export default defineConfig({
   server: {
     // Exposes your dev server and makes it accessible for the devices in the same network.
     host: true,
+    allowedHosts: [
+      "adipopexic-shavonda-daturic.ngrok-free.dev",
+      ".ngrok-free.dev",
+      ".ngrok.io",
+      "localhost",
+    ],
   },
 });
