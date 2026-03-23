@@ -44,5 +44,8 @@
     "vite-plugin-mkcert": "^1.17.8",
     "vite-plugin-pwa": "^1.2.0",
     "vite-tsconfig-paths": "^5.1.4"
+  },
+  "optionalDependencies": {
+    "@rollup/rollup-linux-x64-gnu": "^4.60.0"
   }
 }
