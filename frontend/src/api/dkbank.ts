@@ -1,103 +1,52 @@
+import { request } from "./client";
+import type { 
+  DKBankPaymentRequest, 
+  PaymentResponse, 
+  PaymentStatus
+} from "@/types/payment";
+
 /**
  * DK Bank (Druk PNB Bank) Payment Integration
- *
+ * 
  * This module handles BTN (Bhutanese Ngultrum) payments via DK Bank
  * for Bhutanese users betting on archery matches.
+ * 
+ * INTEGRATES WITH BACKEND PAYMENT SERVICE
  */
 
-import config from "@/config";
-
-export interface DKBankPayment {
-  amount: number; // in BTN
-  merchantTxnId: string;
-  customerPhone: string;
-  customerName?: string;
-  description: string;
-}
-
-export interface DKBankResponse {
-  success: boolean;
-  txnId?: string;
-  status?: "pending" | "success" | "failed";
-  message?: string;
-}
-
 /**
- * Initiate a payment via DK Bank
- *
- * NOTE: This is a placeholder implementation. You need to:
- * 1. Get DK Bank merchant credentials from https://dkpnb.bt
- * 2. Integrate their actual payment gateway API
- * 3. Handle webhooks for payment confirmation
+ * Initiate a payment via DK Bank through backend
+ * 
+ * This calls the backend payment service which handles
+ * the actual DK Bank integration
  */
 export async function initiateDKBankPayment(
-  payment: DKBankPayment,
-): Promise<DKBankResponse> {
-  const { dkBank } = config.payments;
-
-  if (!dkBank.enabled) {
-    throw new Error("DK Bank payments are disabled");
-  }
-
-  if (payment.amount < dkBank.minBet) {
-    throw new Error(`Minimum bet is ${dkBank.minBet} BTN`);
-  }
-
-  // TODO: Replace with actual DK Bank API call
-  console.log("🏦 DK Bank Payment Request:", payment);
-
-  // Simulate API call
+  payment: DKBankPaymentRequest,
+): Promise<PaymentResponse> {
   try {
-    // In production, this would be:
-    // const response = await fetch(`${dkBank.apiUrl}/payment/initiate`, {
-    //   method: 'POST',
-    //   headers: {
-    //     'Content-Type': 'application/json',
-    //     'Authorization': `Bearer ${dkBank.merchantId}`,
-    //   },
-    //   body: JSON.stringify({
-    //     amount: payment.amount,
-    //     currency: dkBank.currency,
-    //     merchantTxnId: payment.merchantTxnId,
-    //     customerPhone: payment.customerPhone,
-    //     description: payment.description,
-    //     callbackUrl: `${config.appUrl}/api/payments/dk-bank/callback`,
-    //   }),
-    // });
-    // return response.json();
-
-    // For now, return mock success
-    return {
-      success: true,
-      txnId: `DKBANK_${Date.now()}`,
-      status: "pending",
-      message:
-        "Payment initiated. Please check your DK Bank app to complete the transaction.",
-    };
+    const response = await request<PaymentResponse>("/payments/dkbank/initiate", {
+      method: "POST",
+      body: JSON.stringify(payment),
+    });
+    
+    return response;
   } catch (error: any) {
-    return {
-      success: false,
-      status: "failed",
-      message: error.message || "Payment failed",
-    };
+    throw new Error(error.message || "DK Bank payment initiation failed");
   }
 }
 
 /**
- * Check payment status
+ * Check payment status through backend
  */
 export async function checkDKBankPaymentStatus(
-  txnId: string,
-): Promise<DKBankResponse> {
-  // TODO: Implement actual status check with DK Bank API
-  console.log("🏦 Checking DK Bank payment status:", txnId);
-
-  return {
-    success: true,
-    txnId,
-    status: "success",
-    message: "Payment completed successfully",
-  };
+  paymentId: string,
+): Promise<PaymentStatus> {
+  try {
+    const response = await request<PaymentStatus>(`/payments/dkbank/status/${paymentId}`);
+    return response;
+  } catch (error: any) {
+    throw new Error(error.message || "Failed to check payment status");
+  }
 }
 
 /**

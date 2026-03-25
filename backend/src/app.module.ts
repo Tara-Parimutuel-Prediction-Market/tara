@@ -7,12 +7,14 @@ import { UsersModule } from "./users/users.module";
 import { MarketsModule } from "./markets/markets.module";
 import { BetsModule } from "./bets/bets.module";
 import { AdminModule } from "./admin/admin.module";
+import { TelegramModule } from "./telegram/telegram.module";
+import { PaymentModule } from "./payment/payment.module";
 import { User } from "./entities/user.entity";
 import { AuthMethod } from "./entities/auth-method.entity";
 import { Market } from "./entities/market.entity";
 import { Outcome } from "./entities/outcome.entity";
 import { Bet } from "./entities/bet.entity";
-import { Transaction } from "./entities/transaction.entity";
+import { Payment } from "./entities/payment.entity";
 import { Settlement } from "./entities/settlement.entity";
 
 @Module({
@@ -35,7 +37,7 @@ import { Settlement } from "./entities/settlement.entity";
           Market,
           Outcome,
           Bet,
-          Transaction,
+          Payment,
           Settlement,
         ],
         synchronize: config.get("DB_SYNC", "true") === "true",
@@ -47,6 +49,8 @@ import { Settlement } from "./entities/settlement.entity";
     MarketsModule,
     BetsModule,
     AdminModule,
+    TelegramModule,
+    PaymentModule,
   ],
 })
 export class AppModule {}

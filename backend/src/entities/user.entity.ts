@@ -9,7 +9,7 @@ import {
 } from "typeorm";
 import { AuthMethod } from "./auth-method.entity";
 import { Bet } from "./bet.entity";
-import { Transaction } from "./transaction.entity";
+import { Payment } from "./payment.entity";
 
 @Entity("users")
 export class User {
@@ -19,6 +19,12 @@ export class User {
   @Index({ unique: true })
   @Column({ nullable: true })
   telegramId: string; // Telegram numeric user ID as string
+
+  @Column({ nullable: true })
+  telegramChatId: number; // Telegram chat ID for notifications
+
+  @Column({ nullable: true })
+  telegramStreak: number; // Current winning streak in Telegram
 
   @Column({ nullable: true })
   firstName: string;
@@ -51,6 +57,6 @@ export class User {
   @OneToMany(() => Bet, (b) => b.user)
   bets: Bet[];
 
-  @OneToMany(() => Transaction, (t) => t.user)
-  transactions: Transaction[];
+  @OneToMany(() => Payment, (p) => p.user)
+  payments: Payment[];
 }

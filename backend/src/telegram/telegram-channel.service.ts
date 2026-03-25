@@ -1,0 +1,330 @@
+import { Injectable, Logger } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
+import { HttpService } from '@nestjs/axios'
+import { InjectRepository } from '@nestjs/typeorm'
+import { Repository } from 'typeorm'
+import { User } from '../entities/user.entity'
+import { Market } from '../entities/market.entity'
+import { TelegramService } from './telegram.service'
+
+@Injectable()
+export class TelegramChannelService {
+  private readonly logger = new Logger(TelegramChannelService.name)
+  private readonly botToken: string
+  private readonly channelId: string
+
+  constructor(
+    private readonly httpService: HttpService,
+    private readonly configService: ConfigService,
+    private readonly telegramService: TelegramService,
+    @InjectRepository(User) private readonly userRepository: Repository<User>,
+  ) {
+    this.botToken = this.configService.get<string>('TELEGRAM_BOT_TOKEN') || ''
+    this.channelId = this.configService.get<string>('TELEGRAM_CHANNEL_ID') || ''
+  }
+
+  async initializeChannel(): Promise<void> {
+    try {
+      // Verify bot is admin of the channel
+      const botInfo = await this.getBotInfo()
+      const channelInfo = await this.getChannelInfo()
+      
+      if (botInfo && channelInfo) {
+        this.logger.log(`Telegram Channel initialized: ${channelInfo.title}`)
+        await this.sendWelcomeMessage()
+      } else {
+        this.logger.error('Failed to initialize Telegram Channel - check bot permissions and channel ID')
+      }
+    } catch (error) {
+      this.logger.error('Error initializing Telegram Channel', error)
+    }
+  }
+
+  async sendMarketAnnouncement(market: Market): Promise<void> {
+    try {
+      const message = this.formatChannelMarketAnnouncement(market)
+      const keyboard = this.createChannelKeyboard(market)
+      
+      await this.sendChannelMessage(message, keyboard)
+      
+      // Also send to individual users who have notifications enabled
+      await this.telegramService.sendMarketAnnouncement(market)
+      
+      this.logger.log(`Market announcement sent to channel: ${market.title}`)
+    } catch (error) {
+      this.logger.error('Failed to send market announcement to channel', error)
+    }
+  }
+
+  async sendMarketResolution(market: Market): Promise<void> {
+    try {
+      const message = this.formatChannelMarketResolution(market)
+      
+      await this.sendChannelMessage(message)
+      
+      // Also send individual notifications to bettors
+      await this.notifyBettors(market)
+      
+      this.logger.log(`Market resolution sent to channel: ${market.title}`)
+    } catch (error) {
+      this.logger.error('Failed to send market resolution to channel', error)
+    }
+  }
+
+  async sendEngagementContent(content: {
+    title: string
+    message: string
+    imageUrl?: string
+    buttons?: Array<{ text: string; url: string }>
+  }): Promise<void> {
+    try {
+      const message = this.formatEngagementContent(content)
+      const keyboard = content.buttons ? this.createEngagementKeyboard(content.buttons) : undefined
+      
+      await this.sendChannelMessage(message, keyboard)
+      
+      this.logger.log(`Engagement content sent to channel: ${content.title}`)
+    } catch (error) {
+      this.logger.error('Failed to send engagement content to channel', error)
+    }
+  }
+
+  async sendDailyDigest(): Promise<void> {
+    try {
+      const digest = await this.generateDailyDigest()
+      
+      await this.sendChannelMessage(digest.message, digest.keyboard)
+      
+      this.logger.log('Daily digest sent to channel')
+    } catch (error) {
+      this.logger.error('Failed to send daily digest to channel', error)
+    }
+  }
+
+  async sendWeeklyStats(): Promise<void> {
+    try {
+      const stats = await this.generateWeeklyStats()
+      
+      await this.sendChannelMessage(stats.message, stats.keyboard)
+      
+      this.logger.log('Weekly stats sent to channel')
+    } catch (error) {
+      this.logger.error('Failed to send weekly stats to channel', error)
+    }
+  }
+
+  private async sendChannelMessage(text: string, keyboard?: any): Promise<void> {
+    try {
+      const url = `https://api.telegram.org/bot${this.botToken}/sendMessage`
+      const payload: any = {
+        chat_id: this.channelId,
+        text,
+        parse_mode: 'HTML',
+        disable_web_page_preview: false
+      }
+
+      if (keyboard) {
+        payload.reply_markup = { inline_keyboard: keyboard }
+      }
+
+      await this.httpService.post(url, payload)
+    } catch (error) {
+      this.logger.error('Failed to send channel message', error)
+      throw error
+    }
+  }
+
+  private async getBotInfo(): Promise<any> {
+    try {
+      const url = `https://api.telegram.org/bot${this.botToken}/getMe`
+      const response = await this.httpService.get(url)
+      return response.data.result
+    } catch (error) {
+      this.logger.error('Failed to get bot info', error)
+      return null
+    }
+  }
+
+  private async getChannelInfo(): Promise<any> {
+    try {
+      const url = `https://api.telegram.org/bot${this.botToken}/getChat`
+      const response = await this.httpService.post(url, {
+        chat_id: this.channelId
+      })
+      return response.data.result
+    } catch (error) {
+      this.logger.error('Failed to get channel info', error)
+      return null
+    }
+  }
+
+  private async sendWelcomeMessage(): Promise<void> {
+    const welcomeMessage = `
+🎯 <b>Welcome to Tara Prediction Markets!</b>
+
+📈 Get real-time market announcements
+🏆 Follow resolution results  
+📊 Track platform statistics
+💬 Engage with the community
+
+👇 <b>Quick Actions:</b>
+    `.trim()
+
+    const keyboard = [
+      [{ text: '🎯 Browse Markets', url: 'https://t.me/your_bot_username?start=browse' }],
+      [{ text: '📊 View Stats', url: 'https://t.me/your_bot_username?start=stats' }],
+      [{ text: '💬 Join Discussion', url: 'https://t.me/your_discussion_group' }]
+    ]
+
+    await this.sendChannelMessage(welcomeMessage, keyboard)
+  }
+
+  private async notifyBettors(market: Market): Promise<void> {
+    // This would find all users who bet on this market and send individual notifications
+    // Implementation depends on your bet entity structure
+    this.logger.log(`Notifying bettors for market: ${market.id}`)
+  }
+
+  private async generateDailyDigest(): Promise<{ message: string; keyboard?: any }> {
+    const activeMarkets = 5 // Get from database
+    const resolvedMarkets = 3 // Get from database
+    const totalVolume = '$50,000' // Calculate from database
+
+    const message = `
+📊 <b>Daily Market Digest</b>
+
+🎯 <b>Active Markets:</b> ${activeMarkets}
+✅ <b>Resolved Today:</b> ${resolvedMarkets}  
+💰 <b>Total Volume:</b> ${totalVolume}
+
+🔥 <b>Top Performers:</b>
+1. @winner1 - 85% win rate
+2. @winner2 - 78% win rate  
+3. @winner3 - 72% win rate
+
+👇 <b>Today's Hot Markets:</b>
+    `.trim()
+
+    const keyboard = [
+      [{ text: '🎯 View Active Markets', url: 'https://t.me/your_bot_username?start=markets' }],
+      [{ text: '📈 Check Leaderboard', url: 'https://t.me/your_bot_username?start=leaderboard' }]
+    ]
+
+    return { message, keyboard }
+  }
+
+  private async generateWeeklyStats(): Promise<{ message: string; keyboard?: any }> {
+    const weeklyMarkets = 25 // Get from database
+    const weeklyVolume = '$350,000' // Calculate from database
+    const activeUsers = 1250 // Get from database
+
+    const message = `
+📈 <b>Weekly Performance Report</b>
+
+🎯 <b>Markets Created:</b> ${weeklyMarkets}
+💰 <b>Trading Volume:</b> ${weeklyVolume}
+👥 <b>Active Users:</b> ${activeUsers}
+
+🏆 <b>Weekly Champions:</b>
+🥇 @champion1 - $5,230 profit
+🥈 @champion2 - $3,890 profit  
+🥉 @champion3 - $2,450 profit
+
+📊 <b>Market Categories:</b>
+• Sports: 45%
+• Politics: 25%
+• Crypto: 20%
+• Other: 10%
+
+Keep predicting and winning! 🎯
+    `.trim()
+
+    const keyboard = [
+      [{ text: '🎯 Start Predicting', url: 'https://t.me/your_bot_username?start=predict' }],
+      [{ text: '📊 Full Report', url: 'https://your-analytics-url/weekly' }]
+    ]
+
+    return { message, keyboard }
+  }
+
+  private formatChannelMarketAnnouncement(market: Market): string {
+    const closesAt = new Date(market.closesAt).toLocaleString()
+    const outcomes = market.outcomes.map(o => o.label).join(' vs ')
+    
+    return `
+🚀 <b>NEW MARKET AVAILABLE</b> 🚀
+
+📊 <b>${market.title}</b>
+
+🎲 <b>Outcomes:</b>
+${outcomes}
+
+⏰ <b>Closes:</b> ${closesAt}
+
+💰 <b>Estimated Volume:</b> High
+
+👇 <b>Predict Now:</b>
+• <a href="https://t.me/your_bot_username?start=market_${market.id}">Quick Predict</a>
+• <a href="https://your-mini-app-url?market=${market.id}">Full Interface</a>
+
+#PredictionMarkets #Betting #Tara
+    `.trim()
+  }
+
+  private formatChannelMarketResolution(market: Market): string {
+    const resolvedAt = new Date().toLocaleString()
+    const winningOutcome = market.outcomes.find(o => o.isWinner)
+    
+    return `
+✅ <b>MARKET RESOLVED</b> ✅
+
+📊 <b>${market.title}</b>
+
+🏆 <b>Winning Outcome:</b>
+${winningOutcome?.label || 'Pending'}
+
+💰 <b>Final Pool Size:</b> $${market.totalPool || 'TBD'}
+
+📈 <b>Total Bets:</b> ${market.totalBets || 'TBD'}
+
+⏰ <b>Resolved:</b> ${resolvedAt}
+
+👇 <b>View Details:</b>
+• <a href="https://your-mini-app-url/market/${market.id}">Market Details</a>
+• <a href="https://t.me/your_bot_username?start=portfolio">Your Portfolio</a>
+
+#MarketResults #TaraPredictions
+    `.trim()
+  }
+
+  private formatEngagementContent(content: any): string {
+    let message = `
+🎯 <b>${content.title}</b>
+
+${content.message}
+    `.trim()
+
+    if (content.imageUrl) {
+      message += `\n🖼️ [Image](${content.imageUrl})`
+    }
+
+    return message
+  }
+
+  private createChannelKeyboard(market: Market): any {
+    return [
+      [
+        { text: '🎯 Quick Predict', url: `https://t.me/your_bot_username?start=market_${market.id}` },
+        { text: '📊 Full Interface', url: `https://your-mini-app-url?market=${market.id}` }
+      ],
+      [
+        { text: '📈 View All Markets', url: 'https://t.me/your_bot_username?start=markets' },
+        { text: '💼 My Portfolio', url: 'https://t.me/your_bot_username?start=portfolio' }
+      ]
+    ]
+  }
+
+  private createEngagementKeyboard(buttons: Array<{ text: string; url: string }>): any {
+    return buttons.map(button => [button])
+  }
+}

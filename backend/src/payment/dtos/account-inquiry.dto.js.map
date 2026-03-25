@@ -1,0 +1,1 @@
+{"version":3,"sources":["../../../../src/modules/payment/dtos/account-inquiry.dto.ts"],"sourcesContent":["import { StringField } from \"../../../decorators/field.decorators.ts\";\n\nexport class AccountInquiryDto {\n  @StringField()\n  account_number!: string;\n}\n"],"names":["StringField","AccountInquiryDto"],"mappings":";;;;;;;;;AAAA,SAASA,WAAW,kDAAkD;AAEtE,OAAO,MAAMC;AAGb"}

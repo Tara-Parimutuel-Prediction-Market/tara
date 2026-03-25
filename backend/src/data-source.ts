@@ -5,7 +5,7 @@ import { AuthMethod } from "./entities/auth-method.entity";
 import { Market } from "./entities/market.entity";
 import { Outcome } from "./entities/outcome.entity";
 import { Bet } from "./entities/bet.entity";
-import { Transaction } from "./entities/transaction.entity";
+import { Payment } from "./entities/payment.entity";
 import { Settlement } from "./entities/settlement.entity";
 
 dotenv.config();
@@ -25,7 +25,7 @@ export const AppDataSource = new DataSource({
     Market,
     Outcome,
     Bet,
-    Transaction,
+    Payment,
     Settlement,
   ],
   migrations: [__dirname + "/migrations/*.ts"],

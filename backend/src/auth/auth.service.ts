@@ -27,7 +27,7 @@ export class AuthService {
 
   // ── HMAC-SHA-256 Telegram initData validation ──────────────────────────────
   validateTelegramInitData(rawInitData: string): TelegramInitData {
-    const botToken = process.env.BOT_TOKEN;
+    const botToken = process.env.TELEGRAM_BOT_TOKEN;
     if (!botToken) throw new UnauthorizedException("Bot token not configured");
 
     const params = new URLSearchParams(rawInitData);

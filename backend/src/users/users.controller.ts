@@ -4,7 +4,7 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { JwtAuthGuard } from "../auth/guards";
 import { User } from "../entities/user.entity";
-import { Transaction } from "../entities/transaction.entity";
+import { Payment } from "../entities/payment.entity";
 
 @ApiTags("users")
 @ApiBearerAuth()
@@ -13,7 +13,7 @@ import { Transaction } from "../entities/transaction.entity";
 export class UsersController {
   constructor(
     @InjectRepository(User) private userRepo: Repository<User>,
-    @InjectRepository(Transaction) private txRepo: Repository<Transaction>,
+    @InjectRepository(Payment) private paymentRepo: Repository<Payment>,
   ) {}
 
   @Get("me")
@@ -34,10 +34,10 @@ export class UsersController {
     });
   }
 
-  @Get("me/transactions")
-  @ApiOperation({ summary: "Get my transaction history" })
-  getTransactions(@Request() req) {
-    return this.txRepo.find({
+  @Get("me/payments")
+  @ApiOperation({ summary: "Get my payment history" })
+  getPayments(@Request() req) {
+    return this.paymentRepo.find({
       where: { userId: req.user.userId },
       order: { createdAt: "DESC" },
       take: 50,

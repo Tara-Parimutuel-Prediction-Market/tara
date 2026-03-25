@@ -54,7 +54,7 @@ export class AuthController {
     @Query("username") username = "testuser",
     @Query("first_name") first_name = "Test",
   ) {
-    const botToken = process.env.BOT_TOKEN;
+    const botToken = process.env.TELEGRAM_BOT_TOKEN;
     const user = JSON.stringify({ id: Number(id), first_name, username });
     const auth_date = Math.floor(Date.now() / 1000);
 
@@ -71,7 +71,7 @@ export class AuthController {
       .join("\n");
 
     const secretKey = createHmac("sha256", "WebAppData")
-      .update(botToken)
+      .update(botToken || "")
       .digest();
     const hash = createHmac("sha256", secretKey)
       .update(dataCheckString)
@@ -111,7 +111,7 @@ export class AuthController {
       throw new UnauthorizedException("Wrong secret");
     }
 
-    const botToken = process.env.BOT_TOKEN;
+    const botToken = process.env.TELEGRAM_BOT_TOKEN;
     const adminTelegramId = process.env.ADMIN_TELEGRAM_ID;
     if (!adminTelegramId) {
       throw new UnauthorizedException("ADMIN_TELEGRAM_ID not set in .env");
@@ -135,7 +135,7 @@ export class AuthController {
       .join("\n");
 
     const secretKey = createHmac("sha256", "WebAppData")
-      .update(botToken)
+      .update(botToken || "")
       .digest();
     const hash = createHmac("sha256", secretKey)
       .update(dataCheckString)

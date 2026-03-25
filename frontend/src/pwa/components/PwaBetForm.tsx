@@ -5,6 +5,7 @@ import {
   TonConnectButton,
 } from "@tonconnect/ui-react";
 import { Market, placeBetWithWallet } from "@/api/client";
+import { PwaPaymentSelector } from "./PwaPaymentSelector";
 
 interface PwaBetFormProps {
   market: Market;
@@ -12,34 +13,47 @@ interface PwaBetFormProps {
 }
 
 export const PwaBetForm: FC<PwaBetFormProps> = ({ market, onBetPlaced }) => {
-  const wallet = useTonWallet();
-  const [tonConnectUI] = useTonConnectUI();
-
   const [selectedOutcomeId, setSelectedOutcomeId] = useState<string | null>(null);
   const [amount, setAmount] = useState("");
   const [limitPrice, setLimitPrice] = useState("0.5");
   const [maxShares, setMaxShares] = useState("");
   const [loading, setLoading] = useState(false);
-  const [isDemoMode, setIsDemoMode] = useState(false);
+  const [showPaymentSelector, setShowPaymentSelector] = useState(false);
+  const [betAmount, setBetAmount] = useState<number>(0);
+  const [cidNumber, setCidNumber] = useState("");
+
+  const wallet = useTonWallet();
+  const [tonConnectUI] = useTonConnectUI();
 
   const isSCPM = String(market.mechanism || "").toLowerCase().includes("scpm") || 
                  market.title.toLowerCase().includes("btc");
 
-  const handlePlaceBet = async () => {
-    if (!selectedOutcomeId || !amount || (!wallet && !isDemoMode)) return;
+  const handlePaymentSuccess = async (paymentMethod: string) => {
+    // Payment successful, now place bet
+    await placeBetAfterPayment(paymentMethod);
+  };
 
-    setLoading(true);
+  const handlePaymentFailure = (error: string) => {
+    setLoading(false);
+    setShowPaymentSelector(false);
+    alert(`Payment failed: ${error}`);
+  };
+
+  const placeBetAfterPayment = async (paymentMethod: string) => {
+    if (!selectedOutcomeId || !amount) return;
+
     try {
-      const tonAmount = parseFloat(amount || "0");
-      if (tonAmount <= 0) throw new Error("Amount must be positive");
+      const betAmount = parseFloat(amount || "0");
+      if (betAmount <= 0) throw new Error("Amount must be positive");
 
-      let finalWalletAddress = isDemoMode ? "EQDemoWallet888888888888888888888888888888888888" : wallet?.account.address;
-      let finalTxHash = isDemoMode ? "demo-tx-" + Date.now() : "";
+      if (paymentMethod === 'ton') {
+        // TON payment flow - requires wallet connection
+        if (!wallet) {
+          throw new Error("TON wallet required for TON payments");
+        }
 
-      if (!isDemoMode) {
-        // Real TON Transaction
         const PLATFORM_WALLET = "EQD..."; 
-        const nanoAmount = (tonAmount * 1_000_000_000).toString();
+        const nanoAmount = (betAmount * 1_000_000_000).toString();
 
         const tx = await tonConnectUI.sendTransaction({
           validUntil: Math.floor(Date.now() / 1000) + 600,
@@ -51,27 +65,25 @@ export const PwaBetForm: FC<PwaBetFormProps> = ({ market, onBetPlaced }) => {
             },
           ],
         });
-        finalTxHash = tx.boc;
-      } else {
-        // Simulate block delay for demo effect
-        await new Promise(resolve => setTimeout(resolve, 800));
-      }
 
-      if (isDemoMode) {
-        // --- STATIC CALCULATION FOR DEMO ---
+        await placeBetWithWallet(market.id, {
+          outcomeId: selectedOutcomeId,
+          amount: betAmount,
+          walletAddress: wallet.account.address,
+          txHash: tx.boc,
+        });
+      } else {
+        // DK Bank or Credits payment flow (demo for now)
         const updatedMarket = { ...market };
-        updatedMarket.totalPool = (Number(market.totalPool || 0) + tonAmount).toString();
+        updatedMarket.totalPool = (Number(market.totalPool || 0) + betAmount).toString();
         
         updatedMarket.outcomes = market.outcomes.map(o => {
           if (o.id === selectedOutcomeId) {
-            const newAmount = Number(o.totalBetAmount || 0) + tonAmount;
-            
-            // Simplified SCPM/LMSR shift for Demo logic
+            const newAmount = Number(o.totalBetAmount || 0) + betAmount;
             let newProb = Number(o.lmsrProbability || 0);
             if (isSCPM) {
               const b = Number(market.liquidityParam || 1000);
-              // Shift probability based on log-sum-exp logic (simplified)
-              newProb = Math.min(0.99, newProb + (tonAmount / b) * (1 - newProb));
+              newProb = Math.min(0.99, newProb + (betAmount / b) * (1 - newProb));
             } else {
               newProb = newAmount / Number(updatedMarket.totalPool || 1);
             }
@@ -82,11 +94,10 @@ export const PwaBetForm: FC<PwaBetFormProps> = ({ market, onBetPlaced }) => {
               lmsrProbability: newProb
             };
           } else {
-            // Adjust other probabilities to sum to 1
             let newProb = Number(o.lmsrProbability || 0);
             if (isSCPM) {
               const b = Number(market.liquidityParam || 1000);
-              newProb = Math.max(0.01, newProb - (tonAmount / b) * newProb);
+              newProb = Math.max(0.01, newProb - (betAmount / b) * newProb);
             } else {
               newProb = Number(o.totalBetAmount || 0) / Number(updatedMarket.totalPool || 1);
             }
@@ -96,69 +107,37 @@ export const PwaBetForm: FC<PwaBetFormProps> = ({ market, onBetPlaced }) => {
 
         await new Promise(resolve => setTimeout(resolve, 800));
         if (onBetPlaced) onBetPlaced(updatedMarket);
-      } else {
-        // Real bet flow
-        await placeBetWithWallet(market.id, {
-          outcomeId: selectedOutcomeId,
-          amount: tonAmount,
-          maxShares: isSCPM ? parseFloat(maxShares || "0") : undefined,
-          limitPrice: isSCPM ? parseFloat(limitPrice || "0") : undefined,
-          walletAddress: finalWalletAddress!,
-          txHash: finalTxHash,
-        });
-        if (onBetPlaced) onBetPlaced();
       }
 
-      alert(`✅ ${isDemoMode ? "Demo " : ""}Bet placed successfully!`);
-      
-      setAmount("");
-      setMaxShares("");
+      // Reset form
       setSelectedOutcomeId(null);
-    } catch (err: any) {
-      alert("❌ Failed: " + (err.message || "Transaction failed"));
+      setAmount("");
+      setBetAmount(0);
+      setShowPaymentSelector(false);
+    } catch (error: any) {
+      alert(`Bet placement failed: ${error.message}`);
     } finally {
       setLoading(false);
     }
   };
 
-  if (!wallet && !isDemoMode) {
-    return (
-      <div style={containerStyle}>
-        <div style={{ marginBottom: "16px", color: "#708499" }}>
-          Connect your TON wallet to start betting
-        </div>
-        <div style={{ display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
-          <TonConnectButton />
-          <span style={{ color: "#708499", fontSize: "0.8rem" }}>OR</span>
-          <button 
-            onClick={() => setIsDemoMode(true)}
-            style={{
-              background: "#2a3a4a",
-              color: "#6ab3f3",
-              border: "1px dashed #6ab3f3",
-              padding: "8px 16px",
-              borderRadius: "16px",
-              cursor: "pointer",
-              fontWeight: 600,
-              fontSize: "0.9rem"
-            }}
-          >
-             Demo Wallet
-          </button>
-        </div>
-      </div>
-    );
-  }
+  const handlePlaceBet = async () => {
+    if (!selectedOutcomeId || !amount) return;
+
+    const betAmount = parseFloat(amount || "0");
+    if (betAmount <= 0) {
+      alert("Please enter a valid bet amount");
+      return;
+    }
+
+    setBetAmount(betAmount);
+    setShowPaymentSelector(true);
+  };
 
   return (
     <div style={containerStyle}>
       <h3 style={{ margin: "0 0 16px 0", fontSize: "1rem", color: "#6ab3f3", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <span>Place a Bet</span>
-        {isDemoMode && (
-          <span style={{ background: "#FF9800", color: "#000", fontSize: "0.6rem", padding: "2px 6px", borderRadius: "4px", fontWeight: 800 }}>
-            DEMO MODE
-          </span>
-        )}
       </h3>
 
       <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
@@ -204,15 +183,71 @@ export const PwaBetForm: FC<PwaBetFormProps> = ({ market, onBetPlaced }) => {
         ) : null}
 
         <div style={fieldStyle}>
-          <label style={labelStyle}>AMOUNT (TON)</label>
+          <label style={labelStyle}>AMOUNT {wallet ? "(TON)" : ""}</label>
           <input 
             type="number" 
             step="0.1" 
-            placeholder="1.0" 
+            placeholder={wallet ? "1.0" : "Enter amount"} 
             value={amount} 
             onChange={(e) => setAmount(e.target.value)}
             style={inputStyle}
+            disabled={!wallet}
           />
+        </div>
+
+        {/* Payment Options */}
+        <div style={{ display: "flex", gap: "12px", alignItems: "center", marginBottom: "16px" }}>
+          {/* DK Bank Payment Button */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px", alignItems: "center" }}>
+            <input
+              type="text"
+              placeholder="Enter CID Number"
+              value={cidNumber}
+              onChange={(e) => setCidNumber(e.target.value)}
+              style={{
+                padding: "8px 12px",
+                border: "1px solid #2a3a4a",
+                borderRadius: "6px",
+                backgroundColor: "#1a2332",
+                color: "#fff",
+                fontSize: "0.9rem",
+                width: "200px"
+              }}
+            />
+            <button
+              onClick={() => {
+                if (!selectedOutcomeId) {
+                  alert("Please select an outcome first");
+                  return;
+                }
+                if (!cidNumber) {
+                  alert("Please enter your CID number");
+                  return;
+                }
+                setBetAmount(parseFloat(amount || "0"));
+                setShowPaymentSelector(true);
+              }}
+              disabled={!selectedOutcomeId || !cidNumber}
+              style={{
+                background: "#2a3a4a",
+                color: "#6ab3f3",
+                border: "1px solid #6ab3f3",
+                padding: "12px 16px",
+                borderRadius: "8px",
+                cursor: "pointer",
+                fontWeight: 600,
+                fontSize: "0.9rem",
+                opacity: (!selectedOutcomeId || !cidNumber) ? 0.6 : 1,
+              }}
+            >
+              🏦 DK Bank Payment
+            </button>
+          </div>   {/* TON Wallet Connection */}
+          {wallet ? (
+            <span style={{ color: "#4CAF50", fontSize: "0.8rem" }}>✓ TON Connected</span>
+          ) : (
+            <TonConnectButton />
+          )}
         </div>
 
         {selectedOutcomeId && amount && parseFloat(amount) > 0 && (
@@ -248,7 +283,7 @@ export const PwaBetForm: FC<PwaBetFormProps> = ({ market, onBetPlaced }) => {
                     {(() => {
                       const tonAmount = Number(amount || 0);
                       const outcome = market.outcomes.find(o => o.id === selectedOutcomeId);
-                      if (!outcome) return "0.00";
+                      if (!outcome) return "+0.00 (0% ROI)";
                       
                       const b = Number(market.liquidityParam || 1000);
                       const prob = Number(outcome.lmsrProbability || 0.5);
@@ -286,9 +321,19 @@ export const PwaBetForm: FC<PwaBetFormProps> = ({ market, onBetPlaced }) => {
             cursor: (loading || !selectedOutcomeId || !amount) ? "not-allowed" : "pointer"
           }}
         >
-          {loading ? "Processing..." : "Confirm Bet"}
+          {loading ? "Processing..." : "Choose Payment Method"}
         </button>
       </div>
+
+      {/* Payment Selector */}
+      {showPaymentSelector && (
+        <PwaPaymentSelector
+          amount={betAmount}
+          description={`Bet on ${market.outcomes.find(o => o.id === selectedOutcomeId)?.label} in "${market.title}"`}
+          onPaymentSuccess={handlePaymentSuccess}
+          onPaymentFailure={handlePaymentFailure}
+        />
+      )}
     </div>
   );
 };

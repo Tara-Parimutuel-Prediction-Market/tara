@@ -2,7 +2,7 @@ import { Router, Request, Response } from "express";
 
 export const botRouter = Router();
 
-const BOT_TOKEN = process.env.BOT_TOKEN;
+const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 
 // POST /api/bot/webhook
 // Register this URL in Telegram:

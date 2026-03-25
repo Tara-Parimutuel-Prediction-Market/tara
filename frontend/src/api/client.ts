@@ -22,7 +22,7 @@ export function clearToken() {
 }
 
 // Base fetch wrapper — automatically attaches Bearer token
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+export async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...(options.headers as Record<string, string>),

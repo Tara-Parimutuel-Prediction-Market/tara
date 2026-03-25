@@ -1,6 +1,7 @@
 import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import { PwaMarketsPage } from "./pages/PwaMarketsPage";
 import { PwaMarketDetailPage } from "./pages/PwaMarketDetailPage";
+import { PwaPaymentTestPage } from "./pages/PwaPaymentTestPage";
 
 import { TonConnectUIProvider } from "@tonconnect/ui-react";
 import { publicUrl } from "@/helpers/publicUrl.ts";
@@ -75,6 +76,7 @@ export function PwaApp() {
           <Routes>
             <Route path="/" element={<PwaMarketsPage />} />
             <Route path="/market/:id" element={<PwaMarketDetailPage />} />
+            <Route path="/payment-test" element={<PwaPaymentTestPage />} />
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </HashRouter>
