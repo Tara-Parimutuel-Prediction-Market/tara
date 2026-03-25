@@ -1,50 +1,52 @@
-// Include Telegram UI styles first to allow our code override the package CSS.
-import '@telegram-apps/telegram-ui/dist/styles.css';
+import ReactDOM from "react-dom/client";
+import { StrictMode } from "react";
 
-import ReactDOM from 'react-dom/client';
-import { StrictMode } from 'react';
-import { retrieveLaunchParams } from '@tma.js/sdk-react';
+import "./index.css";
 
-import { Root } from '@/components/Root.tsx';
-import { EnvUnsupported } from '@/components/EnvUnsupported.tsx';
-import { init } from '@/init.ts';
+const root = ReactDOM.createRoot(document.getElementById("root")!);
 
-import './index.css';
+/**
+ * Detect whether we're running inside a real Telegram client.
+ * Check multiple indicators:
+ * - TelegramGameProxy (older method)
+ * - Telegram.WebApp object
+ * - tgWebAppData in URL parameters
+ */
+const isInsideTelegram =
+  !!(window as any).TelegramGameProxy ||
+  !!(window as any).Telegram?.WebApp ||
+  new URLSearchParams(window.location.search).has("tgWebAppData") ||
+  window.location.hash.includes("tgWebAppData");
 
-// Mock the environment in case, we are outside Telegram.
-import './mockEnv.ts';
-
-const root = ReactDOM.createRoot(document.getElementById('root')!);
-
-try {
-  // Try to retrieve launch params, but don't fail if Telegram version is too old
-  let launchParams;
-  let platform = 'unknown';
-  let debug = import.meta.env.DEV;
-  
-  try {
-    launchParams = retrieveLaunchParams();
-    platform = launchParams.tgWebAppPlatform;
-    debug = (launchParams.tgWebAppStartParam || '').includes('debug') || import.meta.env.DEV;
-  } catch (versionError) {
-    // If version check fails, use defaults and continue anyway
-    console.warn('Telegram version check failed, using defaults:', versionError);
-  }
-
-  // Configure all application dependencies.
-  await init({
-    debug,
-    eruda: debug && ['ios', 'android'].includes(platform),
-    mockForMacOS: platform === 'macos',
-  })
-    .then(() => {
-      root.render(
-        <StrictMode>
-          <Root/>
-        </StrictMode>,
-      );
-    });
-} catch (e) {
-  console.error('Initialization error:', e);
-  root.render(<EnvUnsupported/>);
+if (isInsideTelegram) {
+  // ── TMA path ─────────────────────────────────────────────────────────────
+  // Load Telegram UI styles and the full TMA SDK only when inside Telegram
+  import("@telegram-apps/telegram-ui/dist/styles.css");
+  import("@/tma/mockEnv.ts").then(() =>
+    import("@/tma/init.ts").then(({ init }) =>
+      init({
+        debug: import.meta.env.DEV,
+        eruda: false,
+        mockForMacOS: false,
+      }).then(() =>
+        import("@/tma/components/Root.tsx").then(({ Root }) => {
+          root.render(
+            <StrictMode>
+              <Root />
+            </StrictMode>,
+          );
+        }),
+      ),
+    ),
+  );
+} else {
+  // ── PWA path ─────────────────────────────────────────────────────────────
+  // Plain React app — no TMA SDK, no Telegram auth required
+  import("@/pwa/PwaApp.tsx").then(({ PwaApp }) => {
+    root.render(
+      <StrictMode>
+        <PwaApp />
+      </StrictMode>,
+    );
+  });
 }

@@ -9,6 +9,9 @@ import { User } from "../entities/user.entity";
 import { MarketsService } from "./markets.service";
 import { MarketsController } from "./markets.controller";
 import { ParimutuelEngine } from "./parimutuel.engine";
+import { LMSRService } from "./lmsr.service";
+import { SCPMService } from "./scpm.service";
+import { KeeperService } from "./keeper.service";
 
 @Module({
   imports: [
@@ -21,8 +24,8 @@ import { ParimutuelEngine } from "./parimutuel.engine";
       User,
     ]),
   ],
-  providers: [MarketsService, ParimutuelEngine],
+  providers: [MarketsService, ParimutuelEngine, LMSRService, SCPMService, KeeperService],
   controllers: [MarketsController],
-  exports: [MarketsService, ParimutuelEngine],
+  exports: [MarketsService, ParimutuelEngine, SCPMService],
 })
 export class MarketsModule {}

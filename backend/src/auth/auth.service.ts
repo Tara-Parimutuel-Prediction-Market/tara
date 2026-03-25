@@ -34,8 +34,9 @@ export class AuthService {
     const hash = params.get("hash");
     if (!hash) throw new UnauthorizedException("Missing hash in initData");
 
-    // Build data-check string: sorted key=value pairs excluding hash
+    // Build data-check string: sorted key=value pairs excluding hash and signature
     params.delete("hash");
+    params.delete("signature"); // signature uses Ed25519, not part of HMAC check
     const dataCheckString = Array.from(params.entries())
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([k, v]) => `${k}=${v}`)

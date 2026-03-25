@@ -6,8 +6,8 @@ import {
 } from '@tma.js/sdk-react';
 import { List, Placeholder } from '@telegram-apps/telegram-ui';
 
-import { DisplayData, type DisplayDataRow } from '@/components/DisplayData/DisplayData.tsx';
-import { Page } from '@/components/Page.tsx';
+import { DisplayData, type DisplayDataRow } from '@/tma/components/DisplayData/DisplayData.tsx';
+import { Page } from '@/tma/components/Page.tsx';
 
 function getUserRows(user: User): DisplayDataRow[] {
   return Object.entries(user).map(([title, value]) => ({ title, value }));

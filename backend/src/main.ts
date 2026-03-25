@@ -12,7 +12,11 @@ async function bootstrap() {
     origin: [
       process.env.FRONTEND_URL || "http://localhost:5173",
       "http://localhost:5173",
+      "http://localhost:5174",
+      "http://127.0.0.1:5174",
       "https://tara-parimutuel.vercel.app",
+      /\.ngrok-free\.app$/, // Allow all ngrok URLs
+      /\.ngrok\.io$/, // Allow ngrok.io URLs too
     ],
     credentials: true,
   });

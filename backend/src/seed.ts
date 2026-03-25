@@ -62,8 +62,16 @@ async function seed() {
       }),
     );
     await outcomeRepo.save([
-      outcomeRepo.create({ label: "National Team", marketId: m1.id }),
-      outcomeRepo.create({ label: "Thimphu Team", marketId: m1.id }),
+      outcomeRepo.create({
+        label: "National Team",
+        marketId: m1.id,
+        lmsrProbability: 0.5,
+      }),
+      outcomeRepo.create({
+        label: "Thimphu Team",
+        marketId: m1.id,
+        lmsrProbability: 0.5,
+      }),
     ]);
     console.log("✅ Market 1 created: National vs Thimphu");
 
@@ -80,9 +88,21 @@ async function seed() {
       }),
     );
     await outcomeRepo.save([
-      outcomeRepo.create({ label: "Paro Team", marketId: m2.id }),
-      outcomeRepo.create({ label: "Punakha Team", marketId: m2.id }),
-      outcomeRepo.create({ label: "Draw", marketId: m2.id }),
+      outcomeRepo.create({
+        label: "Paro Team",
+        marketId: m2.id,
+        lmsrProbability: 0.333333,
+      }),
+      outcomeRepo.create({
+        label: "Punakha Team",
+        marketId: m2.id,
+        lmsrProbability: 0.333333,
+      }),
+      outcomeRepo.create({
+        label: "Draw",
+        marketId: m2.id,
+        lmsrProbability: 0.333333,
+      }),
     ]);
     console.log("✅ Market 2 created: Paro vs Punakha");
 
@@ -99,8 +119,16 @@ async function seed() {
       }),
     );
     await outcomeRepo.save([
-      outcomeRepo.create({ label: "Eastern Region", marketId: m3.id }),
-      outcomeRepo.create({ label: "Western Region", marketId: m3.id }),
+      outcomeRepo.create({
+        label: "Eastern Region",
+        marketId: m3.id,
+        lmsrProbability: 0.5,
+      }),
+      outcomeRepo.create({
+        label: "Western Region",
+        marketId: m3.id,
+        lmsrProbability: 0.5,
+      }),
     ]);
     console.log("✅ Market 3 created: Eastern vs Western");
 
@@ -117,8 +145,16 @@ async function seed() {
       }),
     );
     await outcomeRepo.save([
-      outcomeRepo.create({ label: "Bumthang Team", marketId: m4.id }),
-      outcomeRepo.create({ label: "Trongsa Team", marketId: m4.id }),
+      outcomeRepo.create({
+        label: "Bumthang Team",
+        marketId: m4.id,
+        lmsrProbability: 0.5,
+      }),
+      outcomeRepo.create({
+        label: "Trongsa Team",
+        marketId: m4.id,
+        lmsrProbability: 0.5,
+      }),
     ]);
     console.log("✅ Market 4 created: Bumthang vs Trongsa");
   } else {

@@ -7,6 +7,10 @@ import { Bet, BetStatus } from "../entities/bet.entity";
 import { Transaction, TransactionType } from "../entities/transaction.entity";
 import { Settlement } from "../entities/settlement.entity";
 import { User } from "../entities/user.entity";
+import { LMSRService } from "./lmsr.service";
+
+import { SCPMService } from "./scpm.service";
+import { PlaceBetDto } from "./markets.service";
 
 // ─── Valid state machine transitions ────────────────────────────────────────
 const VALID_TRANSITIONS: Record<MarketStatus, MarketStatus[]> = {
@@ -29,6 +33,8 @@ export class ParimutuelEngine {
     private settlementRepo: Repository<Settlement>,
     @InjectRepository(User) private userRepo: Repository<User>,
     private dataSource: DataSource,
+    private lmsrService: LMSRService,
+    private scpmService: SCPMService,
   ) {}
 
   // ── Odds calculation ───────────────────────────────────────────────────────
@@ -40,6 +46,98 @@ export class ParimutuelEngine {
     if (outcomePool === 0) return 0;
     const payoutPool = totalPool * (1 - houseEdgePct / 100);
     return payoutPool / outcomePool;
+  }
+
+  /**
+   * SCPM implementation: Fill shares based on limit price
+   */
+  async placeBetSCPM(
+    userId: string,
+    market: Market,
+    dto: PlaceBetDto,
+  ): Promise<Bet> {
+    const { outcomeId, maxShares, limitPrice } = dto;
+    if (!maxShares || !limitPrice) {
+      throw new BadRequestException("SCPM requires maxShares and limitPrice");
+    }
+
+    return await this.dataSource.transaction(async (em) => {
+      // 1. Refresh market state within transaction
+      const currentMarket = await em.findOne(Market, {
+        where: { id: market.id },
+        relations: ["outcomes"],
+      });
+      if (!currentMarket) throw new BadRequestException("Market not found");
+      if (currentMarket.status !== MarketStatus.OPEN)
+        throw new BadRequestException("Market is not open");
+
+      const outcome = currentMarket.outcomes.find((o) => o.id === outcomeId);
+      if (!outcome) throw new BadRequestException("Outcome not found");
+
+      // 2. Process SCPM order
+      const fill = this.scpmService.processOrder(
+        currentMarket.outcomes,
+        { outcomeId, maxShares, limitPrice },
+        Number(currentMarket.liquidityParam),
+      );
+
+      if (fill.sharesFilled <= 0) {
+        throw new BadRequestException(
+          "Order cannot be filled within limit price",
+        );
+      }
+
+      // 3. Check user balance
+      const user = await em.findOne(User, { where: { id: userId } });
+      if (!user) throw new BadRequestException("User not found");
+      if (Number(user.balance) < fill.totalCost) {
+        throw new BadRequestException("Insufficient balance");
+      }
+
+      // 4. Update state
+      const balanceBefore = Number(user.balance);
+      user.balance = balanceBefore - fill.totalCost;
+      await em.save(User, user);
+
+      // Record transaction
+      await em.save(
+        Transaction,
+        em.create(Transaction, {
+          type: TransactionType.BET_PLACED,
+          amount: -fill.totalCost,
+          balanceBefore,
+          balanceAfter: Number(user.balance),
+          referenceId: market.id,
+          note: `SCPM Bet: ${fill.sharesFilled} shares of ${outcome.label} @ max ${limitPrice}`,
+          userId,
+        }),
+      );
+
+      // Update pools & outcome probabilities
+      outcome.totalBetAmount = Number(outcome.totalBetAmount) + fill.sharesFilled;
+      currentMarket.totalPool = Number(currentMarket.totalPool) + fill.totalCost;
+
+      // Update all outcomes with new probabilities from SCPM fill
+      currentMarket.outcomes.forEach((o, i) => {
+        o.lmsrProbability = fill.newProbabilities[i];
+      });
+
+      await em.save(Outcome, currentMarket.outcomes);
+      await em.save(Market, currentMarket);
+
+      // Create bet record
+      const bet = em.create(Bet, {
+        userId,
+        marketId: market.id,
+        outcomeId,
+        amount: fill.totalCost,
+        shares: fill.sharesFilled,
+        limitPrice: limitPrice,
+        status: BetStatus.PENDING,
+        oddsAtPlacement: fill.pricePerShare > 0 ? 1 / fill.pricePerShare : 0,
+      });
+      return em.save(Bet, bet);
+    });
   }
 
   // ── Accept a bet ──────────────────────────────────────────────────────────
@@ -93,7 +191,7 @@ export class ParimutuelEngine {
       // Update market total pool
       market.totalPool = Number(market.totalPool) + amount;
 
-      // Recalculate odds for all outcomes
+      // Recalculate odds for all outcomes (parimutuel - for settlement)
       for (const o of market.outcomes) {
         o.currentOdds = this.calcOdds(
           Number(market.totalPool),
@@ -102,6 +200,19 @@ export class ParimutuelEngine {
         );
         await em.save(Outcome, o);
       }
+
+      // Calculate LMSR probabilities (for display)
+      const lmsrProbs = this.lmsrService.calculateProbabilities(
+        market.outcomes,
+        1000, // Liquidity parameter in BTN
+      );
+
+      // Update LMSR probabilities for all outcomes
+      for (let i = 0; i < market.outcomes.length; i++) {
+        market.outcomes[i].lmsrProbability = lmsrProbs[i];
+        await em.save(Outcome, market.outcomes[i]);
+      }
+
       await em.save(Market, market);
 
       // Create bet record

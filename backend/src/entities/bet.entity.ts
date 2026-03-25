@@ -33,6 +33,12 @@ export class Bet {
   @Column({ type: "decimal", precision: 10, scale: 4, nullable: true })
   oddsAtPlacement: number;
 
+  @Column({ type: "decimal", precision: 18, scale: 4, nullable: true })
+  shares: number; // Number of shares filled (SCPM)
+
+  @Column({ type: "decimal", precision: 10, scale: 6, nullable: true })
+  limitPrice: number; // Target price/probability (SCPM)
+
   @Column({ type: "decimal", precision: 18, scale: 2, nullable: true })
   payout: number;
 

@@ -86,5 +86,14 @@ export default defineConfig({
       ".ngrok.io",
       "localhost",
     ],
+    proxy: {
+      // Proxy /api/* → backend localhost:3000/*
+      // This way the single ngrok tunnel serves both frontend and API
+      "/api": {
+        target: "http://localhost:3000",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, ""),
+      },
+    },
   },
 });

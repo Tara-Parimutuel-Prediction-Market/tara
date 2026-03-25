@@ -17,7 +17,7 @@ import {
   Title,
   Text,
 } from "@telegram-apps/telegram-ui";
-import { Page } from "@/components/Page";
+import { Page } from "@/tma/components/Page";
 import { getMarket, placeBetWithWallet, Market } from "@/api/client";
 
 export const TONBetPage: FC = () => {
@@ -32,6 +32,8 @@ export const TONBetPage: FC = () => {
     null,
   );
   const [amount, setAmount] = useState("");
+  const [limitPrice, setLimitPrice] = useState("0.5");
+  const [maxShares, setMaxShares] = useState("");
   const [sending, setSending] = useState(false);
 
   useEffect(() => {
@@ -50,42 +52,56 @@ export const TONBetPage: FC = () => {
   }, [id]);
 
   const handleSendTON = async () => {
-    if (!selectedOutcomeId || !amount || !market || !wallet) return;
+    if (!selectedOutcomeId || !market || !wallet) return;
 
     setSending(true);
     try {
-      const tonAmount = parseFloat(amount);
+      const isSCPM = market.mechanism === "scpm";
+      let tonAmount = parseFloat(amount);
+      let limitValue = parseFloat(limitPrice);
+      let sharesValue = parseFloat(maxShares);
+
+      if (isSCPM) {
+        if (!maxShares || !limitPrice) throw new Error("Shares and Limit Price required");
+        // In SCPM, the exact cost is calculated on the backend, 
+        // but we'll send a transaction for the estimated amount or just the limit
+        // For simplicity in this demo, we'll use 'amount' as the total budget
+        tonAmount = parseFloat(amount);
+      }
+
       if (tonAmount <= 0) throw new Error("Amount must be positive");
 
-      // Send TON payment to the platform wallet
-      const PLATFORM_WALLET = "EQD..."; // TODO: Replace with your platform wallet
-      const nanoAmount = (tonAmount * 1_000_000_000).toString(); // Convert TON to nanotons
+      // Send TON payment
+      const PLATFORM_WALLET = "EQD..."; // TODO
+      const nanoAmount = (tonAmount * 1_000_000_000).toString();
 
       const tx = await tonConnectUI.sendTransaction({
-        validUntil: Math.floor(Date.now() / 1000) + 600, // 10 min
+        validUntil: Math.floor(Date.now() / 1000) + 600,
         messages: [
           {
             address: PLATFORM_WALLET,
             amount: nanoAmount,
-            payload: btoa(`bet:${market.id}:${selectedOutcomeId}`), // bet metadata
+            payload: btoa(`bet:${market.id}:${selectedOutcomeId}`),
           },
         ],
       });
 
-      // Register bet on backend with tx proof
+      // Register bet
       await placeBetWithWallet(market.id, {
         outcomeId: selectedOutcomeId,
         amount: tonAmount,
+        maxShares: isSCPM ? sharesValue : undefined,
+        limitPrice: isSCPM ? limitValue : undefined,
         walletAddress: wallet.account.address,
         txHash: tx.boc,
       });
 
       alert("✅ Bet placed successfully!");
 
-      // Reload market
       const updated = await getMarket(market.id);
       setMarket(updated);
       setAmount("");
+      setMaxShares("");
       setSelectedOutcomeId(null);
     } catch (err: any) {
       alert("❌ Failed: " + (err.message || "Transaction cancelled"));
@@ -175,14 +191,12 @@ export const TONBetPage: FC = () => {
         <Section header="Select Outcome">
           {market.outcomes.map((outcome) => {
             const isSelected = selectedOutcomeId === outcome.id;
-            const impliedProb =
-              Number(market.totalPool) > 0
-                ? (
-                    (Number(outcome.totalBetAmount) /
-                      Number(market.totalPool)) *
-                    100
-                  ).toFixed(1)
-                : "0.0";
+
+            // Use LMSR probability if available, fallback to 50%
+            const lmsrProb = Number(outcome.lmsrProbability || 0);
+            const probability = lmsrProb > 0 ? lmsrProb : 1 / market.outcomes.length;
+            const probabilityPercent = (probability * 100).toFixed(1);
+            const decimalOdds = probability > 0 ? (1 / probability).toFixed(2) : "—";
 
             return (
               <Cell
@@ -190,7 +204,7 @@ export const TONBetPage: FC = () => {
                 onClick={() =>
                   canBet && wallet && setSelectedOutcomeId(outcome.id)
                 }
-                subtitle={`Pool: ${outcome.totalBetAmount} TON · Implied: ${impliedProb}%`}
+                subtitle={`${probabilityPercent}% · ${decimalOdds}x · Pool: ${outcome.totalBetAmount} TON`}
                 after={
                   canBet && wallet ? (
                     <input
@@ -218,15 +232,55 @@ export const TONBetPage: FC = () => {
         {canBet && wallet && (
           <Section header="Place Your Bet">
             <div style={{ padding: "1rem" }}>
-              <Input
-                header="Amount in TON"
-                placeholder="0.5"
-                type="number"
-                step="0.01"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                disabled={!selectedOutcomeId}
-              />
+              {market.mechanism === "scpm" ? (
+                <>
+                  <Input
+                    header="Max Shares to Fill"
+                    placeholder="e.g. 20"
+                    type="number"
+                    value={maxShares}
+                    onChange={(e) => setMaxShares(e.target.value)}
+                    disabled={!selectedOutcomeId}
+                    style={{ marginBottom: "1rem" }}
+                  />
+                  <Input
+                    header="Limit Price (0.01 - 0.99)"
+                    placeholder="0.45"
+                    type="number"
+                    step="0.01"
+                    value={limitPrice}
+                    onChange={(e) => setLimitPrice(e.target.value)}
+                    disabled={!selectedOutcomeId}
+                    style={{ marginBottom: "1rem" }}
+                  />
+                  <Input
+                    header="Budget in TON (Max Cost)"
+                    placeholder="5.0"
+                    type="number"
+                    step="0.1"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    disabled={!selectedOutcomeId}
+                  />
+                  <Caption
+                    level="2"
+                    style={{ marginTop: "0.5rem", display: "block", color: "#6ab3f3" }}
+                  >
+                    💡 SCPM fills your order only up to the limit price.
+                  </Caption>
+                </>
+              ) : (
+                <Input
+                  header="Amount in TON"
+                  placeholder="0.5"
+                  type="number"
+                  step="0.01"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  disabled={!selectedOutcomeId}
+                />
+              )}
+
               <Caption
                 level="2"
                 style={{ marginTop: "0.5rem", display: "block" }}
@@ -237,7 +291,12 @@ export const TONBetPage: FC = () => {
                 size="l"
                 stretched
                 loading={sending}
-                disabled={!selectedOutcomeId || !amount || Number(amount) < 0.1}
+                disabled={
+                  !selectedOutcomeId || 
+                  !amount || 
+                  Number(amount) < 0.1 ||
+                  (market.mechanism === "scpm" && (!maxShares || !limitPrice))
+                }
                 onClick={handleSendTON}
                 style={{ marginTop: "1rem" }}
               >

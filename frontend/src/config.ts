@@ -72,6 +72,17 @@ const config = {
   },
 
   // ----------------------------------------------------------
+  // LMSR ODDS CALCULATION (Logarithmic Market Scoring Rule)
+  // Provides smooth, always-defined probability displays
+  // ----------------------------------------------------------
+  lmsr: {
+    enabled: true,
+    liquidityParam: 1000, // b = 1000 BTN (controls market sensitivity)
+    displayFormat: "both", // "probability" | "odds" | "both"
+    // Note: Settlement still uses parimutuel pool redistribution
+  },
+
+  // ----------------------------------------------------------
   // LOCALIZATION (Phase 1: Bhutan)
   // ----------------------------------------------------------
   locale: {

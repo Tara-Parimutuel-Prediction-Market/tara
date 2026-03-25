@@ -1,8 +1,8 @@
 import { Section, Cell, Image, List } from '@telegram-apps/telegram-ui';
 import type { FC } from 'react';
 
-import { Link } from '@/components/Link/Link.tsx';
-import { Page } from '@/components/Page.tsx';
+import { Link } from '@/tma/components/Link/Link.tsx';
+import { Page } from '@/tma/components/Page.tsx';
 
 import tonSvg from './ton.svg';
 

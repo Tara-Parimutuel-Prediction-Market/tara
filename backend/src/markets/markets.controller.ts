@@ -2,14 +2,15 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
   Param,
   Body,
   UseGuards,
   Request,
 } from "@nestjs/common";
 import { ApiBearerAuth, ApiTags, ApiOperation } from "@nestjs/swagger";
-import { JwtAuthGuard, Public } from "../auth/guards";
-import { MarketsService, PlaceBetDto } from "./markets.service";
+import { JwtAuthGuard, Public, AdminGuard } from "../auth/guards";
+import { MarketsService, PlaceBetDto, UpdateMarketDto } from "./markets.service";
 
 @ApiTags("markets")
 @ApiBearerAuth()
@@ -32,6 +33,13 @@ export class MarketsController {
     return this.marketsService.findOne(id);
   }
 
+  @Patch(":id")
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiOperation({ summary: "Update market metadata (admin)" })
+  update(@Param("id") id: string, @Body() dto: UpdateMarketDto) {
+    return this.marketsService.update(id, dto);
+  }
+
   @Post(":id/bets")
   @ApiOperation({ summary: "Place a bet on a market outcome" })
   placeBet(@Param("id") id: string, @Body() dto: PlaceBetDto, @Request() req) {
@@ -47,12 +55,13 @@ export class MarketsController {
     dto: {
       outcomeId: string;
       amount: number;
+      maxShares?: number;
+      limitPrice?: number;
       walletAddress: string;
       txHash?: string;
     },
   ) {
     // TODO: Verify TON transaction on-chain before accepting bet
-    // For now, create a wallet-based user if doesn't exist
     return {
       message:
         "Wallet betting endpoint - TODO: implement on-chain verification",

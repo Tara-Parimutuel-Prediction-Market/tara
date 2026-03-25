@@ -8,7 +8,13 @@
     "start": "node dist/main.js",
     "dev": "TS_NODE_PROJECT=tsconfig.json npx ts-node -r tsconfig-paths/register src/main.ts",
     "typecheck": "npx tsc -p tsconfig.json --noEmit",
-    "seed": "TS_NODE_PROJECT=tsconfig.json npx ts-node -r tsconfig-paths/register src/seed.ts"
+    "seed": "TS_NODE_PROJECT=tsconfig.json npx ts-node -r tsconfig-paths/register src/seed.ts",
+    "typeorm": "typeorm-ts-node-commonjs -d src/data-source.ts",
+    "migration:generate": "npm run typeorm migration:generate --",
+    "migration:run": "npm run typeorm migration:run",
+    "migration:revert": "npm run typeorm migration:revert",
+    "migration:show": "npm run typeorm migration:show",
+    "migrations": "npm run migration:run"
   },
   "keywords": [],
   "author": "",
@@ -21,6 +27,7 @@
     "@nestjs/jwt": "^11.0.2",
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.1.17",
+    "@nestjs/schedule": "^6.1.1",
     "@nestjs/swagger": "^11.2.6",
     "@nestjs/typeorm": "^11.0.0",
     "bcryptjs": "^3.0.3",

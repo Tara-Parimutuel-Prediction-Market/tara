@@ -1,14 +1,14 @@
 import type { ComponentType, JSX } from "react";
 
-import { IndexPage } from "@/pages/IndexPage/IndexPage";
-import { MarketsPage } from "@/pages/MarketsPage";
-import { MarketDetailPage } from "@/pages/MarketDetailPage";
-import { TONBetPage } from "@/pages/TONBetPage";
-import { DKBankBetPage } from "@/pages/DKBankBetPage";
-import { InitDataPage } from "@/pages/InitDataPage.tsx";
-import { LaunchParamsPage } from "@/pages/LaunchParamsPage.tsx";
-import { ThemeParamsPage } from "@/pages/ThemeParamsPage.tsx";
-import { TONConnectPage } from "@/pages/TONConnectPage/TONConnectPage";
+import { IndexPage } from "@/tma/pages/IndexPage/IndexPage";
+import { MarketsPage } from "@/tma/pages/MarketsPage";
+import { MarketDetailPage } from "@/tma/pages/MarketDetailPage";
+import { TONBetPage } from "@/tma/pages/TONBetPage";
+import { DKBankBetPage } from "@/tma/pages/DKBankBetPage";
+import { InitDataPage } from "@/tma/pages/InitDataPage.tsx";
+import { LaunchParamsPage } from "@/tma/pages/LaunchParamsPage.tsx";
+import { ThemeParamsPage } from "@/tma/pages/ThemeParamsPage.tsx";
+import { TONConnectPage } from "@/tma/pages/TONConnectPage/TONConnectPage";
 
 interface Route {
   path: string;

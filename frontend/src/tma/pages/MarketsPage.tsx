@@ -8,10 +8,10 @@ import {
   Caption,
   Badge,
 } from "@telegram-apps/telegram-ui";
-import { Page } from "@/components/Page";
+import { Page } from "@/tma/components/Page";
 import { getMarkets, Market } from "@/api/client";
-import { useAuth } from "@/hooks/useAuth";
-import { Link } from "@/components/Link/Link";
+import { useAuth } from "@/tma/hooks/useAuth";
+import { Link } from "@/tma/components/Link/Link";
 
 export const MarketsPage: FC = () => {
   const { user } = useAuth();
@@ -83,88 +83,26 @@ export const MarketsPage: FC = () => {
 
         {openMarkets.length > 0 && (
           <Section
-            header="Tara"
-            footer="Choose payment: BTN (DK Bank), TON, or Credits"
+            header="Open Markets"
+            footer="Tap a market to see betting options"
           >
             {openMarkets.map((market) => (
-              <div key={market.id}>
-                <Link to={`/market/${market.id}`}>
-                  <Cell
-                    before={
-                      <Badge
-                        type="number"
-                        style={{ backgroundColor: statusColors.open }}
-                      >
-                        {market.outcomes.length}
-                      </Badge>
-                    }
-                    after={<Caption level="1">{market.totalPool} pool</Caption>}
-                    subtitle={market.description?.slice(0, 60) + "..." || ""}
-                  >
-                    {market.title}
-                  </Cell>
-                </Link>
-                <div
-                  style={{
-                    padding: "0 1rem 0.75rem",
-                    display: "grid",
-                    gridTemplateColumns: "repeat(3, 1fr)",
-                    gap: "0.5rem",
-                  }}
+              <Link key={market.id} to={`/market/${market.id}`}>
+                <Cell
+                  before={
+                    <Badge
+                      type="number"
+                      style={{ backgroundColor: statusColors.open }}
+                    >
+                      {market.outcomes.length}
+                    </Badge>
+                  }
+                  after={<Caption level="1">{market.totalPool} pool</Caption>}
+                  subtitle={market.description?.slice(0, 60) + "..." || ""}
                 >
-                  <Link to={`/dkbank-bet/${market.id}`}>
-                    <button
-                      style={{
-                        width: "100%",
-                        padding: "0.6rem 0.3rem",
-                        background: "#FF6B35",
-                        color: "white",
-                        border: "none",
-                        borderRadius: "8px",
-                        fontSize: "0.8rem",
-                        fontWeight: "600",
-                        cursor: "pointer",
-                      }}
-                    >
-                      🏦 DK Bank
-                    </button>
-                  </Link>
-                  <Link to={`/ton-bet/${market.id}`}>
-                    <button
-                      style={{
-                        width: "100%",
-                        padding: "0.6rem 0.3rem",
-                        background: "#0098EA",
-                        color: "white",
-                        border: "none",
-                        borderRadius: "8px",
-                        fontSize: "0.8rem",
-                        fontWeight: "600",
-                        cursor: "pointer",
-                      }}
-                    >
-                      💎 TON
-                    </button>
-                  </Link>
-                  <Link to={`/market/${market.id}`}>
-                    <button
-                      style={{
-                        width: "100%",
-                        padding: "0.6rem 0.3rem",
-                        background: "#007AFF",
-                        color: "white",
-                        border: "none",
-                        borderRadius: "8px",
-                        fontSize: "0.8rem",
-                        fontWeight: "600",
-                        cursor: "pointer",
-                      }}
-                    >
-                      💰 Credits
-                    </button>
-                  </Link>
-                </div>
-              </div>
+                  {market.title}
+                </Cell>
+              </Link>
             ))}
           </Section>
         )}

@@ -6,14 +6,13 @@ import {
   List,
   Spinner,
   Placeholder,
-  Button,
-  Input,
   Caption,
   Title,
 } from "@telegram-apps/telegram-ui";
-import { Page } from "@/components/Page";
-import { getMarket, placeBet, Market } from "@/api/client";
-import { useAuth } from "@/hooks/useAuth";
+import { Page } from "@/tma/components/Page";
+import { getMarket, Market } from "@/api/client";
+import { useAuth } from "@/tma/hooks/useAuth";
+import { Link } from "@/tma/components/Link/Link";
 
 export const MarketDetailPage: FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -24,8 +23,6 @@ export const MarketDetailPage: FC = () => {
   const [selectedOutcomeId, setSelectedOutcomeId] = useState<string | null>(
     null,
   );
-  const [amount, setAmount] = useState("");
-  const [placing, setPlacing] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -41,27 +38,6 @@ export const MarketDetailPage: FC = () => {
     }
     load();
   }, [id]);
-
-  const handlePlaceBet = async () => {
-    if (!selectedOutcomeId || !amount || !market) return;
-    setPlacing(true);
-    try {
-      await placeBet(market.id, {
-        outcomeId: selectedOutcomeId,
-        amount: Number(amount),
-      });
-      alert("Bet placed successfully!");
-      // Reload market data
-      const updated = await getMarket(market.id);
-      setMarket(updated);
-      setAmount("");
-      setSelectedOutcomeId(null);
-    } catch (err: any) {
-      alert("Failed to place bet: " + err.message);
-    } finally {
-      setPlacing(false);
-    }
-  };
 
   if (loading) {
     return (
@@ -96,14 +72,6 @@ export const MarketDetailPage: FC = () => {
             <Title level="2" weight="1">
               {market.title}
             </Title>
-            {market.description && (
-              <Caption
-                level="1"
-                style={{ marginTop: "0.5rem", display: "block" }}
-              >
-                {market.description}
-              </Caption>
-            )}
             <Caption
               level="2"
               style={{ marginTop: "0.5rem", display: "block" }}
@@ -123,23 +91,110 @@ export const MarketDetailPage: FC = () => {
           </div>
         </Section>
 
+        {/* Payment Options - Show when market is open */}
+        {market.status === "open" && (
+          <Section header="Choose Payment Method">
+            <div
+              style={{
+                padding: "1rem",
+                display: "grid",
+                gridTemplateColumns: "repeat(3, 1fr)",
+                gap: "0.75rem",
+              }}
+            >
+              <Link to={`/dkbank-bet/${market.id}`}>
+                <button
+                  style={{
+                    width: "100%",
+                    padding: "1rem 0.5rem",
+                    background: "#FF6B35",
+                    color: "white",
+                    border: "none",
+                    borderRadius: "12px",
+                    fontSize: "0.85rem",
+                    fontWeight: "600",
+                    cursor: "pointer",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    gap: "0.5rem",
+                  }}
+                >
+                  <span style={{ fontSize: "1.5rem" }}></span>
+                  <span>DK Bank</span>
+                </button>
+              </Link>
+              <Link to={`/ton-bet/${market.id}`}>
+                <button
+                  style={{
+                    width: "100%",
+                    padding: "1rem 0.5rem",
+                    background: "#0098EA",
+                    color: "white",
+                    border: "none",
+                    borderRadius: "12px",
+                    fontSize: "0.85rem",
+                    fontWeight: "600",
+                    cursor: "pointer",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    gap: "0.5rem",
+                  }}
+                >
+                  <span style={{ fontSize: "1.5rem" }}></span>
+                  <span>TON</span>
+                </button>
+              </Link>
+              <Link to={`/market/${market.id}`}>
+                <button
+                  style={{
+                    width: "100%",
+                    padding: "1rem 0.5rem",
+                    background: "#007AFF",
+                    color: "white",
+                    border: "none",
+                    borderRadius: "12px",
+                    fontSize: "0.85rem",
+                    fontWeight: "600",
+                    cursor: "pointer",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    gap: "0.5rem",
+                  }}
+                >
+                  <span style={{ fontSize: "1.5rem" }}></span>
+                  <span>Credits</span>
+                </button>
+              </Link>
+            </div>
+          </Section>
+        )}
+
         <Section header="Outcomes">
           {market.outcomes.map((outcome) => {
             const isSelected = selectedOutcomeId === outcome.id;
-            const impliedProb =
-              Number(market.totalPool) > 0
-                ? (
-                    (Number(outcome.totalBetAmount) /
-                      Number(market.totalPool)) *
-                    100
-                  ).toFixed(1)
-                : "0.0";
+
+            // Use LMSR probability if available, fallback to parimutuel calculation
+            const lmsrProb = Number(outcome.lmsrProbability || 0);
+            const probability =
+              lmsrProb > 0
+                ? lmsrProb
+                : Number(market.totalPool) > 0
+                  ? Number(outcome.totalBetAmount) / Number(market.totalPool)
+                  : 0.5;
+            const probabilityPercent = (probability * 100).toFixed(1);
+
+            // Calculate decimal odds from probability
+            const decimalOdds =
+              probability > 0 ? (1 / probability).toFixed(2) : "—";
 
             return (
               <Cell
                 key={outcome.id}
                 onClick={() => canBet && setSelectedOutcomeId(outcome.id)}
-                subtitle={`Pool: ${outcome.totalBetAmount} · Implied: ${impliedProb}%`}
+                subtitle={`${probabilityPercent}% · ${decimalOdds}x odds`}
                 after={
                   outcome.isWinner ? (
                     <span style={{ color: "#4CAF50", fontWeight: "bold" }}>
@@ -165,34 +220,6 @@ export const MarketDetailPage: FC = () => {
             );
           })}
         </Section>
-
-        {canBet && (
-          <Section
-            header="Place a Bet"
-            footer={`Your balance: ${user.balance} credits`}
-          >
-            <div style={{ padding: "1rem" }}>
-              <Input
-                header="Amount"
-                placeholder="Enter amount"
-                type="number"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                disabled={!selectedOutcomeId}
-              />
-              <Button
-                size="l"
-                stretched
-                loading={placing}
-                disabled={!selectedOutcomeId || !amount || Number(amount) <= 0}
-                onClick={handlePlaceBet}
-                style={{ marginTop: "1rem" }}
-              >
-                Place Bet
-              </Button>
-            </div>
-          </Section>
-        )}
 
         {market.status !== "open" && (
           <Section>

@@ -77,7 +77,13 @@ export class AuthController {
       .update(dataCheckString)
       .digest("hex");
 
+    // Signature is required by newer TMA SDK versions (Ed25519 in prod, any string in dev)
+    const signature = createHmac("sha256", secretKey)
+      .update("mock-signature-dev")
+      .digest("hex");
+
     params.set("hash", hash);
+    params.set("signature", signature);
     const initData = params.toString();
 
     return {

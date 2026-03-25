@@ -19,6 +19,11 @@ export enum MarketStatus {
   CANCELLED = "cancelled",
 }
 
+export enum MarketMechanism {
+  PARIMUTUEL = "parimutuel",
+  SCPM = "scpm",
+}
+
 @Entity("markets")
 export class Market {
   @PrimaryGeneratedColumn("uuid")
@@ -42,6 +47,16 @@ export class Market {
 
   @Column({ type: "decimal", precision: 5, scale: 2, default: 5 })
   houseEdgePct: number; // e.g. 5 = 5%
+
+  @Column({
+    type: "enum",
+    enum: MarketMechanism,
+    default: MarketMechanism.PARIMUTUEL,
+  })
+  mechanism: MarketMechanism;
+
+  @Column({ type: "decimal", precision: 18, scale: 2, default: 1000 })
+  liquidityParam: number; // LMSR 'b' parameter
 
   @Column({ nullable: true })
   resolvedOutcomeId: string;

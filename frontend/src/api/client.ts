@@ -79,6 +79,7 @@ export interface Outcome {
   label: string;
   totalBetAmount: string;
   currentOdds: string;
+  lmsrProbability?: number; // LMSR probability (0-1)
   isWinner: boolean;
   marketId: string;
 }
@@ -89,6 +90,8 @@ export interface Market {
   description: string | null;
   imageUrl: string | null;
   status: "upcoming" | "open" | "closed" | "resolved" | "settled" | "cancelled";
+  mechanism: "parimutuel" | "scpm";
+  liquidityParam: string;
   totalPool: string;
   houseEdgePct: string;
   opensAt: string | null;
@@ -110,7 +113,9 @@ export function getMarket(id: string): Promise<Market> {
 
 export interface PlaceBetPayload {
   outcomeId: string;
-  amount: number;
+  amount?: number;
+  maxShares?: number;
+  limitPrice?: number;
 }
 
 export function placeBet(marketId: string, payload: PlaceBetPayload) {
@@ -139,6 +144,8 @@ export function getMyTransactions() {
 export interface WalletBetPayload {
   outcomeId: string;
   amount: number; // in TON
+  maxShares?: number;
+  limitPrice?: number;
   walletAddress: string;
   txHash?: string; // proof of payment
 }
