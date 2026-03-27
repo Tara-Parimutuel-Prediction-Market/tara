@@ -11,6 +11,7 @@ import { User } from "./user.entity";
 
 export enum AuthProvider {
   TELEGRAM = "telegram",
+  DKBANK = "dkbank",
 }
 
 @Index(["provider", "providerId"], { unique: true })

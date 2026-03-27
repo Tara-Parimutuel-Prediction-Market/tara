@@ -1,114 +1,60 @@
 import { FC, useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import {
-  Section,
-  Cell,
-  List,
-  Spinner,
-  Placeholder,
-  Button,
-  Input,
-  Caption,
-  Title,
-} from "@telegram-apps/telegram-ui";
+import { Spinner, Placeholder } from "@telegram-apps/telegram-ui";
 import { Page } from "@/tma/components/Page";
-import { getMarket, placeBet, Market } from "@/api/client";
-import { initiateDKBankPayment, formatBTN } from "@/api/dkbank";
+import { getMarket, placeBet, type Market } from "@/api/client";
+import { formatBTN } from "@/api/dkbank";
 import { useAuth } from "@/tma/hooks/useAuth";
+import { TmaPaymentModal } from "@/tma/components/TmaPaymentModal";
 import config from "@/config";
+
+const { minBet } = config.payments.dkBank;
+
+const QUICK_AMOUNTS = [50, 100, 200, 500];
 
 export const DKBankBetPage: FC = () => {
   const { id } = useParams<{ id: string }>();
-
   const { user } = useAuth();
 
   const [market, setMarket] = useState<Market | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedOutcomeId, setSelectedOutcomeId] = useState<string | null>(
-    null,
-  );
+  const [selectedOutcomeId, setSelectedOutcomeId] = useState<string | null>(null);
   const [amount, setAmount] = useState("");
-  const [limitPrice, setLimitPrice] = useState("0.5");
-  const [maxShares, setMaxShares] = useState("");
-  const [processing, setProcessing] = useState(false);
-  const [step, setStep] = useState<"select" | "payment">("select");
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [betSuccess, setBetSuccess] = useState(false);
 
   useEffect(() => {
-    async function load() {
-      if (!id) return;
-      try {
-        const data = await getMarket(id);
-        setMarket(data);
-      } catch (err: any) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    }
-    load();
+    if (!id) return;
+    getMarket(id)
+      .then(setMarket)
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
   }, [id]);
 
-  const handlePayWithDKBank = async () => {
+  const handlePaymentSuccess = async () => {
     if (!selectedOutcomeId || !amount || !market) return;
-
-    setProcessing(true);
-    try {
-      const btnAmount = parseFloat(amount);
-      const isSCPM = market.mechanism === "scpm";
-
-      // Validation
-      if (btnAmount < config.payments.dkBank.minBet) {
-        throw new Error(`Minimum bet is ${config.payments.dkBank.minBet} BTN`);
+    if (user) {
+      try {
+        await placeBet(market.id, {
+          outcomeId: selectedOutcomeId,
+          amount: parseFloat(amount),
+        });
+      } catch (betErr: any) {
+        console.warn("Bet registration warning:", betErr.message);
       }
-
-      // Step 1: Initiate DK Bank payment
-      const result = await initiateDKBankPayment({
-        amount: btnAmount,
-        merchantTxnId: `TARA_${market.id}_${Date.now()}`,
-        customerPhone: "+975XXXXXXXX",
-        description: `Bet on: ${market.title}`,
-      });
-
-      if (result.success) {
-        // Step 2: Register the bet
-        if (user) {
-          try {
-            await placeBet(market.id, {
-              outcomeId: selectedOutcomeId,
-              amount: btnAmount,
-              maxShares: isSCPM ? parseFloat(maxShares) : undefined,
-              limitPrice: isSCPM ? parseFloat(limitPrice) : undefined,
-            });
-          } catch (betErr: any) {
-            console.warn("Bet registration warning:", betErr.message);
-          }
-        }
-
-        alert(`✅ ${result.message}\n\nTransaction ID: ${result.txnId}`);
-
-        const updated = await getMarket(market.id);
-        setMarket(updated);
-        setAmount("");
-        setMaxShares("");
-        setSelectedOutcomeId(null);
-        setStep("select");
-      } else {
-        throw new Error(result.message || "Payment failed");
-      }
-    } catch (err: any) {
-      alert("❌ Failed: " + err.message);
-    } finally {
-      setProcessing(false);
     }
+    setBetSuccess(true);
+    const updated = await getMarket(market.id);
+    setMarket(updated);
+    setAmount("");
+    setSelectedOutcomeId(null);
   };
 
   if (loading) {
     return (
-      <Page back={true}>
-        <div
-          style={{ display: "flex", justifyContent: "center", padding: "2rem" }}
-        >
+      <Page back>
+        <div style={{ display: "flex", justifyContent: "center", padding: "3rem" }}>
           <Spinner size="l" />
         </div>
       </Page>
@@ -117,397 +63,228 @@ export const DKBankBetPage: FC = () => {
 
   if (error || !market) {
     return (
-      <Page back={true}>
+      <Page back>
         <Placeholder header="Error" description={error || "Market not found"} />
       </Page>
     );
   }
 
   const canBet = market.status === "open";
-  const { dkBank } = config.payments;
-
-  // Calculate potential payout
-  const selectedOutcome = market.outcomes.find(
-    (o) => o.id === selectedOutcomeId,
-  );
+  const selectedOutcome = market.outcomes.find((o) => o.id === selectedOutcomeId);
   const betAmount = parseFloat(amount) || 0;
 
-  // Calculate potential payout based on parimutuel odds
-  let potentialPayout = 0;
-  if (selectedOutcome && betAmount > 0) {
-    const currentPool = Number(market.totalPool);
+  // Parimutuel: expected payout if this side wins
+  let winAmount = 0;
+  if (selectedOutcome && betAmount >= minBet) {
+    const totalPool = Number(market.totalPool);
     const outcomePool = Number(selectedOutcome.totalBetAmount);
     const newOutcomePool = outcomePool + betAmount;
-    const newTotalPool = currentPool + betAmount;
-
-    // Parimutuel payout = (bet amount / outcome pool) * total pool * (1 - fee)
+    const newTotalPool = totalPool + betAmount;
+    const houseEdge = Number(market.houseEdgePct) / 100;
     if (newOutcomePool > 0) {
-      potentialPayout = (betAmount / newOutcomePool) * newTotalPool;
+      winAmount = (betAmount / newOutcomePool) * newTotalPool * (1 - houseEdge);
     }
   }
 
-  const profit = potentialPayout - betAmount;
+  const isReady = !!selectedOutcomeId && betAmount >= minBet;
 
   return (
-    <Page back={true}>
-      <List>
-        {/* Market info */}
-        <Section header="Match">
-          <div style={{ padding: "1rem" }}>
-            <Title level="2" weight="1">
-              {market.title}
-            </Title>
-            <Caption
-              level="2"
-              style={{ marginTop: "0.5rem", display: "block" }}
-            >
-              Total Pool: <strong>{formatBTN(Number(market.totalPool))}</strong>
-            </Caption>
-          </div>
-        </Section>
+    <Page back>
+      <div style={{ padding: "20px 16px 100px", maxWidth: 480, margin: "0 auto" }}>
 
-        {/* Outcomes - Step 1: Select outcome and see odds */}
-        {canBet && step === "select" && (
-          <Section header="Pick Outcome">
+        {/* Question */}
+        <div style={{ marginBottom: 28 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--tg-theme-hint-color, #8e8e93)", marginBottom: 8 }}>
+            {market.status === "open" ? "Open · Pick a side" : market.status}
+          </div>
+          <div style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.3, color: "var(--tg-theme-text-color, #fff)" }}>
+            {market.title}
+          </div>
+        </div>
+
+        {/* Outcome buttons */}
+        {canBet && (
+          <div style={{ display: "grid", gridTemplateColumns: `repeat(${market.outcomes.length <= 2 ? 2 : 1}, 1fr)`, gap: 10, marginBottom: 28 }}>
             {market.outcomes.map((outcome) => {
               const isSelected = selectedOutcomeId === outcome.id;
-              const outcomePool = Number(outcome.totalBetAmount);
-
-              // Use LMSR probability if available, fallback to parimutuel calculation
-              const lmsrProb = Number(outcome.lmsrProbability || 0);
-              const probability = lmsrProb > 0 ? lmsrProb : 0.5; // Fallback to 50% if not set
-              const probabilityPercent = (probability * 100).toFixed(1);
-
-              // Calculate decimal odds from probability (1 / probability)
-              const decimalOdds =
-                probability > 0 ? (1 / probability).toFixed(2) : "—";
-
+              const prob = Number(outcome.lmsrProbability || 0);
+              const pct = prob > 0 ? `${(prob * 100).toFixed(0)}%` : null;
               return (
-                <Cell
+                <button
                   key={outcome.id}
                   onClick={() => setSelectedOutcomeId(outcome.id)}
-                  subtitle={`${probabilityPercent}% · ${formatBTN(outcomePool)} pool`}
-                  after={
-                    <Caption level="1" style={{ fontWeight: "600" }}>
-                      {decimalOdds}x
-                    </Caption>
-                  }
                   style={{
+                    padding: "16px 12px",
+                    borderRadius: 14,
+                    border: isSelected
+                      ? "2px solid var(--tg-theme-button-color, #2481cc)"
+                      : "2px solid var(--tg-theme-secondary-bg-color, #2c2c2e)",
                     backgroundColor: isSelected
-                      ? "rgba(0, 122, 255, 0.15)"
-                      : undefined,
+                      ? "rgba(36, 129, 204, 0.15)"
+                      : "var(--tg-theme-secondary-bg-color, #2c2c2e)",
+                    color: "var(--tg-theme-text-color, #fff)",
                     cursor: "pointer",
-                    border: isSelected ? "2px solid #007AFF" : undefined,
+                    textAlign: "center",
+                    transition: "all 0.15s ease",
                   }}
                 >
-                  <strong>{outcome.label}</strong>
-                </Cell>
+                  <div style={{ fontWeight: 700, fontSize: 15 }}>{outcome.label}</div>
+                  {pct && (
+                    <div style={{ fontSize: 12, marginTop: 4, color: isSelected ? "var(--tg-theme-button-color, #2481cc)" : "var(--tg-theme-hint-color, #8e8e93)" }}>
+                      {pct} chance
+                    </div>
+                  )}
+                </button>
               );
             })}
-          </Section>
+          </div>
         )}
 
-        {/* Bet amount input - Step 2: Enter amount and see potential payout */}
-        {canBet && selectedOutcome && step === "select" && (
-          <Section header="Enter Amount">
-            <div style={{ padding: "1rem" }}>
-              {market.mechanism === "scpm" ? (
-                <>
-                  <Input
-                    header="Max Shares to Fill"
-                    placeholder="e.g. 20"
-                    type="number"
-                    value={maxShares}
-                    onChange={(e) => setMaxShares(e.target.value)}
-                    style={{ marginBottom: "1rem" }}
-                  />
-                  <Input
-                    header="Limit Price (Implied Prob)"
-                    placeholder="0.45"
-                    type="number"
-                    step="0.01"
-                    value={limitPrice}
-                    onChange={(e) => setLimitPrice(e.target.value)}
-                    style={{ marginBottom: "1rem" }}
-                  />
-                  <Input
-                    header={`Budget in ${dkBank.currency} (Max Cost)`}
-                    placeholder={`Min ${dkBank.minBet}`}
-                    type="number"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    style={{ marginBottom: "1rem" }}
-                  />
-                </>
-              ) : (
-                <Input
-                  header={`Amount in ${dkBank.currency}`}
-                  placeholder={`Min ${dkBank.minBet}`}
-                  type="number"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  style={{ marginBottom: "1rem", fontSize: "1.2rem" }}
-                />
-              )}
-
-              {/* Quick amount buttons */}
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(4, 1fr)",
-                  gap: "0.5rem",
-                  marginBottom: "1rem",
-                }}
-              >
-                {[dkBank.minBet, 50, 100, 200, 500, 1000].map((quickAmount) => (
-                  <button
-                    key={quickAmount}
-                    onClick={() => setAmount(quickAmount.toString())}
-                    style={{
-                      padding: "0.6rem",
-                      background:
-                        amount === quickAmount.toString()
-                          ? "#007AFF"
-                          : "rgba(0, 122, 255, 0.1)",
-                      color:
-                        amount === quickAmount.toString() ? "white" : "#007AFF",
-                      border: "1px solid #007AFF",
-                      borderRadius: "8px",
-                      fontSize: "0.85rem",
-                      fontWeight: "600",
-                      cursor: "pointer",
-                    }}
-                  >
-                    {quickAmount}
-                  </button>
-                ))}
-              </div>
-
-              {/* Increment buttons */}
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(3, 1fr)",
-                  gap: "0.5rem",
-                  marginBottom: "1rem",
-                }}
-              >
-                <button
-                  onClick={() => {
-                    const current = parseFloat(amount) || 0;
-                    setAmount((current + dkBank.minBet).toString());
-                  }}
-                  style={{
-                    padding: "0.6rem",
-                    background: "rgba(76, 175, 80, 0.1)",
-                    color: "#4CAF50",
-                    border: "1px solid #4CAF50",
-                    borderRadius: "8px",
-                    fontSize: "0.85rem",
-                    fontWeight: "600",
-                    cursor: "pointer",
-                  }}
-                >
-                  +{dkBank.minBet}
-                </button>
-                <button
-                  onClick={() => {
-                    const current = parseFloat(amount) || 0;
-                    setAmount((current + 50).toString());
-                  }}
-                  style={{
-                    padding: "0.6rem",
-                    background: "rgba(76, 175, 80, 0.1)",
-                    color: "#4CAF50",
-                    border: "1px solid #4CAF50",
-                    borderRadius: "8px",
-                    fontSize: "0.85rem",
-                    fontWeight: "600",
-                    cursor: "pointer",
-                  }}
-                >
-                  +50
-                </button>
-                <button
-                  onClick={() => {
-                    const current = parseFloat(amount) || 0;
-                    setAmount((current + 100).toString());
-                  }}
-                  style={{
-                    padding: "0.6rem",
-                    background: "rgba(76, 175, 80, 0.1)",
-                    color: "#4CAF50",
-                    border: "1px solid #4CAF50",
-                    borderRadius: "8px",
-                    fontSize: "0.85rem",
-                    fontWeight: "600",
-                    cursor: "pointer",
-                  }}
-                >
-                  +100
-                </button>
-              </div>
-
-              {betAmount >= dkBank.minBet && (
-                <div
-                  style={{
-                    background: "rgba(76, 175, 80, 0.1)",
-                    border: "1px solid rgba(76, 175, 80, 0.3)",
-                    borderRadius: "12px",
-                    padding: "1rem",
-                    marginBottom: "1rem",
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      marginBottom: "0.5rem",
-                    }}
-                  >
-                    <Caption level="1">Your bet:</Caption>
-                    <Caption level="1" weight="1">
-                      {formatBTN(betAmount)}
-                    </Caption>
-                  </div>
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      marginBottom: "0.5rem",
-                    }}
-                  >
-                    <Caption level="1">Potential payout:</Caption>
-                    <Caption level="1" weight="1" style={{ color: "#4CAF50" }}>
-                      {formatBTN(potentialPayout)}
-                    </Caption>
-                  </div>
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      borderTop: "1px solid rgba(76, 175, 80, 0.2)",
-                      paddingTop: "0.5rem",
-                    }}
-                  >
-                    <Caption level="1" weight="2">
-                      Potential profit:
-                    </Caption>
-                    <Caption level="1" weight="2" style={{ color: "#4CAF50" }}>
-                      +{formatBTN(profit)}
-                    </Caption>
-                  </div>
-                </div>
-              )}
-
-              <Button
-                size="l"
-                stretched
-                disabled={!betAmount || betAmount < dkBank.minBet}
-                onClick={() => setStep("payment")}
-              >
-                Continue to Payment
-              </Button>
-            </div>
-          </Section>
-        )}
-
-        {/* Payment details - Step 3: Enter phone and confirm */}
-        {canBet && step === "payment" && selectedOutcome && (
+        {/* Amount */}
+        {canBet && selectedOutcomeId && (
           <>
-            <Section header="Bet Summary">
-              <div style={{ padding: "1rem" }}>
-                <div
+            <div style={{ marginBottom: 10 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--tg-theme-hint-color, #8e8e93)", marginBottom: 8 }}>
+                Amount (Nu.)
+              </div>
+              <input
+                type="number"
+                inputMode="decimal"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder={`Min ${minBet}`}
+                autoFocus
+                style={{
+                  width: "100%",
+                  padding: "14px 16px",
+                  backgroundColor: "var(--tg-theme-secondary-bg-color, #2c2c2e)",
+                  border: "2px solid transparent",
+                  borderRadius: 14,
+                  color: "var(--tg-theme-text-color, #fff)",
+                  fontSize: 22,
+                  fontWeight: 700,
+                  outline: "none",
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
+
+            {/* Quick amounts */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 24 }}>
+              {QUICK_AMOUNTS.map((q) => (
+                <button
+                  key={q}
+                  onClick={() => setAmount(q.toString())}
                   style={{
-                    background: "rgba(0, 122, 255, 0.1)",
-                    borderRadius: "12px",
-                    padding: "1rem",
-                    marginBottom: "1rem",
+                    padding: "10px 0",
+                    borderRadius: 10,
+                    border: "none",
+                    backgroundColor: amount === q.toString()
+                      ? "var(--tg-theme-button-color, #2481cc)"
+                      : "var(--tg-theme-secondary-bg-color, #2c2c2e)",
+                    color: amount === q.toString()
+                      ? "var(--tg-theme-button-text-color, #fff)"
+                      : "var(--tg-theme-text-color, #fff)",
+                    fontSize: 14,
+                    fontWeight: 600,
+                    cursor: "pointer",
                   }}
                 >
-                  <Caption level="2" style={{ marginBottom: "0.5rem" }}>
-                    Betting on:
-                  </Caption>
-                  <Title level="3" weight="2">
-                    {selectedOutcome.label}
-                  </Title>
-                  <div
-                    style={{
-                      marginTop: "1rem",
-                      display: "flex",
-                      justifyContent: "space-between",
-                    }}
-                  >
-                    <div>
-                      <Caption level="2">Amount:</Caption>
-                      <Caption level="1" weight="1">
-                        {formatBTN(betAmount)}
-                      </Caption>
-                    </div>
-                    <div style={{ textAlign: "right" }}>
-                      <Caption level="2">Potential win:</Caption>
-                      <Caption
-                        level="1"
-                        weight="1"
-                        style={{ color: "#4CAF50" }}
-                      >
-                        {formatBTN(potentialPayout)}
-                      </Caption>
-                    </div>
-                  </div>
+                  {q}
+                </button>
+              ))}
+            </div>
+
+            {/* Win amount */}
+            {winAmount > 0 && (
+              <div style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "16px 18px",
+                borderRadius: 14,
+                backgroundColor: "rgba(48, 209, 88, 0.1)",
+                border: "1.5px solid rgba(48, 209, 88, 0.3)",
+                marginBottom: 20,
+              }}>
+                <div style={{ fontSize: 14, color: "var(--tg-theme-hint-color, #8e8e93)" }}>
+                  Win if <strong style={{ color: "var(--tg-theme-text-color, #fff)" }}>{selectedOutcome?.label}</strong>
                 </div>
-                <Button
-                  mode="outline"
-                  size="s"
-                  stretched
-                  onClick={() => setStep("select")}
-                  style={{ marginBottom: "1rem" }}
-                >
-                  ← Change Selection
-                </Button>
+                <div style={{ fontSize: 22, fontWeight: 800, color: "#30d158" }}>
+                  {formatBTN(winAmount)}
+                </div>
               </div>
-            </Section>
-
-            <Section header="Payment via DK Bank">
-              <Cell before={<span style={{ fontSize: "2rem" }}></span>}>
-                <strong>Digital Kidu Mobile Banking</strong>
-              </Cell>
-            </Section>
-
-            <Section>
-              <div style={{ padding: "1rem" }}>
-                <Button
-                  size="l"
-                  stretched
-                  loading={processing}
-                  onClick={handlePayWithDKBank}
-                >
-                  {processing
-                    ? "Processing..."
-                    : `Pay ${formatBTN(betAmount)} BTN`}
-                </Button>
-              </div>
-            </Section>
+            )}
           </>
         )}
 
-        {!canBet && (
-          <Section>
-            <Placeholder
-              header={
-                market.status === "upcoming"
-                  ? "Match Not Started"
-                  : "Betting Closed"
-              }
-              description={
-                market.status === "upcoming"
-                  ? "This match will open soon"
-                  : "Betting is no longer available"
-              }
-            />
-          </Section>
+        {/* Success state */}
+        {betSuccess && (
+          <div style={{ textAlign: "center", padding: "24px 0" }}>
+            <div style={{ fontSize: 52, marginBottom: 10 }}>✅</div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: "#30d158", marginBottom: 6 }}>Bet Placed!</div>
+            <div style={{ fontSize: 13, color: "var(--tg-theme-hint-color, #8e8e93)" }}>
+              Your payment was confirmed and your bet has been registered.
+            </div>
+          </div>
         )}
-      </List>
+
+        {!canBet && (
+          <Placeholder
+            header={market.status === "upcoming" ? "Opening Soon" : "Betting Closed"}
+            description={market.status === "upcoming" ? "This market will open soon." : "Betting is no longer available."}
+          />
+        )}
+      </div>
+
+      {/* Sticky confirm button */}
+      {canBet && !betSuccess && (
+        <div style={{
+          position: "fixed",
+          bottom: 0,
+          left: 0,
+          right: 0,
+          padding: "12px 16px 28px",
+          backgroundColor: "var(--tg-theme-bg-color, #1c1c1e)",
+          borderTop: "1px solid var(--tg-theme-secondary-bg-color, #2c2c2e)",
+        }}>
+          <button
+            disabled={!isReady}
+            onClick={() => setIsPaymentModalOpen(true)}
+            style={{
+              width: "100%",
+              padding: "16px",
+              borderRadius: 14,
+              border: "none",
+              backgroundColor: isReady
+                ? "var(--tg-theme-button-color, #2481cc)"
+                : "var(--tg-theme-secondary-bg-color, #2c2c2e)",
+              color: isReady
+                ? "var(--tg-theme-button-text-color, #fff)"
+                : "var(--tg-theme-hint-color, #8e8e93)",
+              fontSize: 16,
+              fontWeight: 700,
+              cursor: isReady ? "pointer" : "not-allowed",
+              transition: "all 0.2s ease",
+            }}
+          >
+            {isReady
+              ? `Bet ${formatBTN(betAmount)} on ${selectedOutcome?.label}`
+              : selectedOutcomeId
+                ? `Enter at least Nu. ${minBet}`
+                : "Pick a side to continue"}
+          </button>
+        </div>
+      )}
+
+      <TmaPaymentModal
+        isOpen={isPaymentModalOpen}
+        onClose={() => setIsPaymentModalOpen(false)}
+        amount={betAmount}
+        description={`Bet on: ${market.title} — ${selectedOutcome?.label}`}
+        onSuccess={() => { setIsPaymentModalOpen(false); handlePaymentSuccess(); }}
+        onFailure={(err) => console.error("Payment failed:", err)}
+      />
     </Page>
   );
 };

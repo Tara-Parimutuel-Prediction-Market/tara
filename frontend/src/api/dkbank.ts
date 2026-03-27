@@ -36,6 +36,23 @@ export async function initiateDKBankPayment(
 }
 
 /**
+ * Step 2: Submit OTP to confirm a DK Bank payment
+ */
+export async function confirmDKBankPayment(
+  paymentId: string,
+  otp: string,
+): Promise<PaymentResponse> {
+  try {
+    return await request<PaymentResponse>("/payments/dkbank/confirm", {
+      method: "POST",
+      body: JSON.stringify({ paymentId, otp }),
+    });
+  } catch (error: any) {
+    throw new Error(error.message || "DK Bank payment confirmation failed");
+  }
+}
+
+/**
  * Check payment status through backend
  */
 export async function checkDKBankPaymentStatus(
@@ -60,11 +77,10 @@ export function formatBTN(amount: number): string {
 }
 
 /**
- * Validate Bhutanese phone number
- * Format: +975 17XXXXXX or +975 77XXXXXX
+ * Validate Bhutanese CID number
+ * Format: exactly 11 numeric digits
  */
-export function validateBhutanesePhone(phone: string): boolean {
-  const cleaned = phone.replace(/\s+/g, "");
-  const regex = /^\+975[17]\d{7}$/;
-  return regex.test(cleaned);
+export function validateCID(cid: string): boolean {
+  const cleaned = cid.replace(/\s+/g, "");
+  return /^\d{11}$/.test(cleaned);
 }

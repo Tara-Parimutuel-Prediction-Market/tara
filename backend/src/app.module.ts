@@ -15,7 +15,9 @@ import { Market } from "./entities/market.entity";
 import { Outcome } from "./entities/outcome.entity";
 import { Bet } from "./entities/bet.entity";
 import { Payment } from "./entities/payment.entity";
+import { Transaction } from "./entities/transaction.entity";
 import { Settlement } from "./entities/settlement.entity";
+import { DKGatewayAuthToken } from "./entities/dk-gateway-auth-token.entity";
 
 @Module({
   imports: [
@@ -38,7 +40,9 @@ import { Settlement } from "./entities/settlement.entity";
           Outcome,
           Bet,
           Payment,
+          Transaction,
           Settlement,
+          DKGatewayAuthToken,
         ],
         synchronize: config.get("DB_SYNC", "true") === "true",
         logging: false,

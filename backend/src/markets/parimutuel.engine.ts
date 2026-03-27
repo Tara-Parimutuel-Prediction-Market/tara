@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException } from "@nestjs/common";
+import { Injectable, BadRequestException, Logger } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, DataSource } from "typeorm";
 import { Market, MarketStatus } from "../entities/market.entity";
@@ -24,6 +24,8 @@ const VALID_TRANSITIONS: Record<MarketStatus, MarketStatus[]> = {
 
 @Injectable()
 export class ParimutuelEngine {
+  private readonly logger = new Logger(ParimutuelEngine.name);
+
   constructor(
     @InjectRepository(Market) private marketRepo: Repository<Market>,
     @InjectRepository(Outcome) private outcomeRepo: Repository<Outcome>,
@@ -31,7 +33,6 @@ export class ParimutuelEngine {
     @InjectRepository(Payment) private paymentRepo: Repository<Payment>,
     @InjectRepository(Settlement)
     private settlementRepo: Repository<Settlement>,
-    @InjectRepository(User) private userRepo: Repository<User>,
     private dataSource: DataSource,
     private lmsrService: LMSRService,
     private scpmService: SCPMService,
@@ -87,19 +88,21 @@ export class ParimutuelEngine {
         );
       }
 
-      // 3. Check user balance
+      // 3. Check user balance from ledger
       const user = await em.findOne(User, { where: { id: userId } });
       if (!user) throw new BadRequestException("User not found");
-      if (Number(user.balance) < fill.totalCost) {
+      const { balance: rawBalance } = await em.getRepository(Payment)
+        .createQueryBuilder("p")
+        .select("COALESCE(SUM(p.amount), 0)", "balance")
+        .where("p.userId = :userId", { userId })
+        .andWhere("p.method = :method", { method: PaymentMethod.CREDITS })
+        .andWhere("p.status = :status", { status: PaymentStatus.SUCCESS })
+        .getRawOne();
+      if (Number(rawBalance) < fill.totalCost) {
         throw new BadRequestException("Insufficient balance");
       }
 
-      // 4. Update state
-      const balanceBefore = Number(user.balance);
-      user.balance = balanceBefore - fill.totalCost;
-      await em.save(User, user);
-
-      // Record payment
+      // 4. Record payment (balance is derived from ledger — no user mutation)
       await em.save(
         Payment,
         em.create(Payment, {
@@ -108,8 +111,6 @@ export class ParimutuelEngine {
           method: PaymentMethod.CREDITS,
           amount: -fill.totalCost,
           currency: 'CREDITS',
-          balanceBefore,
-          balanceAfter: Number(user.balance),
           referenceId: market.id,
           description: `SCPM Bet: ${fill.sharesFilled} shares of ${outcome.label} @ max ${limitPrice}`,
           userId,
@@ -168,23 +169,24 @@ export class ParimutuelEngine {
 
       const user = await em.findOne(User, { where: { id: userId } });
       if (!user) throw new BadRequestException("User not found");
-      if (Number(user.balance) < amount)
+      const { balance: rawBalance } = await em.getRepository(Payment)
+        .createQueryBuilder("p")
+        .select("COALESCE(SUM(p.amount), 0)", "balance")
+        .where("p.userId = :userId", { userId })
+        .andWhere("p.method = :method", { method: PaymentMethod.CREDITS })
+        .andWhere("p.status = :status", { status: PaymentStatus.SUCCESS })
+        .getRawOne();
+      this.logger.log(`[placeBet] user=${userId} credits=${rawBalance} betAmount=${amount}`);
+      if (Number(rawBalance) < amount)
         throw new BadRequestException("Insufficient balance");
 
-      // Deduct balance
-      const balanceBefore = Number(user.balance);
-      user.balance = balanceBefore - amount;
-      await em.save(User, user);
-
-      // Record payment
+      // Record payment (balance is derived from ledger — no user mutation)
       const payment = em.create(Payment, {
         type: PaymentType.BET_PLACED,
         status: PaymentStatus.SUCCESS,
         method: PaymentMethod.CREDITS,
         amount: -amount,
         currency: 'CREDITS',
-        balanceBefore,
-        balanceAfter: Number(user.balance),
         referenceId: marketId,
         description: `Bet on outcome: ${outcome.label}`,
         userId,
@@ -304,52 +306,36 @@ export class ParimutuelEngine {
           totalPaidOut += payout;
           winningBets++;
 
-          // Credit user
-          const user = await em.findOne(User, { where: { id: bet.userId } });
-          if (user) {
-            const balanceBefore = Number(user.balance);
-            user.balance = balanceBefore + payout;
-            await em.save(User, user);
-            await em.save(
-              Payment,
-              em.create(Payment, {
-                type: PaymentType.BET_PAYOUT,
-                status: PaymentStatus.SUCCESS,
-                method: PaymentMethod.CREDITS,
-                amount: payout,
-                currency: 'CREDITS',
-                balanceBefore,
-                balanceAfter: Number(user.balance),
-                referenceId: market.id,
-                description: `Won bet on: ${winner.label}`,
-                userId: bet.userId,
-              }),
-            );
-          }
+          // Credit user via ledger entry
+          await em.save(
+            Payment,
+            em.create(Payment, {
+              type: PaymentType.BET_PAYOUT,
+              status: PaymentStatus.SUCCESS,
+              method: PaymentMethod.CREDITS,
+              amount: payout,
+              currency: 'CREDITS',
+              referenceId: market.id,
+              description: `Won bet on: ${winner.label}`,
+              userId: bet.userId,
+            }),
+          );
         } else if (market.status === MarketStatus.CANCELLED) {
-          // Refund on cancellation
+          // Refund on cancellation via ledger entry
           bet.status = BetStatus.REFUNDED;
-          const user = await em.findOne(User, { where: { id: bet.userId } });
-          if (user) {
-            const balanceBefore = Number(user.balance);
-            user.balance = balanceBefore + Number(bet.amount);
-            await em.save(User, user);
-            await em.save(
-              Payment,
-              em.create(Payment, {
-                type: PaymentType.REFUND,
-                status: PaymentStatus.SUCCESS,
-                method: PaymentMethod.CREDITS,
-                amount: Number(bet.amount),
-                currency: 'CREDITS',
-                balanceBefore,
-                balanceAfter: Number(user.balance),
-                referenceId: market.id,
-                description: "Market cancelled — refund",
-                userId: bet.userId,
-              }),
-            );
-          }
+          await em.save(
+            Payment,
+            em.create(Payment, {
+              type: PaymentType.REFUND,
+              status: PaymentStatus.SUCCESS,
+              method: PaymentMethod.CREDITS,
+              amount: Number(bet.amount),
+              currency: 'CREDITS',
+              referenceId: market.id,
+              description: "Market cancelled — refund",
+              userId: bet.userId,
+            }),
+          );
         } else {
           bet.status = BetStatus.LOST;
         }
@@ -387,28 +373,20 @@ export class ParimutuelEngine {
     const bets = await this.betRepo.find({ where: { marketId } });
     for (const bet of bets) {
       if (bet.status === BetStatus.PENDING) {
-        const user = await this.userRepo.findOneBy({ id: bet.userId });
-        if (user) {
-          const balanceBefore = Number(user.balance);
-          user.balance = balanceBefore + Number(bet.amount);
-          await this.userRepo.save(user);
-          await this.paymentRepo.save(
-            this.paymentRepo.create({
-              type: PaymentType.REFUND,
-              status: PaymentStatus.SUCCESS,
-              method: PaymentMethod.CREDITS,
-              amount: Number(bet.amount),
-              currency: 'CREDITS',
-              balanceBefore,
-              balanceAfter: Number(user.balance),
-              referenceId: marketId,
-              description: "Market cancelled — refund",
-              userId: bet.userId,
-            }),
-          );
-          bet.status = BetStatus.REFUNDED;
-          await this.betRepo.save(bet);
-        }
+        await this.paymentRepo.save(
+          this.paymentRepo.create({
+            type: PaymentType.REFUND,
+            status: PaymentStatus.SUCCESS,
+            method: PaymentMethod.CREDITS,
+            amount: Number(bet.amount),
+            currency: 'CREDITS',
+            referenceId: marketId,
+            description: "Market cancelled — refund",
+            userId: bet.userId,
+          }),
+        );
+        bet.status = BetStatus.REFUNDED;
+        await this.betRepo.save(bet);
       }
     }
   }

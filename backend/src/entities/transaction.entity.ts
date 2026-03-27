@@ -5,6 +5,7 @@ import {
   CreateDateColumn,
   ManyToOne,
   JoinColumn,
+  Index,
 } from "typeorm";
 import { User } from "./user.entity";
 
@@ -24,17 +25,22 @@ export class Transaction {
   @Column({ type: "enum", enum: TransactionType })
   type: TransactionType;
 
-  @Column({ type: "decimal", precision: 18, scale: 2 })
+  @Column({ type: "decimal", precision: 20, scale: 9 })
   amount: number;
 
-  @Column({ type: "decimal", precision: 18, scale: 2 })
+  @Column({ type: "decimal", precision: 20, scale: 9 })
   balanceBefore: number;
 
-  @Column({ type: "decimal", precision: 18, scale: 2 })
+  @Column({ type: "decimal", precision: 20, scale: 9 })
   balanceAfter: number;
 
+  @Index()
   @Column({ nullable: true })
-  referenceId: string; // betId or marketId
+  paymentId: string;
+
+  @Index()
+  @Column({ nullable: true })
+  betId: string;
 
   @Column({ nullable: true })
   note: string;

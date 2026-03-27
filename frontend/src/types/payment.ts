@@ -7,7 +7,7 @@ export interface PaymentMethod {
   id: string;
   name: string;
   type: 'dkbank' | 'ton' | 'credits';
-  currency: 'BTN' | 'TON' | 'CREDITS';
+  currency: 'BTN' | 'USDT' | 'CREDITS';
   enabled: boolean;
   icon?: string;
   minAmount: number;
@@ -16,7 +16,7 @@ export interface PaymentMethod {
 
 export interface PaymentRequest {
   amount: number;
-  currency: 'BTN' | 'TON' | 'CREDITS';
+  currency: 'BTN' | 'USDT' | 'CREDITS';
   method: PaymentMethod;
   description: string;
   metadata?: Record<string, any>;
@@ -40,7 +40,7 @@ export interface DKBankResponse {
 }
 
 export interface TONPaymentRequest {
-  amount: number; // in TON
+  amount: number; // in USDT
   destinationAddress: string;
   comment?: string;
 }
@@ -64,6 +64,8 @@ export interface PaymentResponse {
   paymentUrl?: string;
   qrCode?: string;
   timestamp: string;
+  /** True when an OTP has been sent to the customer and must be submitted via confirmDKBankPayment */
+  otpRequired?: boolean;
 }
 
 export interface PaymentStatus {
@@ -77,9 +79,9 @@ export interface PaymentStatus {
 }
 
 export interface UserBalance {
-  btn: number;
-  ton: number;
   credits: number;
+  btn: number;
+  usdt: number;
   lastUpdated: string;
 }
 

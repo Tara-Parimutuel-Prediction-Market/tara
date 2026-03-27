@@ -64,7 +64,7 @@ export class UpdateMarketDto {
 
 export class PlaceBetDto {
   @ApiProperty() @IsUUID() outcomeId: string;
-  @ApiPropertyOptional() @IsNumber() @Min(1) amount?: number;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(1) amount?: number;
 
   // SCPM fields
   @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) maxShares?: number;

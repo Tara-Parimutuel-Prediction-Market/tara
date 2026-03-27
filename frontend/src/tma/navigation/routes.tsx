@@ -1,6 +1,7 @@
 import type { ComponentType, JSX } from "react";
 
 import { IndexPage } from "@/tma/pages/IndexPage/IndexPage";
+import { TmaFeedPage } from "@/tma/pages/TmaFeedPage";
 import { MarketsPage } from "@/tma/pages/MarketsPage";
 import { MarketDetailPage } from "@/tma/pages/MarketDetailPage";
 import { TONBetPage } from "@/tma/pages/TONBetPage";
@@ -18,7 +19,8 @@ interface Route {
 }
 
 export const routes: Route[] = [
-  { path: "/", Component: MarketsPage },
+  { path: "/", Component: TmaFeedPage },
+  { path: "/markets", Component: MarketsPage },
   { path: "/market/:id", Component: MarketDetailPage },
   { path: "/ton-bet/:id", Component: TONBetPage, title: "Bet with TON" },
   {

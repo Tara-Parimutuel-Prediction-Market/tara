@@ -5,6 +5,8 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { User } from "../entities/user.entity";
 import { AuthMethod, AuthProvider } from "../entities/auth-method.entity";
+import { Payment, PaymentMethod, PaymentStatus, PaymentType } from "../entities/payment.entity";
+import { DKGatewayService } from "../payment/services/dk-gateway/dk-gateway.service";
 
 export interface TelegramInitData {
   id: number;
@@ -20,9 +22,10 @@ export interface TelegramInitData {
 export class AuthService {
   constructor(
     @InjectRepository(User) private userRepo: Repository<User>,
-    @InjectRepository(AuthMethod)
-    private authMethodRepo: Repository<AuthMethod>,
+    @InjectRepository(AuthMethod) private authMethodRepo: Repository<AuthMethod>,
+    @InjectRepository(Payment) private paymentRepo: Repository<Payment>,
     private jwtService: JwtService,
+    private dkGateway: DKGatewayService,
   ) {}
 
   // ── HMAC-SHA-256 Telegram initData validation ──────────────────────────────
@@ -84,9 +87,21 @@ export class AuthService {
         lastName: tgUser.last_name,
         username: tgUser.username,
         photoUrl: tgUser.photo_url,
-        balance: 1000, // starter balance
       });
       await this.userRepo.save(user);
+
+      // Seed 1000 starter credits as a ledger entry
+      await this.paymentRepo.save(
+        this.paymentRepo.create({
+          type: PaymentType.DEPOSIT,
+          status: PaymentStatus.SUCCESS,
+          method: PaymentMethod.CREDITS,
+          amount: 1000,
+          currency: "CREDITS",
+          description: "Starter credits",
+          userId: user.id,
+        }),
+      );
 
       authMethod = this.authMethodRepo.create({
         provider: AuthProvider.TELEGRAM,
@@ -113,5 +128,63 @@ export class AuthService {
     const token = this.jwtService.sign({ sub: user.id, isAdmin: user.isAdmin });
 
     return { token, user };
+  }
+
+  // ── Login / Register via DK Bank CID ──────────────────────────────────────
+  async loginWithDKBank(cid: string) {
+    const account = await this.dkGateway.lookupAccountByCID(cid);
+
+    let authMethod = await this.authMethodRepo.findOne({
+      where: { provider: AuthProvider.DKBANK, providerId: account.accountNumber },
+      relations: ["user"],
+    });
+
+    if (!authMethod) {
+      // New user — create account linked to DK Bank identity
+      const user = this.userRepo.create({
+        firstName: account.accountName.split(" ")[0] || account.accountName,
+        lastName: account.accountName.split(" ").slice(1).join(" ") || null,
+        dkCid: cid,
+        dkAccountNumber: account.accountNumber,
+        dkAccountName: account.accountName,
+      });
+      await this.userRepo.save(user);
+
+      // Seed 1000 starter credits as a ledger entry
+      await this.paymentRepo.save(
+        this.paymentRepo.create({
+          type: PaymentType.DEPOSIT,
+          status: PaymentStatus.SUCCESS,
+          method: PaymentMethod.CREDITS,
+          amount: 1000,
+          currency: "CREDITS",
+          description: "Starter credits",
+          userId: user.id,
+        }),
+      );
+
+      authMethod = this.authMethodRepo.create({
+        provider: AuthProvider.DKBANK,
+        providerId: account.accountNumber,
+        metadata: { cid, accountName: account.accountName, phoneNumber: account.phoneNumber },
+        user,
+        userId: user.id,
+      });
+      await this.authMethodRepo.save(authMethod);
+    } else {
+      // Existing user — keep DK fields in sync
+      await this.userRepo.update(authMethod.userId, {
+        dkCid: cid,
+        dkAccountNumber: account.accountNumber,
+        dkAccountName: account.accountName,
+      });
+    }
+
+    const user =
+      authMethod.user ||
+      (await this.userRepo.findOneBy({ id: authMethod.userId }));
+    const token = this.jwtService.sign({ sub: user.id, isAdmin: user.isAdmin });
+
+    return { token, user, dkAccount: account };
   }
 }

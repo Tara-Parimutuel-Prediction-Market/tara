@@ -72,6 +72,16 @@ export async function loginWithTelegram(
   return result;
 }
 
+/** Login / register using DK Bank CID — for PWA users without Telegram */
+export async function loginWithDKBank(cid: string): Promise<AuthResponse> {
+  const result = await request<AuthResponse>("/auth/dkbank", {
+    method: "POST",
+    body: JSON.stringify({ cid }),
+  });
+  setToken(result.token);
+  return result;
+}
+
 // ─── Markets ─────────────────────────────────────────────────────────────────
 
 export interface Outcome {

@@ -50,17 +50,21 @@ export class Payment {
   @Column({ type: "varchar", length: 10, default: "BTN" })
   currency: string;
 
-  @Column({ type: "decimal", precision: 18, scale: 2, nullable: true })
-  balanceBefore: number;
-
-  @Column({ type: "decimal", precision: 18, scale: 2, nullable: true })
-  balanceAfter: number;
-
-  @Column({ nullable: true })
+  @Column({ nullable: true, unique: true })
   externalPaymentId: string; // DK Bank transaction ID, TON transaction hash, etc.
 
   @Column({ nullable: true })
   referenceId: string; // betId, marketId, or other reference
+
+  // DK-specific refs to correlate callbacks/webhooks reliably.
+  @Column({ nullable: true, name: "dkinquiryid" })
+  dkInquiryId: string;
+
+  @Column({ nullable: true, name: "dktxnstatusid" })
+  dkTxnStatusId: string;
+
+  @Column({ nullable: true, name: "dkrequestid" })
+  dkRequestId: string;
 
   @Column({ nullable: true })
   customerPhone: string; // For DK Bank payments

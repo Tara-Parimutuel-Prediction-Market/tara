@@ -8,10 +8,13 @@ import { AuthController } from "./auth.controller";
 import { JwtStrategy } from "./jwt.strategy";
 import { User } from "../entities/user.entity";
 import { AuthMethod } from "../entities/auth-method.entity";
+import { Payment } from "../entities/payment.entity";
+import { DKGatewayAuthToken } from "../entities/dk-gateway-auth-token.entity";
+import { DKGatewayService } from "../payment/services/dk-gateway/dk-gateway.service";
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, AuthMethod]),
+    TypeOrmModule.forFeature([User, AuthMethod, Payment, DKGatewayAuthToken]),
     PassportModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
@@ -22,7 +25,7 @@ import { AuthMethod } from "../entities/auth-method.entity";
       }),
     }),
   ],
-  providers: [AuthService, JwtStrategy],
+  providers: [AuthService, JwtStrategy, DKGatewayService],
   controllers: [AuthController],
   exports: [AuthService, JwtModule],
 })

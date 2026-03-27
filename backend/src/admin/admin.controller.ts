@@ -4,6 +4,7 @@ import {
   Get,
   Param,
   Body,
+  Query,
   UseGuards,
   Patch,
   HttpCode,
@@ -20,11 +21,13 @@ import { Repository } from "typeorm";
 import { IsUUID, IsEnum } from "class-validator";
 import { JwtAuthGuard, AdminGuard } from "../auth/guards";
 import { MarketsService, CreateMarketDto } from "../markets/markets.service";
+import { FixturesService } from "./fixtures.service";
 import { Market, MarketStatus } from "../entities/market.entity";
 import { Outcome } from "../entities/outcome.entity";
 import { Settlement } from "../entities/settlement.entity";
 import { Bet } from "../entities/bet.entity";
 import { User } from "../entities/user.entity";
+import { Payment } from "../entities/payment.entity";
 
 class TransitionDto {
   @ApiProperty({ enum: MarketStatus })
@@ -45,10 +48,12 @@ class ResolveDto {
 export class AdminController {
   constructor(
     private marketsService: MarketsService,
+    private fixturesService: FixturesService,
     @InjectRepository(Settlement)
     private settlementRepo: Repository<Settlement>,
     @InjectRepository(Bet) private betRepo: Repository<Bet>,
     @InjectRepository(User) private userRepo: Repository<User>,
+    @InjectRepository(Payment) private paymentRepo: Repository<Payment>,
   ) {}
 
   // ── Markets ────────────────────────────────────────────────────────────────
@@ -99,6 +104,13 @@ export class AdminController {
     return this.marketsService.delete(id);
   }
 
+  // ── Fixtures ──────────────────────────────────────────────────────────────
+  @Get("fixtures")
+  @ApiOperation({ summary: "Fetch upcoming football fixtures from football-data.org" })
+  getFixtures(@Query("q") q?: string) {
+    return this.fixturesService.getFixtures(q);
+  }
+
   // ── Pool view ─────────────────────────────────────────────────────────────
   @Get("markets/:id/pool")
   @ApiOperation({ summary: "View pool breakdown per outcome" })
@@ -145,5 +157,16 @@ export class AdminController {
   @ApiOperation({ summary: "List all users" })
   listUsers() {
     return this.userRepo.find({ order: { createdAt: "DESC" } });
+  }
+
+  // ── Payments ───────────────────────────────────────────────────────────────
+  @Get("payments")
+  @ApiOperation({ summary: "List all payments (admin view)" })
+  listPayments() {
+    return this.paymentRepo.find({
+      relations: ["user"],
+      order: { createdAt: "DESC" },
+      take: 500,
+    });
   }
 }

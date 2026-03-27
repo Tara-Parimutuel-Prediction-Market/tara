@@ -1,0 +1,445 @@
+import {
+  Injectable,
+  Logger,
+  UnauthorizedException,
+  BadRequestException,
+  RequestTimeoutException,
+  ServiceUnavailableException,
+} from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { InjectRepository } from "@nestjs/typeorm";
+import axios, { AxiosInstance } from "axios";
+import * as jwt from "jsonwebtoken";
+import { Repository } from "typeorm";
+import { createHmac, randomUUID } from "crypto";
+
+import { DKGatewayAuthToken } from "../../../entities/dk-gateway-auth-token.entity";
+
+const DK_RESPONSE_CODES = {
+  SUCCESS: "0000",
+  TIMEOUT: "2002",
+  INTERNAL_FAILURE: "2004",
+  RESTRICTION: "2008",
+  NOT_FOUND: "3001",
+  INVALID_PARAMS: "4002",
+  EXCEPTION: "5001",
+  DB_ERROR: "5002",
+  INTERNAL_NO_RESPONSE: "2001",
+} as const;
+
+type DKTokenRow = DKGatewayAuthToken;
+
+interface DKAuthResponse {
+  response_code: string;
+  response_message?: string;
+  response_description?: string;
+  response_data?: {
+    access_token: string;
+    refresh_token?: string;
+    token_type?: string;
+    expires_in: number;
+  };
+}
+
+@Injectable()
+export class DKGatewayService {
+  private readonly logger = new Logger(DKGatewayService.name);
+  private readonly httpClient: AxiosInstance;
+  private privateKeyCache: string | null = null;
+
+  constructor(
+    private readonly configService: ConfigService,
+    @InjectRepository(DKGatewayAuthToken)
+    private readonly tokenRepo: Repository<DKTokenRow>,
+  ) {
+    this.httpClient = axios.create({
+      baseURL: this.configService.get<string>("DK_BASE_URL"),
+      timeout: 60_000,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  private get apiKey(): string { return this.configService.getOrThrow<string>("DK_API_KEY"); }
+  private get username(): string { return this.configService.getOrThrow<string>("DK_USERNAME"); }
+  private get password(): string { return this.configService.getOrThrow<string>("DK_PASSWORD"); }
+  private get clientId(): string { return this.configService.getOrThrow<string>("DK_CLIENT_ID"); }
+  private get clientSecret(): string { return this.configService.getOrThrow<string>("DK_CLIENT_SECRET"); }
+  private get sourceApp(): string { return this.configService.getOrThrow<string>("DK_SOURCE_APP"); }
+  private get beneficiaryAccount(): string { return this.configService.getOrThrow<string>("DK_BENEFICIARY_ACCOUNT"); }
+  private get beneficiaryName(): string {
+    return this.configService.get<string>("DK_BENEFICIARY_ACCOUNT_NAME") || "Lucky Pem";
+  }
+  private get bankCode(): string { return this.configService.getOrThrow<string>("DK_BANK_CODE"); }
+  private get webhookSecret(): string | null {
+    return this.configService.get<string>("DK_WEBHOOK_SECRET") || null;
+  }
+
+  private canonicalize(obj: unknown): unknown {
+    if (Array.isArray(obj)) return obj.map((v) => this.canonicalize(v));
+    if (obj && typeof obj === "object") {
+      const rec = obj as Record<string, unknown>;
+      const out: Record<string, unknown> = {};
+      for (const k of Object.keys(rec).sort()) out[k] = this.canonicalize(rec[k]);
+      return out;
+    }
+    return obj;
+  }
+
+  private generateRequestId(): string {
+    return `${Date.now()}-${randomUUID().replace(/-/g, "").slice(0, 10)}`;
+  }
+
+  private generateNonce(): string { return randomUUID().replace(/-/g, ""); }
+
+  private generateDkTimestamp(): string {
+    return new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
+  }
+
+  /** 6-digit System Trace Audit Number — must be consistent across account_auth and debit_request. */
+  generateStanNumber(): string {
+    return String(Math.floor(100000 + Math.random() * 900000));
+  }
+
+  private async signHeaders(requestBody: Record<string, unknown>) {
+    if (!this.privateKeyCache) await this.fetchPrivateKey();
+    if (!this.privateKeyCache) throw new UnauthorizedException("DK RSA private key not available");
+
+    const timestamp = this.generateDkTimestamp();
+    const nonce = this.generateNonce();
+    const bodyBase64 = Buffer.from(JSON.stringify(this.canonicalize(requestBody))).toString("base64");
+    const signature = jwt.sign({ data: bodyBase64, timestamp, nonce }, this.privateKeyCache, { algorithm: "RS256" });
+
+    return {
+      "DK-Signature": `DKSignature ${signature}`,
+      "DK-Timestamp": timestamp,
+      "DK-Nonce": nonce,
+    };
+  }
+
+  private async fetchPrivateKey(): Promise<void> {
+    const token = await this.getValidAccessToken();
+    const res = await this.httpClient.post(
+      "/v1/sign/key",
+      { request_id: this.generateRequestId(), source_app: this.sourceApp },
+      { headers: { Authorization: `Bearer ${token}`, "X-gravitee-api-key": this.apiKey } },
+    );
+    const data = res.data;
+    if (typeof data === "string" && data.includes("BEGIN") && data.includes("PRIVATE KEY")) {
+      this.privateKeyCache = data;
+      return;
+    }
+    throw new Error("DK private key response format invalid");
+  }
+
+  private async getValidAccessToken(): Promise<string> {
+    const bufferMs = 2 * 60 * 1000;
+    const tokenRow = await this.tokenRepo
+      .createQueryBuilder("t")
+      .where("t.expiresAt > :cutoff", { cutoff: new Date(Date.now() + bufferMs) })
+      .orderBy("t.updatedAt", "DESC")
+      .getOne();
+    if (tokenRow?.accessToken) return tokenRow.accessToken;
+
+    await this.refreshAccessToken();
+    const refreshed = await this.tokenRepo
+      .createQueryBuilder("t")
+      .where("t.expiresAt > :cutoff", { cutoff: new Date(Date.now() + bufferMs) })
+      .orderBy("t.updatedAt", "DESC")
+      .getOne();
+    if (!refreshed?.accessToken) throw new Error("DK token refresh failed");
+    return refreshed.accessToken;
+  }
+
+  private async refreshAccessToken(): Promise<void> {
+    const params = new URLSearchParams();
+    params.append("username", this.username);
+    params.append("password", this.password);
+    params.append("client_id", this.clientId);
+    params.append("client_secret", this.clientSecret);
+    params.append("grant_type", "password");
+    params.append("scopes", "keys:read");
+    params.append("source_app", this.sourceApp);
+    params.append("request_id", this.generateRequestId());
+
+    const res = await this.httpClient.post("/v1/auth/token", params.toString(), {
+      headers: { "Content-Type": "application/x-www-form-urlencoded", "X-gravitee-api-key": this.apiKey },
+    });
+
+    const data = res.data as DKAuthResponse;
+    if (data.response_code !== DK_RESPONSE_CODES.SUCCESS || !data.response_data) {
+      throw new Error(`DK token fetch failed: ${data.response_description || data.response_message || data.response_code}`);
+    }
+
+    const tokenData = data.response_data;
+    const expiresAt = new Date(Date.now() + tokenData.expires_in * 1000);
+    await this.tokenRepo.save({ accessToken: tokenData.access_token, refreshToken: tokenData.refresh_token || null, expiresAt });
+    this.privateKeyCache = null;
+    this.logger.log("DK access token refreshed");
+  }
+
+  private async dkPost<T = unknown>(
+    endpoint: string,
+    data: Record<string, unknown>,
+    requireSignature = true,
+  ): Promise<T> {
+    const requestBody = { request_id: this.generateRequestId(), ...data };
+    const headers: Record<string, string> = {
+      "X-gravitee-api-key": this.apiKey,
+      source_app: this.sourceApp,
+      "Content-Type": "application/json",
+    };
+
+    if (requireSignature) {
+      const token = await this.getValidAccessToken();
+      const signedHeaders = await this.signHeaders(requestBody);
+      headers.Authorization = `Bearer ${token}`;
+      Object.assign(headers, signedHeaders);
+    }
+
+    try {
+      this.logger.log(`DK POST ${endpoint} → ${JSON.stringify(requestBody)}`);
+      const res = await this.httpClient.post(endpoint, requestBody, { headers });
+      this.logger.log(`DK POST ${endpoint} ← ${JSON.stringify(res.data)}`);
+      return res.data as T;
+    } catch (err: any) {
+      if (err?.code === "ECONNABORTED" || err?.message?.includes("timeout")) {
+        throw new RequestTimeoutException("DK payment request timed out");
+      }
+      const responseStatus = err?.response?.status;
+      const responseData = err?.response?.data;
+      if (responseStatus === 502 || responseStatus === 503 || responseStatus === 504) {
+        throw new ServiceUnavailableException("DK payment gateway unavailable");
+      }
+      const details =
+        responseData !== undefined
+          ? typeof responseData === "string" ? responseData : JSON.stringify(responseData)
+          : undefined;
+      this.logger.error(`DK POST ${endpoint} failed: ${responseStatus ?? "NO_STATUS"} ${details ?? ""}`.trim());
+      throw new BadRequestException(
+        responseStatus
+          ? `DK gateway HTTP ${responseStatus}${details ? `: ${details}` : ""}`
+          : err?.message || "DK HTTP request failed",
+      );
+    }
+  }
+
+  // ── Public API methods ────────────────────────────────────────────────────────
+
+  /**
+   * Step 1: Look up a customer's DK Bank account by their CID.
+   * Returns account number, name, and phone for use in authorizeTransaction.
+   */
+  async lookupAccountByCID(cid: string): Promise<{
+    accountNumber: string;
+    accountName: string;
+    phoneNumber: string;
+  }> {
+    const res = await this.dkPost<{
+      response_code: string;
+      response_message?: string;
+      response_description?: string;
+      response_data?: Array<{
+        national_id: string;
+        account_number: string;
+        first_name?: string;
+        middle_name?: string | null;
+        last_name?: string;
+        phone_number?: string;
+      }>;
+    }>("/v1/client_inquiry", { id_type: "CID", id_number: cid }, true);
+
+    if (res.response_code !== DK_RESPONSE_CODES.SUCCESS || !res.response_data?.length) {
+      throw new BadRequestException(
+        res.response_description || res.response_message || "CID account inquiry failed",
+      );
+    }
+
+    const acct = res.response_data[0];
+    if (!acct?.account_number) throw new BadRequestException("Account not found for CID");
+
+    const firstName = acct.first_name || "";
+    const middleName = acct.middle_name ? ` ${acct.middle_name}` : "";
+    const lastName = acct.last_name ? ` ${acct.last_name}` : "";
+    const fullName = `${firstName}${middleName}${lastName}`.trim() || cid;
+
+    return {
+      accountNumber: acct.account_number,
+      accountName: fullName,
+      phoneNumber: acct.phone_number || "",
+    };
+  }
+
+  /**
+   * Step 2: Authorize a pull-payment transaction.
+   * Must be called after lookupAccountByCID. Returns bfsTxnId needed for OTP confirmation.
+   * DK will send an OTP to the customer's phone after this call.
+   */
+  async authorizeTransaction(params: {
+    customerAccountNumber: string;
+    customerAccountName: string;
+    customerPhone: string;
+    amount: number;
+    description: string;
+    stanNumber: string;
+  }): Promise<{
+    bfsTxnId: string;
+    stanNumber: string;
+    txDatetime: string;
+  }> {
+    const txDatetime = this.generateDkTimestamp();
+
+    const res = await this.dkPost<{
+      response_code: string;
+      response_message?: string;
+      response_description?: string;
+      response_data?: {
+        bfs_txn_id: string;
+        stan_number: string;
+        account_number: string;
+        remitter_account_number: string;
+      };
+    }>("/v1/account_auth/pull-payment", {
+      account_number: params.customerAccountNumber,
+      account_name: params.customerAccountName,
+      transaction_datetime: txDatetime,
+      stan_number: params.stanNumber,
+      transaction_amount: params.amount.toFixed(2),
+      payment_desc: params.description,
+      ...(params.customerPhone ? { phone_number: params.customerPhone } : {}),
+      remitter_account_number: params.customerAccountNumber,
+      remitter_account_name: params.customerAccountName,
+      remitter_bank_id: this.bankCode,
+    }, true);
+
+    if (res.response_code !== DK_RESPONSE_CODES.SUCCESS || !res.response_data?.bfs_txn_id) {
+      throw new BadRequestException(
+        res.response_description || res.response_message || "Transaction authorization failed",
+      );
+    }
+
+    return {
+      bfsTxnId: res.response_data.bfs_txn_id,
+      stanNumber: params.stanNumber,
+      txDatetime,
+    };
+  }
+
+  /**
+   * Step 3: Execute the transaction using the OTP entered by the customer.
+   * Returns a txnStatusId for polling the final transaction status.
+   */
+  async executeTransactionWithOtp(params: {
+    bfsTxnId: string;
+    otp: string;
+    stanNumber: string;
+    txDatetime: string;
+    sourceAccountNumber: string;
+    sourceAccountName: string;
+    amount: number;
+    description: string;
+  }): Promise<{
+    txnStatusId: string;
+    paymentUrl?: string;
+    qrCode?: string;
+    raw: any;
+  }> {
+    const res = await this.dkPost<{
+      response_code: string;
+      response_description?: string;
+      response_message?: string;
+      response_data?: {
+        txn_status_id?: string;
+        payment_url?: string;
+        qr_code?: string;
+        [k: string]: unknown;
+      };
+    }>("/v1/debit_request/pull-payment", {
+      bfs_TxnId: params.bfsTxnId,
+      bfs_remitter_Otp: params.otp,
+      stan_number: params.stanNumber,
+      transaction_datetime: params.txDatetime,
+      transaction_amount: params.amount.toFixed(2),
+      currency: "BTN",
+      payment_type: "INTRA",
+      source_account_name: params.sourceAccountName,
+      source_account_number: params.sourceAccountNumber,
+      bene_cust_name: this.beneficiaryName,
+      bene_account_number: this.beneficiaryAccount,
+      bene_bank_code: this.bankCode,
+      narration: params.description,
+    }, true);
+
+    if (res.response_code === DK_RESPONSE_CODES.RESTRICTION) {
+      throw new BadRequestException(res.response_description || "Transaction restricted by DK");
+    }
+    if (res.response_code !== DK_RESPONSE_CODES.SUCCESS) {
+      throw new BadRequestException(res.response_description || res.response_message || "Transaction failed");
+    }
+
+    const txnStatusId = res.response_data?.txn_status_id;
+    if (!txnStatusId) throw new BadRequestException("DK did not return transaction status id");
+
+    return {
+      txnStatusId,
+      paymentUrl: (res.response_data as any)?.payment_url || (res.response_data as any)?.paymentUrl || undefined,
+      qrCode: (res.response_data as any)?.qr_code || undefined,
+      raw: res.response_data,
+    };
+  }
+
+  async checkTransactionStatus(transactionId: string) {
+    const res = await this.dkPost<{
+      response_code: string;
+      response_description?: string;
+      response_message?: string;
+      response_data?: {
+        status: {
+          status: string;
+          status_desc?: string;
+          amount?: string | number;
+          debit_account?: string;
+          credit_account?: string;
+          txn_ts?: string;
+        };
+        [k: string]: unknown;
+      };
+    }>("/v1/transaction/status", { transaction_id: transactionId, bene_account_number: this.beneficiaryAccount }, true);
+
+    if (res.response_code === DK_RESPONSE_CODES.NOT_FOUND) {
+      return { status: "PENDING", statusDesc: "Transaction not found (yet)", raw: res };
+    }
+    if (res.response_code !== DK_RESPONSE_CODES.SUCCESS || !res.response_data?.status) {
+      throw new BadRequestException(res.response_description || res.response_message || "Transaction status check failed");
+    }
+
+    const s = res.response_data.status;
+    return {
+      status: (s.status || "PENDING").toUpperCase(),
+      statusDesc: s.status_desc || undefined,
+      amount: s.amount,
+      debitAccount: s.debit_account,
+      creditAccount: s.credit_account,
+      txnTimestamp: s.txn_ts,
+      raw: res.response_data,
+    };
+  }
+
+  /** Public client inquiry — used by the /client-inquiry controller endpoint. */
+  async clientInquiry(dto: { id_type: "CID"; id_number: string }) {
+    return this.dkPost<{
+      response_code: string;
+      response_message?: string;
+      response_description?: string;
+      response_data?: any[];
+    }>("/v1/client_inquiry", dto, true);
+  }
+
+  verifyWebhookSignature(body: unknown, signatureHeader: string | undefined): boolean {
+    if (!this.webhookSecret) return true;
+    if (!signatureHeader) return false;
+    const bodyStr = JSON.stringify(body);
+    const computed = createHmac("sha256", this.webhookSecret).update(bodyStr).digest("hex");
+    const received = signatureHeader.replace(/^DK\s*/i, "").trim();
+    return computed === received;
+  }
+}

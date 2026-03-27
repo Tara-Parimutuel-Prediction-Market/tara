@@ -1,4 +1,5 @@
 import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
+import { PwaFeedPage } from "./pages/PwaFeedPage";
 import { PwaMarketsPage } from "./pages/PwaMarketsPage";
 import { PwaMarketDetailPage } from "./pages/PwaMarketDetailPage";
 import { PwaPaymentTestPage } from "./pages/PwaPaymentTestPage";
@@ -12,19 +13,19 @@ export function PwaApp() {
       <div
         style={{
           minHeight: "100vh",
-          background: "#0f1923",
-          color: "#fff",
+          background: "#f5f5f7",
+          color: "#111827",
           fontFamily: "system-ui, -apple-system, sans-serif",
         }}
       >
         <header
           style={{
-            background: "#17212b",
+            background: "#ffffff",
             padding: "12px 20px",
             display: "flex",
             alignItems: "center",
             gap: "10px",
-            borderBottom: "1px solid #2a3a4a",
+            borderBottom: "1px solid #e5e7eb",
             position: "sticky",
             top: 0,
             zIndex: 10,
@@ -32,12 +33,12 @@ export function PwaApp() {
         >
           <span style={{ fontSize: "1.4rem" }}></span>
           <span
-            style={{ fontWeight: 700, fontSize: "1.1rem", color: "#6ab3f3" }}
+            style={{ fontWeight: 700, fontSize: "1.1rem", color: "#3b82f6" }}
           >
             Tara
           </span>
           <span
-            style={{ fontSize: "0.75rem", color: "#708499", marginLeft: "4px" }}
+            style={{ fontSize: "0.75rem", color: "#9ca3af", marginLeft: "4px" }}
           >
             Prediction Platform
           </span>
@@ -74,7 +75,8 @@ export function PwaApp() {
 
         <HashRouter>
           <Routes>
-            <Route path="/" element={<PwaMarketsPage />} />
+            <Route path="/" element={<PwaFeedPage />} />
+            <Route path="/markets" element={<PwaMarketsPage />} />
             <Route path="/market/:id" element={<PwaMarketDetailPage />} />
             <Route path="/payment-test" element={<PwaPaymentTestPage />} />
             <Route path="*" element={<Navigate to="/" />} />

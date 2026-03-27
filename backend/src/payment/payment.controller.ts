@@ -1,58 +1,187 @@
-import { Controller, Post, Body, Get, Param, HttpCode, HttpStatus } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import {
+  Controller,
+  Post,
+  Body,
+  Get,
+  Param,
+  HttpCode,
+  HttpStatus,
+  Request,
+  UseGuards,
+  Headers,
+  BadRequestException,
+} from "@nestjs/common";
+import { ApiTags, ApiOperation, ApiResponse, ApiBody } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
+import { IsString, IsNotEmpty, MinLength, MaxLength, IsNumber, IsIn } from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../auth/guards';
+import { DKBankPaymentService } from './dkbank-payment.service';
+import { DKGatewayService } from './services/dk-gateway/dk-gateway.service';
+
+// DTO class for DK Bank payment initiation
+class InitiatePaymentDto {
+  @ApiProperty({ description: 'Payment description', example: 'Tara Credits top-up', minLength: 3, maxLength: 500 })
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(3)
+  @MaxLength(500)
+  description: string;
+
+  @ApiProperty({ description: 'Amount in BTN', example: 100 })
+  @IsNumber()
+  @IsNotEmpty()
+  amount: number;
+
+  @ApiProperty({ description: 'Customer phone number registered with DK Bank', example: '17123456' })
+  @IsString()
+  @IsNotEmpty()
+  customerPhone: string;
+}
+
+// DTO class for OTP confirmation
+class ConfirmPaymentDto {
+  @ApiProperty({ description: 'Payment ID from initiation', example: 'uuid-here' })
+  @IsString()
+  @IsNotEmpty()
+  paymentId: string;
+
+  @ApiProperty({ description: '6-digit OTP sent by DK Bank', example: '123456' })
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(4)
+  @MaxLength(8)
+  otp: string;
+}
+
+// DTO class for client inquiry
+class ClientInquiryDto {
+  @ApiProperty({ 
+    description: 'ID type - must be "CID"',
+    example: 'CID',
+    enum: ['CID']
+  })
+  @IsString()
+  @IsNotEmpty()
+  @IsIn(['CID'])
+  id_type: 'CID';
+
+  @ApiProperty({ 
+    description: 'CID number - 11 digits',
+    example: '11000000000',
+    minLength: 11,
+    maxLength: 11
+  })
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(11)
+  @MaxLength(11)
+  id_number: string;
+}
 
 @ApiTags('Payments')
 @Controller('payments')
 export class PaymentController {
-  constructor(private readonly configService: ConfigService) {}
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly dkBankPaymentService: DKBankPaymentService,
+    private readonly dkGatewayService: DKGatewayService,
+  ) {}
 
-  // DTO for DK Bank payment initiation
   @Post('dkbank/initiate')
+  @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Initiate DK Bank payment' })
-  @ApiResponse({ status: 200, description: 'Payment initiated successfully' })
-  async initiateDKBankPayment(@Body() paymentData: { amount: number; customerPhone: string; description: string }) {
-    // Validate required fields
-    if (!paymentData || !paymentData.amount) {
-      throw new Error('Amount is required for DK Bank payment');
-    }
-
-    console.log('🏦 DK Bank Payment Request:', paymentData);
-    
-    // Mock response for now - replace with actual DK Bank API call
-    return {
-      success: true,
-      paymentId: `DKBANK_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      status: 'pending',
+  @ApiOperation({ summary: 'Step 1: Initiate DK Bank payment (sends OTP to customer phone)' })
+  @ApiBody({ type: InitiatePaymentDto })
+  @ApiResponse({ status: 200, description: 'Payment initiated — OTP sent to customer' })
+  async initiateDKBankPayment(@Body() paymentData: InitiatePaymentDto, @Request() req) {
+    return this.dkBankPaymentService.initiatePayment(req.user.userId, {
       amount: paymentData.amount,
-      currency: 'BTN',
-      method: 'dkbank',
-      message: 'Payment initiated. Please complete in your DK Bank app.',
-      timestamp: new Date().toISOString(),
-    };
+      customerPhone: paymentData.customerPhone,
+      description: paymentData.description,
+    });
   }
 
-  @Get('dkbank/status/:paymentId')
-  @ApiOperation({ summary: 'Check DK Bank payment status' })
-  @ApiResponse({ status: 200, description: 'Payment status retrieved' })
-  async checkDKBankPaymentStatus(@Param('paymentId') paymentId: string) {
-    // TODO: Implement actual status check with DK Bank
-    console.log('🏦 Checking DK Bank payment status:', paymentId);
-    
-    // Mock response for now - replace with actual DK Bank status check
-    return {
-      paymentId,
-      status: 'success', // pending | success | failed
-      amount: 100, // Mock amount
-      currency: 'BTN',
-      method: 'dkbank',
-      confirmedAt: new Date().toISOString(),
-      message: 'Payment completed successfully',
-    };
+  @Post('dkbank/confirm')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Step 2: Confirm DK Bank payment with OTP' })
+  @ApiBody({ type: ConfirmPaymentDto })
+  @ApiResponse({ status: 200, description: 'Payment submitted to DK Bank' })
+  async confirmDKBankPayment(@Body() dto: ConfirmPaymentDto, @Request() req) {
+    return this.dkBankPaymentService.confirmPayment(req.user.userId, dto.paymentId, dto.otp);
+  }
+
+  @Post('dkbank/account-inquiry')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Look up DK Bank account by CID — returns account number, name, and phone' })
+  @ApiBody({ type: ClientInquiryDto })
+  @ApiResponse({ status: 200, description: 'Account found', schema: { example: { accountNumber: '1234567890', accountName: 'Sonam Tenzin', phoneNumber: '17123456' } } })
+  async dkAccountInquiry(@Body() dto: ClientInquiryDto) {
+    if (!dto?.id_number || dto.id_number.length < 11) {
+      throw new BadRequestException('id_number must be 11 digits');
+    }
+    return this.dkGatewayService.lookupAccountByCID(dto.id_number);
+  }
+
+  // Public endpoint (no JWT) - aligned to CLIENT_INQUIRY_API.md
+  @Post("client-inquiry")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "DK client inquiry by CID" })
+  @ApiBody({ type: ClientInquiryDto })
+  async clientInquiry(@Body() dto: ClientInquiryDto) {
+    if (!dto?.id_type || dto.id_type !== "CID") {
+      throw new BadRequestException(`id_type must be "CID"`);
+    }
+    if (!dto?.id_number || dto.id_number.length < 11) {
+      throw new BadRequestException(`id_number must be 11 digits`);
+    }
+
+    return this.dkGatewayService.clientInquiry(dto);
+  }
+
+  @Get("dkbank/status/:paymentId")
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: "Check DK Bank payment status" })
+  async checkDKBankPaymentStatusOwned(
+    @Param("paymentId") paymentId: string,
+    @Request() req,
+  ) {
+    return this.dkBankPaymentService.getPaymentStatus(req.user.userId, paymentId);
+  }
+
+  // DK webhook/callback endpoint (no user JWT required)
+  @Post("dkbank/webhook")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "DK Bank webhook: update payment status" })
+  async dkBankWebhook(
+    @Body() payload: any,
+    @Headers() headers: Record<string, string>,
+  ) {
+    const signature =
+      headers["x-dk-signature"] ||
+      headers["dk-signature"] ||
+      headers["x-dk-signature-v1"];
+    return this.dkBankPaymentService.handleWebhook(payload, signature);
+  }
+
+  // Backward-compatible alias
+  @Post("dkbank/callback")
+  @HttpCode(HttpStatus.OK)
+  async dkBankCallback(
+    @Body() payload: any,
+    @Headers() headers: Record<string, string>,
+  ) {
+    const signature =
+      headers["x-dk-signature"] ||
+      headers["dk-signature"] ||
+      headers["x-dk-signature-v1"];
+    return this.dkBankPaymentService.handleWebhook(payload, signature);
   }
 
   @Get('methods')
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Get available payment methods' })
   @ApiResponse({ status: 200, description: 'Available payment methods' })
   async getPaymentMethods() {
@@ -72,35 +201,35 @@ export class PaymentController {
           id: 'ton',
           name: 'TON Wallet',
           type: 'ton',
-          currency: 'TON',
+          currency: 'USDT',
           enabled: true,
           minAmount: 0.5,
           maxAmount: 100,
           icon: '💎',
         },
-        // {
-        //   id: 'credits',
-        //   name: 'Test Credits',
-        //   type: 'credits',
-        //   currency: 'CREDITS',
-        //   enabled: true,
-        //   minAmount: 1,
-        //   icon: '🪙',
-        // },
+        {
+          id: 'credits',
+          name: 'Tara Credits',
+          type: 'credits',
+          currency: 'CREDITS',
+          enabled: true,
+          minAmount: 1,
+          icon: '🪙',
+        },
       ],
     };
   }
 
   @Get('config')
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Get payment configuration' })
   @ApiResponse({ status: 200, description: 'Payment configuration' })
   async getPaymentConfig() {
+    const baseUrl = this.configService.get("DK_BASE_URL") || "";
     return {
       dkBank: {
-        baseUrl: this.configService.get('DK_BASE_URL'),
-        isStaging: this.configService.get('DK_BASE_URL')?.includes('sit') || false,
-        beneficiaryAccount: this.configService.get('DK_BENEFICIARY_ACCOUNT'),
-        bankCode: this.configService.get('DK_BANK_CODE'),
+        // Public/non-secret flags only; do not leak DK internal endpoints/beneficiary identifiers.
+        isStaging: baseUrl.includes("sit"),
       },
       environment: process.env.NODE_ENV || 'development',
     };

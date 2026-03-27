@@ -10,6 +10,7 @@ import {
 import { AuthMethod } from "./auth-method.entity";
 import { Bet } from "./bet.entity";
 import { Payment } from "./payment.entity";
+import { Transaction } from "./transaction.entity";
 
 @Entity("users")
 export class User {
@@ -42,8 +43,16 @@ export class User {
   @Column({ default: false })
   isAdmin: boolean;
 
-  @Column({ type: "decimal", precision: 18, scale: 2, default: 1000 })
-  balance: number; // New users start with 1000 credits
+  @Index({ unique: true, sparse: true } as any)
+  @Column({ nullable: true, unique: true })
+  dkCid: string; // DK Bank CID (11-digit national ID)
+
+  @Index({ unique: true, sparse: true } as any)
+  @Column({ nullable: true, unique: true })
+  dkAccountNumber: string; // DK Bank account number resolved from CID
+
+  @Column({ nullable: true })
+  dkAccountName: string; // Full name from DK Bank account inquiry
 
   @CreateDateColumn()
   createdAt: Date;
@@ -59,4 +68,7 @@ export class User {
 
   @OneToMany(() => Payment, (p) => p.user)
   payments: Payment[];
+
+  @OneToMany(() => Transaction, (t) => t.user)
+  transactions: Transaction[];
 }

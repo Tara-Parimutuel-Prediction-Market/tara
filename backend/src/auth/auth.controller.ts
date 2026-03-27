@@ -7,8 +7,8 @@ import {
   Query,
   UnauthorizedException,
 } from "@nestjs/common";
-import { ApiTags, ApiOperation, ApiQuery } from "@nestjs/swagger";
-import { IsString } from "class-validator";
+import { ApiTags, ApiOperation, ApiQuery, ApiBody, ApiProperty } from "@nestjs/swagger";
+import { IsString, IsNotEmpty, Length } from "class-validator";
 import { createHmac } from "crypto";
 import { AuthService } from "./auth.service";
 import { Public } from "./guards";
@@ -16,6 +16,14 @@ import { Public } from "./guards";
 class TelegramAuthDto {
   @IsString()
   initData: string;
+}
+
+class DKBankAuthDto {
+  @ApiProperty({ description: 'CID (11-digit national ID)', example: '11000000000', minLength: 11, maxLength: 11 })
+  @IsString()
+  @IsNotEmpty()
+  @Length(11, 11)
+  cid: string;
 }
 
 @ApiTags("auth")
@@ -31,6 +39,15 @@ export class AuthController {
   })
   async telegramLogin(@Body() dto: TelegramAuthDto) {
     return this.authService.loginWithTelegram(dto.initData);
+  }
+
+  @Post("dkbank")
+  @HttpCode(200)
+  @Public()
+  @ApiOperation({ summary: "Login or register with DK Bank CID" })
+  @ApiBody({ type: DKBankAuthDto })
+  async dkBankLogin(@Body() dto: DKBankAuthDto) {
+    return this.authService.loginWithDKBank(dto.cid);
   }
 
   /**

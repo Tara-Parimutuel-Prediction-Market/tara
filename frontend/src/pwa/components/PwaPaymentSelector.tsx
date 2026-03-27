@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { PwaPaymentModal } from './PwaPaymentModal';
-import type { PaymentMethod } from '@/types/payment';
+import type { PaymentMethod, PaymentResponse } from '@/types/payment';
 
 interface PwaPaymentSelectorProps {
   amount: number;
@@ -17,11 +17,6 @@ export function PwaPaymentSelector({
 }: PwaPaymentSelectorProps) {
   const [selectedMethod, setSelectedMethod] = useState<string>('');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [phoneNumber, setPhoneNumber] = useState("");
-  const [showOtpModal, setShowOtpModal] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [paymentId, setPaymentId] = useState<string | null>(null);
-  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus | null>(null);
 
   const paymentMethods: PaymentMethod[] = [
     {
@@ -37,7 +32,7 @@ export function PwaPaymentSelector({
       id: 'ton',
       name: 'TON Wallet',
       type: 'ton',
-      currency: 'TON',
+      currency: 'USDT',
       enabled: true,
       minAmount: 0.5,
       maxAmount: 100,
@@ -54,24 +49,21 @@ export function PwaPaymentSelector({
 
   const handlePaymentSelect = (methodId: string) => {
     setSelectedMethod(methodId);
-    
     if (methodId === 'dkbank') {
       setIsModalOpen(true);
     } else if (methodId === 'ton') {
-      // TODO: Implement TON payment
       onPaymentFailure?.('TON payments coming soon');
     } else if (methodId === 'credits') {
-      // TODO: Implement credits payment
       onPaymentFailure?.('Credits payments coming soon');
     }
   };
 
-  const handlePaymentSuccess = (method: string) => {
+  const handleDkBankSuccess = (_payment: PaymentResponse) => {
     setIsModalOpen(false);
-    onPaymentSuccess?.(method);
+    onPaymentSuccess?.('dkbank');
   };
 
-  const handlePaymentFailure = (error: string) => {
+  const handleDkBankFailure = (error: string) => {
     setIsModalOpen(false);
     onPaymentFailure?.(error);
   };
@@ -84,29 +76,14 @@ export function PwaPaymentSelector({
         padding: '20px',
         marginTop: '16px',
       }}>
-        <h4 style={{
-          margin: '0 0 16px 0',
-          fontSize: '1.1rem',
-          fontWeight: 600,
-          color: '#fff',
-        }}>
+        <h4 style={{ margin: '0 0 16px 0', fontSize: '1.1rem', fontWeight: 600, color: '#fff' }}>
           Choose Payment Method
         </h4>
 
-        <div style={{
-          backgroundColor: '#2a3a4a',
-          padding: '16px',
-          borderRadius: '8px',
-          marginBottom: '16px',
-        }}>
+        <div style={{ backgroundColor: '#2a3a4a', padding: '16px', borderRadius: '8px', marginBottom: '16px' }}>
           <div style={{ fontSize: '0.9rem', color: '#708499', marginBottom: '4px' }}>Amount to Pay</div>
           <div style={{ fontSize: '1.8rem', fontWeight: 600, color: '#6ab3f3' }}>
-            {paymentMethods.find(m => m.id === selectedMethod)?.currency === 'BTN' 
-              ? `Nu. ${amount.toLocaleString()}`
-              : paymentMethods.find(m => m.id === selectedMethod)?.currency === 'TON'
-              ? `${amount} TON`
-              : `${amount} Credits`
-            }
+            Nu. {amount.toLocaleString()}
           </div>
         </div>
 
@@ -140,7 +117,7 @@ export function PwaPaymentSelector({
                   backgroundColor: selectedMethod === method.id ? '#6ab3f3' : '#3a4a5a',
                   borderRadius: '8px',
                 }}>
-                  {method.type === 'dkbank' && '🏦'}
+                  {method.type === 'dkbank' && ''}
                   {method.type === 'ton' && '💎'}
                   {method.type === 'credits' && '🪙'}
                 </div>
@@ -150,41 +127,9 @@ export function PwaPaymentSelector({
                     Min: {method.minAmount} {method.currency}
                     {method.maxAmount && ` • Max: ${method.maxAmount} ${method.currency}`}
                   </div>
-                  <button
-                    onClick={() => {
-                      if (!selectedOutcomeId) {
-                        alert("Please select an outcome first");
-                        return;
-                      }
-                      if (!cidNumber) {
-                        alert("Please enter your CID number");
-                        return;
-                      }
-                      setBetAmount(amount);
-                      setShowPaymentSelector(true);
-                    }}
-                    disabled={!selectedOutcomeId || !cidNumber}
-                    style={{
-                      background: "#2a3a4a",
-                      color: "#6ab3f3",
-                      border: "1px solid #6ab3f3",
-                      padding: "12px 16px",
-                      borderRadius: "8px",
-                      cursor: "pointer",
-                      fontWeight: 600,
-                      fontSize: "0.9rem",
-                      opacity: (!selectedOutcomeId || !cidNumber) ? 0.6 : 1,
-                    }}
-                  >
-                    🏦 DK Bank Payment
-                  </button>
                 </div>
               </div>
-              
-              <div style={{
-                fontSize: '1.2rem',
-                color: selectedMethod === method.id ? '#fff' : '#708499',
-              }}>
+              <div style={{ fontSize: '1.2rem', color: selectedMethod === method.id ? '#fff' : '#708499' }}>
                 {selectedMethod === method.id ? '✓' : '→'}
               </div>
             </button>
@@ -211,8 +156,8 @@ export function PwaPaymentSelector({
         onClose={() => setIsModalOpen(false)}
         amount={amount}
         description={description}
-        onSuccess={handleDkBankPayment}
-        onFailure={handlePaymentFailure}
+        onSuccess={handleDkBankSuccess}
+        onFailure={handleDkBankFailure}
       />
     </>
   );

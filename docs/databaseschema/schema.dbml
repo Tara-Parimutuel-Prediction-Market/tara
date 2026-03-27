@@ -1,0 +1,176 @@
+// Tara Backend — Database Schema (DBML)
+
+Table users {
+  id uuid [primary key]
+  telegramId varchar [unique]
+  telegramChatId integer
+  telegramStreak integer
+  firstName varchar
+  lastName varchar
+  username varchar [unique]
+  photoUrl varchar
+  isAdmin boolean [default: false]
+  dkCid varchar [unique]
+  dkAccountNumber varchar [unique]
+  dkAccountName varchar
+  createdAt timestamp
+  updatedAt timestamp
+}
+
+Table markets {
+  id uuid [primary key]
+  title varchar [not null]
+  description text
+  imageUrl varchar
+
+  status market_status [default: 'upcoming']
+  mechanism market_mechanism [default: 'parimutuel']
+
+  totalPool decimal(18,2) [default: 0]
+  houseEdgePct decimal(5,2) [default: 5]
+
+  resolvedOutcomeId uuid
+
+  opensAt timestamptz
+  closesAt timestamptz
+  resolvedAt timestamptz
+
+  createdAt timestamp
+  updatedAt timestamp
+}
+
+Table outcomes {
+  id uuid [primary key]
+  label varchar [not null]
+
+  totalBetAmount decimal(18,2) [default: 0]
+  currentOdds decimal(10,4) [default: 0]
+
+  isWinner boolean [default: false]
+
+  marketId uuid [not null]
+}
+
+Table bets {
+  id uuid [primary key]
+
+  amount decimal(18,2) [not null]
+  status bet_status [default: 'pending']
+  oddsAtPlacement decimal(10,4)
+  payout decimal(18,2)
+
+  placedAt timestamp
+
+  userId uuid [not null]
+  marketId uuid [not null]
+  outcomeId uuid [not null]
+
+  // NO unique constraint → allows multiple bets
+  indexes {
+    (userId, marketId)
+  }
+}
+
+Table payments {
+  id uuid [primary key]
+
+  type payment_type [not null]
+  status payment_status [default: 'pending']
+  method payment_method [not null]
+
+  amount decimal(18,2) [not null]
+  currency varchar(10) [default: 'BTN']
+
+  externalPaymentId varchar [unique]
+  dkinquiryid varchar [unique]
+  dktxnstatusid varchar
+  dkrequestid varchar
+
+  customerPhone varchar
+  description varchar
+  metadata json
+
+  failureReason varchar
+
+  confirmedAt timestamp
+  createdAt timestamp
+  updatedAt timestamp
+
+  userId uuid [not null]
+}
+
+Table transactions {
+  id uuid [primary key]
+
+  type transaction_type [not null]
+  amount decimal(20,9) [not null]
+
+  balanceBefore decimal(20,9) [not null]
+  balanceAfter decimal(20,9) [not null]
+
+  paymentId uuid [ref: > payments.id] // payments → transactions
+  betId uuid [ref: > bets.id]         // transactions → bets
+
+  note varchar
+  createdAt timestamp
+
+  userId uuid [not null]
+
+  indexes {
+    (paymentId)
+    (betId)
+  }
+}
+
+Table settlements {
+  id uuid [primary key]
+
+  marketId uuid [not null]
+  winningOutcomeId uuid [not null]
+
+  totalBets integer [default: 0]
+  winningBets integer [default: 0]
+
+  totalPool decimal(18,2) [default: 0]
+  houseAmount decimal(18,2) [default: 0]
+  payoutPool decimal(18,2) [default: 0]
+  totalPaidOut decimal(18,2) [default: 0]
+
+  settledAt timestamp
+}
+
+Table auth_methods {
+  id uuid [primary key]
+  provider auth_provider [default: 'telegram']
+  providerId varchar
+  metadata jsonb
+  createdAt timestamp
+  userId uuid [not null]
+
+  indexes {
+    (provider, providerId) [unique]
+  }
+}
+
+Table dk_gateway_auth_tokens {
+  id uuid [primary key]
+  accessToken text [not null]
+  refreshToken text
+  expiresAt timestamp [not null]
+  createdAt timestamp
+  updatedAt timestamp
+}
+
+// Relationships
+
+Ref: auth_methods.userId > users.id
+Ref: bets.userId > users.id
+Ref: bets.marketId > markets.id
+Ref: bets.outcomeId > outcomes.id
+Ref: outcomes.marketId > markets.id
+Ref: payments.userId > users.id
+Ref: transactions.userId > users.id
+
+Ref: settlements.marketId > markets.id
+
+
