@@ -215,7 +215,7 @@ export function PwaPaymentModal({
                 display: 'flex', alignItems: 'center', gap: 8, textAlign: 'left',
               }}
             >
-              <span style={{ fontSize: 18 }}>🏦</span>
+              {/* <span style={{ fontSize: 18 }}>🏦</span> */}
               <div>
                 <div style={{ fontSize: 13, fontWeight: 700, color: selectedMethod === 'dkbank' ? '#1d4ed8' : '#374151' }}>DK Bank</div>
                 <div style={{ fontSize: 11, color: selectedMethod === 'dkbank' ? '#60a5fa' : '#9ca3af' }}>BTN · Nu</div>
@@ -226,7 +226,7 @@ export function PwaPaymentModal({
               border: '2px solid #f3f4f6', background: '#fafafa',
               display: 'flex', alignItems: 'center', gap: 8, opacity: 0.45,
             }}>
-              <span style={{ fontSize: 18 }}>💎</span>
+              {/* <span style={{ fontSize: 18 }}>💎</span> */}
               <div>
                 <div style={{ fontSize: 13, fontWeight: 700, color: '#9ca3af' }}>TON Wallet</div>
                 <div style={{ fontSize: 11, color: '#d1d5db' }}>Coming soon</div>

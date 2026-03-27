@@ -3,6 +3,7 @@ import { Market, placeBet, getMarket } from "@/api/client";
 import { formatBTN } from "@/api/dkbank";
 import { PwaPaymentModal } from "./PwaPaymentModal";
 import type { PaymentResponse } from "@/types/payment";
+import { useBreakpoint } from "../hooks/useBreakpoint";
 
 interface PwaBetFormProps {
   market: Market;
@@ -31,6 +32,7 @@ export const PwaBetForm: FC<PwaBetFormProps> = ({ market, onBetPlaced }) => {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [betSuccess, setBetSuccess] = useState(false);
 
+  const bp = useBreakpoint();
   const selectedOutcome = market.outcomes.find((o) => o.id === selectedOutcomeId) ?? null;
   const betAmount = parseFloat(amount) || 0;
   const winAmount = selectedOutcomeId ? calcWin(market, selectedOutcomeId, betAmount) : 0;
@@ -115,7 +117,11 @@ export const PwaBetForm: FC<PwaBetFormProps> = ({ market, onBetPlaced }) => {
           background: winAmount > 0 ? "#f0fdf4" : "#f9fafb",
           border: `1.5px solid ${winAmount > 0 ? "#bbf7d0" : "#e5e7eb"}`,
           borderRadius: 12, padding: "14px 16px",
-          display: "flex", justifyContent: "space-between", alignItems: "center",
+          display: "flex",
+          flexDirection: bp === "mobile" ? "column" : "row",
+          justifyContent: "space-between",
+          alignItems: bp === "mobile" ? "flex-start" : "center",
+          gap: bp === "mobile" ? 12 : 0,
           marginBottom: 16,
         }}>
           <div>
@@ -129,7 +135,7 @@ export const PwaBetForm: FC<PwaBetFormProps> = ({ market, onBetPlaced }) => {
               Estimated · final payout at close
             </div>
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-end" }}>
+          <div style={{ display: "flex", flexDirection: bp === "mobile" ? "row" : "column", gap: 6, alignItems: bp === "mobile" ? "center" : "flex-end", flexWrap: "wrap" }}>
             {QUICK_AMOUNTS.map((q) => (
               <button
                 key={q}

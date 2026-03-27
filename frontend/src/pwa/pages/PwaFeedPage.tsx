@@ -2,7 +2,12 @@ import { useState, useEffect } from "react";
 import { getMarkets, placeBet, type Market } from "@/api/client";
 import { PwaPaymentModal } from "../components/PwaPaymentModal";
 import type { PaymentResponse } from "@/types/payment";
-const COLORS = ["#3b82f6", "#ef4444", "#22c55e", "#f59e0b"];
+import { useBreakpoint } from "../hooks/useBreakpoint";
+function outcomeColor(rank: number, total: number): string {
+  if (rank === 0) return "#22c55e";                          // highest → green
+  if (rank === total - 1 && total > 1) return "#ef4444";    // lowest  → red
+  return "#f59e0b";                                          // middle  → amber
+}
 
 function useCountdown(closesAt: string | null): string {
   const [label, setLabel] = useState("Open");
@@ -32,11 +37,17 @@ function MarketCard({ market, onBet }: {
   const countdown = useCountdown(isUpcoming ? market.opensAt ?? null : market.closesAt);
   const totalPool = Number(market.totalPool);
 
-  const sentiment = market.outcomes.map((o, i) => ({
-    ...o,
-    pct: totalPool > 0 ? (Number(o.totalBetAmount) / totalPool) * 100 : 100 / market.outcomes.length,
-    color: COLORS[i] ?? COLORS[COLORS.length - 1],
-  }));
+  const sentiment = (() => {
+    const raw = market.outcomes.map((o) => ({
+      ...o,
+      pct: totalPool > 0 ? (Number(o.totalBetAmount) / totalPool) * 100 : 100 / market.outcomes.length,
+    }));
+    const sorted = [...raw].sort((a, b) => b.pct - a.pct);
+    return raw.map((o) => {
+      const rank = sorted.findIndex((s) => s.id === o.id);
+      return { ...o, color: outcomeColor(rank, raw.length) };
+    });
+  })();
 
   const isBinary = sentiment.length <= 2;
 
@@ -189,6 +200,7 @@ export function PwaFeedPage() {
   const [markets, setMarkets] = useState<Market[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeBet, setActiveBet] = useState<ActiveBet | null>(null);
+  const bp = useBreakpoint();
 
   useEffect(() => {
     getMarkets()
@@ -206,10 +218,10 @@ export function PwaFeedPage() {
       if (m.id !== activeBet.marketId) return m;
       return {
         ...m,
-        totalPool: Number(m.totalPool) + betAmt,
+        totalPool: String(Number(m.totalPool) + betAmt),
         outcomes: m.outcomes.map((o) =>
           o.id === activeBet.outcomeId
-            ? { ...o, totalBetAmount: Number(o.totalBetAmount) + betAmt }
+            ? { ...o, totalBetAmount: String(Number(o.totalBetAmount) + betAmt) }
             : o
         ),
       };
@@ -251,12 +263,14 @@ export function PwaFeedPage() {
     </div>
   );
 
+  const gridCols = bp === "mobile" ? "1fr" : bp === "tablet" ? "repeat(2, 1fr)" : "repeat(4, 1fr)";
+
   const openMarkets = markets.filter((m) => m.status === "open");
   const upcomingMarkets = markets.filter((m) => m.status === "upcoming");
   const activeMarket = activeBet ? markets.find((m) => m.id === activeBet.marketId) : null;
 
   const grid = (items: typeof markets) => (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, alignItems: "stretch" }}>
+    <div style={{ display: "grid", gridTemplateColumns: gridCols, gap: 12, alignItems: "stretch" }}>
       {items.map((market) => (
         <MarketCard
           key={market.id}
@@ -268,7 +282,7 @@ export function PwaFeedPage() {
   );
 
   return (
-    <div style={{ padding: "20px 16px 60px", maxWidth: 1400, margin: "0 auto", display: "flex", flexDirection: "column", gap: 28 }}>
+    <div style={{ padding: bp === "mobile" ? "16px 12px 80px" : "20px 16px 60px", maxWidth: 1400, margin: "0 auto", display: "flex", flexDirection: "column", gap: 28 }}>
       {openMarkets.length > 0 && (
         <section>
           <div style={{ fontSize: 11, fontWeight: 800, color: "#22c55e", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>

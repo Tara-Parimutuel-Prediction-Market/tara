@@ -1,15 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { getMarkets, Market } from "@/api/client";
+import { useBreakpoint } from "../hooks/useBreakpoint";
 
-const STATUS_COLOR: Record<string, string> = {
-  open: "#4CAF50",
-  upcoming: "#708499",
-  closed: "#FF9800",
-  resolved: "#2196F3",
-  settled: "#9C27B0",
-  cancelled: "#F44336",
-};
 
 const MarketCard = ({ market }: { market: Market }) => {
   const isUpcoming = market.status === "upcoming";
@@ -89,36 +82,37 @@ const MarketCard = ({ market }: { market: Market }) => {
         </div>
 
         <div style={{ flex: 1, marginBottom: "12px" }}>
-          {market.outcomes.slice(0, 2).map((o) => {
-            const prob = (o.lmsrProbability || 0) * 100;
-            return (
-              <div key={o.id} style={{ position: "relative", marginBottom: "6px", borderRadius: "6px", overflow: "hidden", background: "#232e3c" }}>
-                <div style={{
-                  position: "absolute",
-                  top: 0,
-                  left: 0,
-                  bottom: 0,
-                  width: isUpcoming ? "0%" : `${prob}%`,
-                  background: isUpcoming ? "transparent" : "#5288c133",
-                  transition: "width 0.5s ease-out",
-                }} />
-                <div style={{
-                  position: "relative",
-                  display: "flex",
-                  justifyContent: "space-between",
-                  padding: "6px 10px",
-                  fontSize: "0.75rem",
-                  fontWeight: 600,
-                  zIndex: 1,
-                }}>
-                  <span style={{ color: "#f5f5f5", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "70%" }}>{o.label}</span>
-                  <span style={{ color: "#6ab3f3" }}>
-                    {isUpcoming ? "Coming" : `${prob.toFixed(0)}%`}
-                  </span>
+          {(() => {
+            const totalPool = Number(market.totalPool);
+            const withPct = market.outcomes.map((o) => ({
+              ...o,
+              pct: totalPool > 0 ? (Number(o.totalBetAmount) / totalPool) * 100 : 100 / market.outcomes.length,
+            }));
+            const sorted = [...withPct].sort((a, b) => b.pct - a.pct);
+            return withPct.slice(0, 2).map((o) => {
+              const rank = sorted.findIndex((s) => s.id === o.id);
+              const color = rank === 0 ? "#22c55e" : rank === sorted.length - 1 ? "#ef4444" : "#f59e0b";
+              return (
+                <div key={o.id} style={{ position: "relative", marginBottom: "6px", borderRadius: "6px", overflow: "hidden", background: "#232e3c" }}>
+                  <div style={{
+                    position: "absolute", top: 0, left: 0, bottom: 0,
+                    width: isUpcoming ? "0%" : `${o.pct}%`,
+                    background: isUpcoming ? "transparent" : `${color}33`,
+                    transition: "width 0.5s ease-out",
+                  }} />
+                  <div style={{
+                    position: "relative", display: "flex", justifyContent: "space-between",
+                    padding: "6px 10px", fontSize: "0.75rem", fontWeight: 600, zIndex: 1,
+                  }}>
+                    <span style={{ color: "#f5f5f5", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "70%" }}>{o.label}</span>
+                    <span style={{ color: isUpcoming ? "#708499" : color }}>
+                      {isUpcoming ? "Coming" : `${o.pct.toFixed(0)}%`}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            });
+          })()}
           {market.outcomes.length > 2 && (
             <div style={{ fontSize: "0.65rem", color: "#708499", textAlign: "right", marginTop: "2px" }}>
               +{market.outcomes.length - 2} more options
@@ -201,20 +195,24 @@ const MarketCard = ({ market }: { market: Market }) => {
   );
 };
 
-const MarketGrid = ({ markets }: { markets: Market[] }) => (
-  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "16px", alignItems: "start" }}>
-    {markets.map((m) => (
-      <div
-        key={m.id}
-        style={{ position: "relative", zIndex: 0 }}
-        onMouseEnter={(e) => (e.currentTarget.style.zIndex = "10")}
-        onMouseLeave={(e) => (e.currentTarget.style.zIndex = "0")}
-      >
-        <MarketCard market={m} />
-      </div>
-    ))}
-  </div>
-);
+function MarketGrid({ markets }: { markets: Market[] }) {
+  const bp = useBreakpoint();
+  const cols = bp === "mobile" ? "1fr" : bp === "tablet" ? "repeat(2, 1fr)" : "repeat(auto-fill, minmax(260px, 1fr))";
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: cols, gap: "16px", alignItems: "start" }}>
+      {markets.map((m) => (
+        <div
+          key={m.id}
+          style={{ position: "relative", zIndex: 0 }}
+          onMouseEnter={(e) => (e.currentTarget.style.zIndex = "10")}
+          onMouseLeave={(e) => (e.currentTarget.style.zIndex = "0")}
+        >
+          <MarketCard market={m} />
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export function PwaMarketsPage() {
   const [markets, setMarkets] = useState<Market[]>([]);

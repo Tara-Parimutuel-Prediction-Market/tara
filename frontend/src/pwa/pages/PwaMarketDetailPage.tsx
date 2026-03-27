@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import { getMarket, Market } from "@/api/client";
 import { PwaBetForm } from "../components/PwaBetForm";
+import { useBreakpoint } from "../hooks/useBreakpoint";
 
 export function PwaMarketDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -61,9 +62,10 @@ export function PwaMarketDetailPage() {
   );
 
   const isOpen = market.status === "open";
+  const bp = useBreakpoint();
 
   return (
-    <div style={{ maxWidth: "680px", margin: "0 auto", padding: "20px 16px" }}>
+    <div style={{ maxWidth: "680px", margin: "0 auto", padding: bp === "mobile" ? "16px 12px 80px" : "20px 16px" }}>
       <Link
         to="/"
         style={{
@@ -115,10 +117,10 @@ export function PwaMarketDetailPage() {
 
       <div
         style={{
-          display: "flex",
-          gap: "16px",
+          display: "grid",
+          gridTemplateColumns: bp === "mobile" ? "repeat(2, 1fr)" : "repeat(auto-fill, minmax(120px, 1fr))",
+          gap: "10px",
           marginBottom: "24px",
-          flexWrap: "wrap",
         }}
       >
         <div
