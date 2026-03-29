@@ -14,6 +14,7 @@ export enum MarketStatus {
   UPCOMING = "upcoming",
   OPEN = "open",
   CLOSED = "closed",
+  RESOLVING = "resolving",
   RESOLVED = "resolved",
   SETTLED = "settled",
   CANCELLED = "cancelled",
@@ -60,6 +61,12 @@ export class Market {
 
   @Column({ nullable: true })
   resolvedOutcomeId: string;
+
+  @Column({ nullable: true })
+  proposedOutcomeId: string;
+
+  @Column({ type: "timestamptz", nullable: true })
+  disputeDeadlineAt: Date;
 
   @Column({ type: "timestamptz", nullable: true })
   opensAt: Date;

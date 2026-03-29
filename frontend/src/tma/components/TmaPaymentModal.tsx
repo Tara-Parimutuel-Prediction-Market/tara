@@ -1,468 +1,473 @@
-import { useState } from 'react';
-import { initiateDKBankPayment, confirmDKBankPayment, checkDKBankPaymentStatus, formatBTN, validateCID } from '@/api/dkbank';
+import { useState, useRef, useEffect } from 'react';
+import { initiateDKBankPayment, confirmDKBankPayment, checkDKBankPaymentStatus, formatBTN } from '@/api/dkbank';
+import { loginWithDKBank } from '@/api/client';
+import type { Market } from '@/api/client';
 import type { DKBankPaymentRequest, PaymentResponse } from '@/types/payment';
+import { PayoutBreakdown } from '@/components/PayoutBreakdown';
+
+const QUICK_AMOUNTS = [50, 100, 200, 500];
+const MIN_BET = 50;
 
 interface TmaPaymentModalProps {
   isOpen: boolean;
   onClose: () => void;
-  amount: number;
-  description: string;
+  market: Market;
+  outcomeId: string;
   onSuccess?: (payment: PaymentResponse) => void;
   onFailure?: (error: string) => void;
 }
 
-type PaymentMethod = 'dkbank' | 'ton' | null;
+type Status = 'idle' | 'processing' | 'otp_required' | 'success' | 'failed';
 
 export function TmaPaymentModal({
   isOpen,
   onClose,
-  amount,
-  description,
+  market,
+  outcomeId,
   onSuccess,
   onFailure,
 }: TmaPaymentModalProps) {
-  const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>(null);
+  const [selectedMethod, setSelectedMethod] = useState<'dkbank' | null>(null);
+  const [amountStr, setAmountStr] = useState('100');
   const [cidNumber, setCidNumber] = useState('');
+  const [customerName, setCustomerName] = useState('');
   const [otpValue, setOtpValue] = useState('');
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [paymentStatus, setPaymentStatus] = useState<'idle' | 'otp_required' | 'initiated' | 'checking' | 'success' | 'failed'>('idle');
-  const [currentPayment, setCurrentPayment] = useState<PaymentResponse | null>(null);
+  const [status, setStatus] = useState<Status>('idle');
   const [error, setError] = useState('');
+  const [pendingPaymentId, setPendingPaymentId] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const outcome = market.outcomes.find((o) => o.id === outcomeId);
+  const betAmount = parseFloat(amountStr) || 0;
+  const isValidAmount = betAmount >= MIN_BET;
+  const canPay = isValidAmount && cidNumber.length === 11 && status === 'idle' && selectedMethod === 'dkbank';
+
+  const estPayout = (() => {
+    if (!isValidAmount || !outcome) return 0;
+    const houseEdge = parseFloat(market.houseEdgePct) || 0;
+    const outcomePool = Number(outcome.totalBetAmount) + betAmount;
+    const totalPool = Number(market.totalPool) + betAmount;
+    if (outcomePool <= 0) return 0;
+    return betAmount * (totalPool * (1 - houseEdge / 100) / outcomePool);
+  })();
+  const estProfit = estPayout - betAmount;
+
+  useEffect(() => {
+    if (selectedMethod === 'dkbank') setTimeout(() => inputRef.current?.focus(), 50);
+  }, [selectedMethod]);
 
   if (!isOpen) return null;
 
-  const handleInitiatePayment = async () => {
-    if (!validateCID(cidNumber)) {
-      setError('Enter a valid 11-digit CID number');
-      return;
-    }
-    setIsProcessing(true);
+  const resetForm = () => {
+    setSelectedMethod(null);
+    setAmountStr('100');
+    setCidNumber('');
+    setCustomerName('');
+    setOtpValue('');
+    setStatus('idle');
+    setError('');
+    setPendingPaymentId('');
+  };
+
+  const handleClose = () => {
+    if (status === 'processing') return;
+    onClose();
+    resetForm();
+  };
+
+  const handlePay = async () => {
+    if (!canPay) return;
+    setStatus('processing');
     setError('');
     try {
-      const paymentRequest: DKBankPaymentRequest = {
-        amount,
+      await loginWithDKBank(cidNumber);
+      const req: DKBankPaymentRequest = {
+        amount: betAmount,
         customerPhone: cidNumber,
-        description,
+        customerName: customerName || undefined,
+        description: `Predict: ${market.title} — ${outcome?.label}`,
         merchantTxnId: `TARA_TMA_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
       };
-      const payment = await initiateDKBankPayment(paymentRequest);
-      setCurrentPayment(payment);
+      const payment = await initiateDKBankPayment(req);
       if (payment.otpRequired) {
-        setPaymentStatus('otp_required');
+        setPendingPaymentId(payment.paymentId);
+        setStatus('otp_required');
+      } else if (payment.status === 'success') {
+        setStatus('success');
+        setTimeout(() => { onClose(); resetForm(); onSuccess?.({ ...payment, amount: betAmount }); }, 2500);
       } else {
-        setPaymentStatus('initiated');
-        pollPaymentStatus(payment.paymentId);
+        pollStatus(payment.paymentId, payment);
       }
     } catch (err: any) {
-      setError(err.message || 'Payment initiation failed');
-      setPaymentStatus('failed');
-      onFailure?.(err.message || 'Payment initiation failed');
-    } finally {
-      setIsProcessing(false);
+      setError(err.message || 'Payment failed');
+      setStatus('failed');
+      onFailure?.(err.message || 'Payment failed');
     }
   };
 
   const handleConfirmOtp = async () => {
-    if (!otpValue || otpValue.length < 4) {
-      setError('Enter the OTP sent to your registered phone');
-      return;
-    }
-    if (!currentPayment) return;
-    setIsProcessing(true);
+    if (!otpValue || otpValue.length < 4 || !pendingPaymentId) return;
+    setStatus('processing');
     setError('');
     try {
-      const confirmed = await confirmDKBankPayment(currentPayment.paymentId, otpValue);
-      setCurrentPayment(confirmed);
-      setPaymentStatus('initiated');
-      pollPaymentStatus(confirmed.paymentId);
+      const confirmed = await confirmDKBankPayment(pendingPaymentId, otpValue);
+      pollStatus(confirmed.paymentId, confirmed);
     } catch (err: any) {
       setError(err.message || 'OTP confirmation failed');
-    } finally {
-      setIsProcessing(false);
+      setStatus('otp_required');
     }
   };
 
-  const pollPaymentStatus = async (paymentId: string) => {
-    const maxAttempts = 30;
+  const pollStatus = async (paymentId: string, initiatedPayment: PaymentResponse) => {
+    const max = 30;
     let attempts = 0;
     const poll = async () => {
       try {
-        setPaymentStatus('checking');
-        const status = await checkDKBankPaymentStatus(paymentId);
-        if (status.status === 'success') {
-          setPaymentStatus('success');
-          onSuccess?.(currentPayment!);
-          setTimeout(() => { onClose(); resetForm(); }, 2000);
-        } else if (status.status === 'failed') {
-          setPaymentStatus('failed');
-          setError(status.failureReason || 'Payment failed');
-          onFailure?.(status.failureReason || 'Payment failed');
-        } else if (attempts < maxAttempts) {
+        const s = await checkDKBankPaymentStatus(paymentId);
+        if (s.status === 'success') {
+          setStatus('success');
+          setTimeout(() => { onClose(); resetForm(); onSuccess?.({ ...initiatedPayment, amount: betAmount }); }, 2500);
+        } else if (s.status === 'failed') {
+          setError(s.failureReason || 'Payment failed');
+          setStatus('failed');
+          onFailure?.(s.failureReason || 'Payment failed');
+        } else if (attempts < max) {
           attempts++;
           setTimeout(poll, 10000);
         } else {
-          setPaymentStatus('failed');
-          setError('Payment verification timed out');
-          onFailure?.('Payment verification timed out');
+          setError('Payment verification timeout');
+          setStatus('failed');
+          onFailure?.('Payment verification timeout');
         }
       } catch {
-        if (attempts < maxAttempts) { attempts++; setTimeout(poll, 10000); }
-        else { setPaymentStatus('failed'); setError('Unable to verify payment status'); }
+        if (attempts < max) { attempts++; setTimeout(poll, 10000); }
+        else { setError('Unable to verify payment'); setStatus('failed'); }
       }
     };
     poll();
   };
 
-  const resetForm = () => {
-    setSelectedMethod(null);
-    setCidNumber('');
-    setOtpValue('');
-    setPaymentStatus('idle');
-    setCurrentPayment(null);
-    setError('');
-  };
-
-  const handleClose = () => {
-    if (paymentStatus === 'initiated' || paymentStatus === 'checking') return;
-    onClose();
-    resetForm();
-  };
-
-  const step = paymentStatus === 'idle' ? 1 : paymentStatus === 'otp_required' ? 2 : 3;
-  const canClose = paymentStatus === 'idle' || paymentStatus === 'success' || paymentStatus === 'failed' || paymentStatus === 'otp_required';
-  const showingMethodSelector = selectedMethod === null && paymentStatus === 'idle';
-
   return (
-    <div style={{
-      position: 'fixed',
-      inset: 0,
-      backgroundColor: 'rgba(0,0,0,0.6)',
-      display: 'flex',
-      alignItems: 'flex-end',
-      justifyContent: 'center',
-      zIndex: 1000,
-    }}>
-      <div style={{
-        backgroundColor: 'var(--tg-theme-bg-color, #1c1c1e)',
-        borderRadius: '20px 20px 0 0',
-        padding: '0',
-        width: '100%',
-        maxWidth: '480px',
-        color: 'var(--tg-theme-text-color, #ffffff)',
-        maxHeight: '90vh',
-        overflowY: 'auto',
-      }}>
-        {/* Handle bar */}
-        <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0 0' }}>
-          <div style={{ width: '40px', height: '4px', borderRadius: '2px', backgroundColor: 'var(--tg-theme-hint-color, #555)' }} />
-        </div>
+    <div
+      style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+      onClick={(e) => { if (e.target === e.currentTarget) handleClose(); }}
+    >
+      <style>{`
+        @keyframes tmaModalUp {
+          from { opacity: 0; transform: translateY(24px) scale(0.97); }
+          to   { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes tmaSuccessPop {
+          0%   { transform: scale(0.3) rotate(-10deg); opacity: 0; }
+          55%  { transform: scale(1.25) rotate(4deg); opacity: 1; }
+          75%  { transform: scale(0.92) rotate(-2deg); }
+          100% { transform: scale(1) rotate(0deg); }
+        }
+        @keyframes tmaSuccessGlow {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(22,163,74,0.4); }
+          50%       { box-shadow: 0 0 0 18px rgba(22,163,74,0); }
+        }
+        @keyframes tmaFailShake {
+          0%, 100% { transform: translateX(0) rotate(0deg); }
+          15%       { transform: translateX(-8px) rotate(-6deg); }
+          30%       { transform: translateX(8px) rotate(6deg); }
+          45%       { transform: translateX(-6px) rotate(-3deg); }
+          60%       { transform: translateX(6px) rotate(3deg); }
+          75%       { transform: translateX(-3px); }
+        }
+        @keyframes tmaFadeIn {
+          from { opacity: 0; transform: translateY(8px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
 
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px 0' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            {selectedMethod && (
-              <div style={{
-                width: '36px', height: '36px', borderRadius: '10px',
-                backgroundColor: 'var(--tg-theme-secondary-bg-color, #2c2c2e)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: '20px',
-              }}>
-                {selectedMethod === 'dkbank' ? '' : '💎'}
-              </div>
-            )}
-            <div>
-              <div style={{ fontWeight: 700, fontSize: '16px' }}>
-                {showingMethodSelector ? 'Choose Payment' : selectedMethod === 'ton' ? 'TON Wallet' : 'DK Bank'}
-              </div>
-              {!showingMethodSelector && (
-                <div style={{ fontSize: '12px', color: 'var(--tg-theme-hint-color, #8e8e93)' }}>
-                  {paymentStatus === 'otp_required' ? 'Verify OTP' :
-                   paymentStatus === 'initiated' || paymentStatus === 'checking' ? 'Processing…' :
-                   paymentStatus === 'success' ? 'Payment confirmed' :
-                   paymentStatus === 'failed' ? 'Payment failed' : 'Secure payment'}
-                </div>
-              )}
+      <div style={{
+        background: '#ffffff', borderRadius: 20,
+        padding: '24px 20px 28px',
+        width: '100%', maxWidth: 460, margin: '0 16px',
+        boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
+        animation: 'tmaModalUp 0.3s cubic-bezier(0.34,1.56,0.64,1) forwards',
+        maxHeight: '90vh', overflowY: 'auto',
+      }}>
+
+        {/* ── Success ── */}
+        {status === 'success' && (
+          <div style={{ textAlign: 'center', padding: '32px 0 24px' }}>
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              width: 72, height: 72, borderRadius: '50%',
+              background: 'linear-gradient(135deg, #dcfce7, #bbf7d0)',
+              marginBottom: 16,
+              animation: 'tmaSuccessPop 0.55s cubic-bezier(0.34,1.56,0.64,1) forwards, tmaSuccessGlow 1.2s ease 0.55s 2',
+            }}>
+              <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            </div>
+            <div style={{ fontSize: 18, fontWeight: 800, color: '#16a34a', marginBottom: 6, animation: 'tmaFadeIn 0.35s ease 0.3s both' }}>
+              Bet Placed!
+            </div>
+            <div style={{ fontSize: 13, color: '#6b7280', animation: 'tmaFadeIn 0.35s ease 0.45s both' }}>
+              Your payment was confirmed
             </div>
           </div>
-          {canClose && (
-            <button onClick={handleClose} style={{
-              background: 'var(--tg-theme-secondary-bg-color, #2c2c2e)',
-              border: 'none',
-              color: 'var(--tg-theme-hint-color, #8e8e93)',
-              width: '30px', height: '30px',
-              borderRadius: '50%',
-              fontSize: '16px',
-              cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              flexShrink: 0,
-            }}>✕</button>
-          )}
-        </div>
+        )}
 
-        {/* Amount pill */}
-        {(paymentStatus === 'idle' || paymentStatus === 'otp_required') && (
-          <div style={{ margin: '16px 20px 0', padding: '14px 16px', borderRadius: '12px', backgroundColor: 'var(--tg-theme-secondary-bg-color, #2c2c2e)' }}>
-            <div style={{ fontSize: '12px', color: 'var(--tg-theme-hint-color, #8e8e93)', marginBottom: '2px' }}>Amount</div>
-            <div style={{ fontSize: '26px', fontWeight: 700, color: 'var(--tg-theme-button-color, #2481cc)' }}>{formatBTN(amount)}</div>
-            <div style={{ fontSize: '12px', color: 'var(--tg-theme-hint-color, #8e8e93)', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{description}</div>
+        {/* ── Failed ── */}
+        {status === 'failed' && (
+          <div style={{ textAlign: 'center', padding: '32px 0 24px' }}>
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              width: 72, height: 72, borderRadius: '50%',
+              background: 'linear-gradient(135deg, #fee2e2, #fecaca)',
+              marginBottom: 16,
+              animation: 'tmaFailShake 0.55s cubic-bezier(0.36,0.07,0.19,0.97) forwards',
+            }}>
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </div>
+            <div style={{ fontSize: 18, fontWeight: 800, color: '#ef4444', marginBottom: 8, animation: 'tmaFadeIn 0.35s ease 0.3s both' }}>
+              Payment Failed
+            </div>
+            <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 24, lineHeight: 1.5, animation: 'tmaFadeIn 0.35s ease 0.45s both' }}>
+              {error || 'Could not complete payment'}
+            </div>
+            <button
+              onClick={() => { setStatus('idle'); setError(''); setOtpValue(''); }}
+              style={{ padding: '12px 28px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}
+            >
+              Try Again
+            </button>
           </div>
         )}
 
-        {/* Step dots — only when a method is selected and in DK Bank flow */}
-        {!showingMethodSelector && selectedMethod === 'dkbank' && (paymentStatus === 'idle' || paymentStatus === 'otp_required') && (
-          <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', margin: '14px 0 0' }}>
-            {[1, 2, 3].map(s => (
-              <div key={s} style={{
-                width: s === step ? '20px' : '6px',
-                height: '6px',
-                borderRadius: '3px',
-                backgroundColor: s <= step ? 'var(--tg-theme-button-color, #2481cc)' : 'var(--tg-theme-hint-color, #555)',
-                transition: 'all 0.3s ease',
-              }} />
-            ))}
+        {/* ── OTP step ── */}
+        {status === 'otp_required' && (
+          <div>
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>Verify OTP</div>
+                <div style={{ fontSize: 15, fontWeight: 800, color: '#111827' }}>DK Bank</div>
+              </div>
+              <button onClick={handleClose} style={{ background: '#f3f4f6', border: 'none', borderRadius: '50%', width: 30, height: 30, fontSize: 18, color: '#6b7280', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+            </div>
+            <div style={{ height: 1, background: '#f3f4f6', marginBottom: 20 }} />
+
+            <div style={{ textAlign: 'center', marginBottom: 20 }}>
+              <div style={{ fontSize: 36, marginBottom: 8 }}>📲</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#111827', marginBottom: 4 }}>OTP Sent</div>
+              <div style={{ fontSize: 13, color: '#9ca3af' }}>Enter the code sent to your DK Bank registered phone</div>
+            </div>
+
+            <input
+              type="text"
+              inputMode="numeric"
+              value={otpValue}
+              onChange={(e) => { setOtpValue(e.target.value.replace(/\D/g, '').slice(0, 8)); setError(''); }}
+              placeholder="- - - - - -"
+              autoFocus
+              style={{
+                width: '100%', boxSizing: 'border-box',
+                padding: '16px', borderRadius: 10,
+                border: error ? '2px solid #ef4444' : '2px solid #e5e7eb',
+                background: '#f9fafb', color: '#111827',
+                fontSize: 24, fontWeight: 700, letterSpacing: '0.3em',
+                textAlign: 'center', outline: 'none',
+              }}
+            />
+            {error && <div style={{ fontSize: 13, color: '#ef4444', marginTop: 8, textAlign: 'center' }}>{error}</div>}
+
+            <button
+              onClick={handleConfirmOtp}
+              disabled={otpValue.length < 4}
+              style={{
+                width: '100%', padding: '14px', marginTop: 16,
+                background: otpValue.length < 4 ? '#e5e7eb' : '#3b82f6',
+                color: otpValue.length < 4 ? '#9ca3af' : '#fff',
+                border: 'none', borderRadius: 10, fontSize: 15, fontWeight: 700,
+                cursor: otpValue.length < 4 ? 'not-allowed' : 'pointer',
+              }}
+            >
+              {`Confirm & Pay ${formatBTN(betAmount)}`}
+            </button>
+            <button
+              onClick={() => { setStatus('idle'); setOtpValue(''); setError(''); }}
+              style={{ width: '100%', padding: '12px', marginTop: 8, background: 'transparent', color: '#9ca3af', border: 'none', borderRadius: 10, fontSize: 14, cursor: 'pointer' }}
+            >
+              ← Change CID
+            </button>
           </div>
         )}
 
-        <div style={{ padding: '16px 20px 32px' }}>
+        {/* ── Main form (idle / processing) ── */}
+        {(status === 'idle' || status === 'processing') && (<>
 
-          {/* ── Method selector ── */}
-          {showingMethodSelector && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '4px' }}>
-              {[
-                { id: 'dkbank' as const, label: 'DK Bank', sub: 'Pay in BTN via OTP', icon: '', available: true },
-                { id: 'ton' as const, label: 'TON Wallet', sub: 'Pay with USDT / TON', icon: '💎', available: false },
-              ].map(({ id, label, sub, icon, available }) => (
-                <button
-                  key={id}
-                  onClick={() => available && setSelectedMethod(id)}
-                  disabled={!available}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: '14px',
-                    padding: '16px',
-                    backgroundColor: 'var(--tg-theme-secondary-bg-color, #2c2c2e)',
-                    border: '1.5px solid transparent',
-                    borderRadius: '14px',
-                    color: available ? 'var(--tg-theme-text-color, #fff)' : 'var(--tg-theme-hint-color, #8e8e93)',
-                    cursor: available ? 'pointer' : 'not-allowed',
-                    textAlign: 'left',
-                    width: '100%',
-                    opacity: available ? 1 : 0.55,
-                  }}
-                >
-                  <div style={{
-                    width: '44px', height: '44px', borderRadius: '12px', flexShrink: 0,
-                    backgroundColor: 'var(--tg-theme-bg-color, #1c1c1e)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: '22px',
-                  }}>{icon}</div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 600, fontSize: '15px' }}>{label}</div>
-                    <div style={{ fontSize: '12px', color: 'var(--tg-theme-hint-color, #8e8e93)', marginTop: '2px' }}>
-                      {available ? sub : 'Coming soon'}
-                    </div>
-                  </div>
-                  <div style={{ fontSize: '18px', color: 'var(--tg-theme-hint-color, #555)' }}>›</div>
-                </button>
+          {/* Header */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+            <div style={{ flex: 1, minWidth: 0, paddingRight: 12 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>
+                Placing a bet on
+              </div>
+              <div style={{ fontSize: 15, fontWeight: 800, color: '#111827', lineHeight: 1.3, marginBottom: 8, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {market.title}
+              </div>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 20, padding: '4px 12px' }}>
+                <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#3b82f6', flexShrink: 0 }} />
+                <span style={{ fontSize: 13, fontWeight: 600, color: '#3b82f6' }}>{outcome?.label}</span>
+              </div>
+            </div>
+            <button
+              onClick={handleClose}
+              style={{ background: '#f3f4f6', border: 'none', borderRadius: '50%', width: 30, height: 30, fontSize: 18, color: '#6b7280', cursor: status === 'processing' ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+            >×</button>
+          </div>
+
+          <div style={{ height: 1, background: '#f3f4f6', marginBottom: 16 }} />
+
+          {/* Payment method */}
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>Pay with</div>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+            <button
+              onClick={() => setSelectedMethod('dkbank')}
+              style={{
+                flex: 1, padding: '10px 12px', borderRadius: 10, cursor: 'pointer',
+                border: selectedMethod === 'dkbank' ? '2px solid #3b82f6' : '2px solid #e5e7eb',
+                background: selectedMethod === 'dkbank' ? '#eff6ff' : '#f9fafb',
+                display: 'flex', alignItems: 'center', gap: 8, textAlign: 'left',
+              }}
+            >
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: selectedMethod === 'dkbank' ? '#1d4ed8' : '#374151' }}>DK Bank</div>
+                <div style={{ fontSize: 11, color: selectedMethod === 'dkbank' ? '#60a5fa' : '#9ca3af' }}>BTN · Nu</div>
+              </div>
+            </button>
+            <div style={{ flex: 1, padding: '10px 12px', borderRadius: 10, border: '2px solid #f3f4f6', background: '#fafafa', display: 'flex', alignItems: 'center', gap: 8, opacity: 0.45 }}>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#9ca3af' }}>TON Wallet</div>
+                <div style={{ fontSize: 11, color: '#d1d5db' }}>Coming soon</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Amount + CID */}
+          {selectedMethod === 'dkbank' && (<>
+            <div style={{ height: 1, background: '#f3f4f6', marginBottom: 16 }} />
+
+            {/* Amount */}
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Amount (Nu)</div>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+              {QUICK_AMOUNTS.map((q) => (
+                <button key={q} onClick={() => setAmountStr(q.toString())} style={{
+                  flex: 1, padding: '9px 0', borderRadius: 10,
+                  border: amountStr === q.toString() ? '2px solid #3b82f6' : '2px solid #e5e7eb',
+                  background: amountStr === q.toString() ? '#eff6ff' : '#f9fafb',
+                  color: amountStr === q.toString() ? '#3b82f6' : '#374151',
+                  fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                }}>{q}</button>
               ))}
             </div>
-          )}
-
-          {/* ── Step 1: CID entry ── */}
-          {!showingMethodSelector && selectedMethod === 'dkbank' && paymentStatus === 'idle' && (
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--tg-theme-hint-color, #8e8e93)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                CID Number
-              </label>
+            <div style={{ position: 'relative', marginBottom: 16 }}>
+              <span style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', fontSize: 13, fontWeight: 600, color: '#9ca3af', pointerEvents: 'none' }}>Nu</span>
               <input
-                type="text"
-                inputMode="numeric"
-                value={cidNumber}
-                onChange={(e) => { setCidNumber(e.target.value.replace(/\D/g, '').slice(0, 11)); setError(''); }}
-                placeholder="11-digit Citizenship ID"
-                autoFocus
+                ref={inputRef}
+                type="number" min={MIN_BET} value={amountStr}
+                onChange={(e) => setAmountStr(e.target.value)}
                 style={{
-                  width: '100%',
-                  padding: '14px',
-                  backgroundColor: 'var(--tg-theme-secondary-bg-color, #2c2c2e)',
-                  border: error ? '1.5px solid #ff453a' : '1.5px solid transparent',
-                  borderRadius: '12px',
-                  color: 'var(--tg-theme-text-color, #ffffff)',
-                  fontSize: '16px',
-                  outline: 'none',
-                  boxSizing: 'border-box',
-                  letterSpacing: cidNumber ? '0.12em' : 'normal',
+                  width: '100%', boxSizing: 'border-box',
+                  padding: '12px 14px 12px 34px', borderRadius: 10,
+                  border: isValidAmount || !betAmount ? '2px solid #e5e7eb' : '2px solid #fca5a5',
+                  fontSize: 15, fontWeight: 600, color: '#111827',
+                  background: '#f9fafb', outline: 'none',
                 }}
               />
-              {cidNumber.length > 0 && cidNumber.length < 11 && (
-                <div style={{ fontSize: '12px', color: 'var(--tg-theme-hint-color, #8e8e93)', marginTop: '6px' }}>
-                  {cidNumber.length}/11 digits
-                </div>
-              )}
-              {error && <div style={{ fontSize: '13px', color: '#ff453a', marginTop: '8px' }}>{error}</div>}
-
-              <button
-                onClick={handleInitiatePayment}
-                disabled={isProcessing || cidNumber.length !== 11}
-                style={{
-                  width: '100%',
-                  padding: '15px',
-                  marginTop: '16px',
-                  backgroundColor: isProcessing || cidNumber.length !== 11
-                    ? 'var(--tg-theme-hint-color, #555)'
-                    : 'var(--tg-theme-button-color, #2481cc)',
-                  color: 'var(--tg-theme-button-text-color, #ffffff)',
-                  border: 'none',
-                  borderRadius: '12px',
-                  fontSize: '16px',
-                  fontWeight: 600,
-                  cursor: isProcessing || cidNumber.length !== 11 ? 'not-allowed' : 'pointer',
-                  opacity: isProcessing || cidNumber.length !== 11 ? 0.6 : 1,
-                }}
-              >
-                {isProcessing ? 'Sending OTP…' : 'Continue'}
-              </button>
-              <button
-                onClick={() => { setSelectedMethod(null); setCidNumber(''); setError(''); }}
-                style={{
-                  width: '100%', padding: '12px', marginTop: '8px',
-                  backgroundColor: 'transparent',
-                  color: 'var(--tg-theme-hint-color, #8e8e93)',
-                  border: 'none', borderRadius: '12px', fontSize: '14px', cursor: 'pointer',
-                }}
-              >
-                ← Back
-              </button>
             </div>
-          )}
 
-          {/* ── Step 2: OTP entry ── */}
-          {paymentStatus === 'otp_required' && (
-            <div>
-              <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-                <div style={{ fontSize: '40px', marginBottom: '8px' }}>📲</div>
-                <div style={{ fontSize: '15px', fontWeight: 600, marginBottom: '4px' }}>OTP Sent</div>
-                <div style={{ fontSize: '13px', color: 'var(--tg-theme-hint-color, #8e8e93)' }}>
-                  Enter the code sent to your DK Bank registered phone
+            {/* Estimated payout */}
+            {isValidAmount && (
+              <div style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                background: estProfit >= 0 ? '#f0fdf4' : '#f9fafb',
+                border: `1px solid ${estProfit >= 0 ? '#86efac' : '#e5e7eb'}`,
+                borderRadius: 10, padding: '10px 14px', marginBottom: 16,
+              }}>
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Est. payout if win</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: estProfit >= 0 ? '#16a34a' : '#9ca3af' }}>
+                    {estProfit >= 0 ? `Nu ${estPayout.toFixed(2)}` : '—'}
+                  </div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Est. profit</div>
+                  {estProfit >= 0
+                    ? <div style={{ fontSize: 15, fontWeight: 700, color: '#16a34a' }}>+Nu {estProfit.toFixed(2)}</div>
+                    : <div style={{ fontSize: 12, color: '#9ca3af', maxWidth: 120, textAlign: 'right' }}>Grows as more bets join</div>
+                  }
                 </div>
               </div>
+            )}
 
+            {/* Payout breakdown */}
+            {isValidAmount && (
+              <PayoutBreakdown market={market} outcomeId={outcomeId} betAmount={betAmount} />
+            )}
+
+            {/* CID */}
+            <div style={{ marginBottom: 12, marginTop: 16 }}>
+              <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>CID Number *</label>
               <input
-                type="text"
-                inputMode="numeric"
-                value={otpValue}
-                onChange={(e) => { setOtpValue(e.target.value.replace(/\D/g, '').slice(0, 8)); setError(''); }}
-                placeholder="- - - - - -"
-                autoFocus
+                type="text" inputMode="numeric" value={cidNumber}
+                onChange={(e) => setCidNumber(e.target.value.replace(/\D/g, '').slice(0, 11))}
+                placeholder="11-digit CID"
                 style={{
-                  width: '100%',
-                  padding: '16px',
-                  backgroundColor: 'var(--tg-theme-secondary-bg-color, #2c2c2e)',
-                  border: error ? '1.5px solid #ff453a' : '1.5px solid transparent',
-                  borderRadius: '12px',
-                  color: 'var(--tg-theme-text-color, #ffffff)',
-                  fontSize: '24px',
-                  fontWeight: 700,
-                  letterSpacing: '0.3em',
-                  textAlign: 'center',
-                  outline: 'none',
-                  boxSizing: 'border-box',
+                  width: '100%', boxSizing: 'border-box',
+                  padding: '12px 14px', borderRadius: 10,
+                  border: '2px solid #e5e7eb', fontSize: 15, fontWeight: 600,
+                  color: '#111827', background: '#f9fafb', outline: 'none',
                 }}
               />
-              {error && <div style={{ fontSize: '13px', color: '#ff453a', marginTop: '8px', textAlign: 'center' }}>{error}</div>}
-
-              <button
-                onClick={handleConfirmOtp}
-                disabled={isProcessing || otpValue.length < 4}
+            </div>
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Name (Optional)</label>
+              <input
+                type="text" value={customerName}
+                onChange={(e) => setCustomerName(e.target.value)}
+                placeholder="Your name"
                 style={{
-                  width: '100%',
-                  padding: '15px',
-                  marginTop: '16px',
-                  backgroundColor: isProcessing || otpValue.length < 4
-                    ? 'var(--tg-theme-hint-color, #555)'
-                    : 'var(--tg-theme-button-color, #2481cc)',
-                  color: 'var(--tg-theme-button-text-color, #ffffff)',
-                  border: 'none',
-                  borderRadius: '12px',
-                  fontSize: '16px',
-                  fontWeight: 600,
-                  cursor: isProcessing || otpValue.length < 4 ? 'not-allowed' : 'pointer',
-                  opacity: isProcessing || otpValue.length < 4 ? 0.6 : 1,
+                  width: '100%', boxSizing: 'border-box',
+                  padding: '12px 14px', borderRadius: 10,
+                  border: '2px solid #e5e7eb', fontSize: 15, fontWeight: 600,
+                  color: '#111827', background: '#f9fafb', outline: 'none',
                 }}
-              >
-                {isProcessing ? 'Confirming…' : `Pay ${formatBTN(amount)}`}
-              </button>
+              />
+            </div>
+          </>)}
 
-              <button
-                onClick={() => { setPaymentStatus('idle'); setOtpValue(''); setError(''); }}
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  marginTop: '8px',
-                  backgroundColor: 'transparent',
-                  color: 'var(--tg-theme-hint-color, #8e8e93)',
-                  border: 'none',
-                  borderRadius: '12px',
-                  fontSize: '14px',
-                  cursor: 'pointer',
-                }}
-              >
-                ← Change CID
-              </button>
+          {error && (
+            <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', color: '#ef4444', padding: '10px 14px', borderRadius: 8, marginBottom: 16, fontSize: 13, fontWeight: 500 }}>
+              {error}
             </div>
           )}
 
-          {/* ── Processing ── */}
-          {(paymentStatus === 'initiated' || paymentStatus === 'checking') && (
-            <div style={{ textAlign: 'center', padding: '24px 0' }}>
-              <div style={{ fontSize: '48px', marginBottom: '12px', animation: 'pulse 1.5s infinite' }}>⏳</div>
-              <div style={{ fontSize: '17px', fontWeight: 600, marginBottom: '6px' }}>Confirming Payment</div>
-              <div style={{ fontSize: '13px', color: 'var(--tg-theme-hint-color, #8e8e93)' }}>
-                DK Bank is processing your transaction…
-              </div>
-              <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--tg-theme-button-color, #2481cc)', marginTop: '16px' }}>
-                {formatBTN(amount)}
-              </div>
-            </div>
-          )}
-
-          {/* ── Success ── */}
-          {paymentStatus === 'success' && (
-            <div style={{ textAlign: 'center', padding: '24px 0' }}>
-              <div style={{ fontSize: '56px', marginBottom: '12px' }}>✅</div>
-              <div style={{ fontSize: '17px', fontWeight: 600, marginBottom: '6px', color: '#30d158' }}>Payment Confirmed</div>
-              <div style={{ fontSize: '22px', fontWeight: 700, marginTop: '8px' }}>{formatBTN(amount)}</div>
-              <div style={{ fontSize: '13px', color: 'var(--tg-theme-hint-color, #8e8e93)', marginTop: '6px' }}>Your bet has been placed</div>
-            </div>
-          )}
-
-          {/* ── Failed ── */}
-          {paymentStatus === 'failed' && (
-            <div style={{ textAlign: 'center', padding: '24px 0' }}>
-              <div style={{ fontSize: '56px', marginBottom: '12px' }}>❌</div>
-              <div style={{ fontSize: '17px', fontWeight: 600, marginBottom: '6px', color: '#ff453a' }}>Payment Failed</div>
-              <div style={{ fontSize: '13px', color: 'var(--tg-theme-hint-color, #8e8e93)', marginBottom: '20px' }}>
-                {error || 'Something went wrong. Please try again.'}
-              </div>
-              <button
-                onClick={() => { setPaymentStatus('idle'); setError(''); setOtpValue(''); }}
-                style={{
-                  width: '100%',
-                  padding: '15px',
-                  backgroundColor: 'var(--tg-theme-button-color, #2481cc)',
-                  color: 'var(--tg-theme-button-text-color, #ffffff)',
-                  border: 'none',
-                  borderRadius: '12px',
-                  fontSize: '16px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                }}
-              >
-                Try Again
-              </button>
-            </div>
-          )}
-
-        </div>
+          <button
+            onClick={handlePay}
+            disabled={!canPay}
+            style={{
+              width: '100%', padding: '14px',
+              background: canPay ? '#3b82f6' : '#e5e7eb',
+              color: canPay ? '#fff' : '#9ca3af',
+              border: 'none', borderRadius: 10, fontSize: 15, fontWeight: 700,
+              cursor: canPay ? 'pointer' : 'not-allowed',
+            }}
+          >
+            {status === 'processing'
+              ? 'Processing…'
+              : canPay
+                ? `Pay ${formatBTN(betAmount)} with DK Bank`
+                : !isValidAmount ? `Min Nu ${MIN_BET}` : 'Enter CID to continue'}
+          </button>
+        </>)}
       </div>
     </div>
   );

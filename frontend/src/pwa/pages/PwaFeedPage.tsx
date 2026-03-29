@@ -3,6 +3,7 @@ import { getMarkets, placeBet, type Market } from "@/api/client";
 import { PwaPaymentModal } from "../components/PwaPaymentModal";
 import type { PaymentResponse } from "@/types/payment";
 import { useBreakpoint } from "../hooks/useBreakpoint";
+import { PoolDetails } from "@/components/PoolDetails";
 function outcomeColor(rank: number, total: number): string {
   if (rank === 0) return "#22c55e";                          // highest → green
   if (rank === total - 1 && total > 1) return "#ef4444";    // lowest  → red
@@ -28,9 +29,10 @@ function useCountdown(closesAt: string | null): string {
 
 // ── Market Card ────────────────────────────────────────────────────────────────
 
-function MarketCard({ market, onBet }: {
+function MarketCard({ market, onBet, lastUpdated }: {
   market: Market;
   onBet: (outcomeId: string) => void;
+  lastUpdated?: Date | null;
 }) {
   const [showAll, setShowAll] = useState(false);
   const isUpcoming = market.status === "upcoming";
@@ -184,8 +186,11 @@ function MarketCard({ market, onBet }: {
       )}
 
       {/* Footer */}
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#9ca3af", marginTop: "auto" }}>
-        <span>{isUpcoming ? "Upcoming" : `Vol Nu ${totalPool.toLocaleString()}`}</span>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 10, color: "#9ca3af", marginTop: "auto" }}>
+        {!isUpcoming
+          ? <PoolDetails market={market} lastUpdated={lastUpdated} />
+          : <span>Upcoming</span>
+        }
         <span>{isUpcoming ? `Opens ${countdown}` : countdown}</span>
       </div>
     </div>
@@ -200,11 +205,12 @@ export function PwaFeedPage() {
   const [markets, setMarkets] = useState<Market[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeBet, setActiveBet] = useState<ActiveBet | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const bp = useBreakpoint();
 
   useEffect(() => {
     getMarkets()
-      .then((d) => setMarkets(d.filter((m) => m.status === "open" || m.status === "upcoming")))
+      .then((d) => { setMarkets(d.filter((m) => m.status === "open" || m.status === "upcoming")); setLastUpdated(new Date()); })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
@@ -242,7 +248,7 @@ export function PwaFeedPage() {
 
     // Refresh from server to get accurate numbers
     getMarkets()
-      .then((d) => setMarkets(d.filter((m) => m.status === "open" || m.status === "upcoming")))
+      .then((d) => { setMarkets(d.filter((m) => m.status === "open" || m.status === "upcoming")); setLastUpdated(new Date()); })
       .catch(console.error);
   };
 
@@ -276,6 +282,7 @@ export function PwaFeedPage() {
           key={market.id}
           market={market}
           onBet={(outcomeId) => setActiveBet({ marketId: market.id, outcomeId })}
+          lastUpdated={lastUpdated}
         />
       ))}
     </div>

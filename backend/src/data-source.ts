@@ -8,6 +8,7 @@ import { Bet } from "./entities/bet.entity";
 import { Payment } from "./entities/payment.entity";
 import { Transaction } from "./entities/transaction.entity";
 import { Settlement } from "./entities/settlement.entity";
+import { Dispute } from "./entities/dispute.entity";
 import { DKGatewayAuthToken } from "./entities/dk-gateway-auth-token.entity";
 
 dotenv.config();
@@ -35,6 +36,7 @@ export const AppDataSource = new DataSource({
     Payment,
     Transaction,
     Settlement,
+    Dispute,
     DKGatewayAuthToken,
   ],
   migrations: [__dirname + "/migrations/*.ts"],

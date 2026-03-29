@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 200" width="560" height="200">
+  <!-- Background -->
+  <rect width="560" height="200" fill="#0b1a2e" rx="14"/>
+
+  <!-- === T Icon === -->
+  <g transform="translate(44, 48)">
+
+    <!-- Green dot -->
+    <circle cx="12" cy="42" r="7.5" fill="#3ecf6e"/>
+
+    <!-- Blue dot (slightly lower and right) -->
+    <circle cx="24" cy="62" r="6.5" fill="#2b7fdb"/>
+
+    <!-- Green curved left cap of crossbar -->
+    <path d="M38,24 C38,14 46,8 56,8 L110,8 L110,30 L56,30 C46,30 38,34 38,24 Z" fill="#3ecf6e" rx="8"/>
+
+    <!-- Blue crossbar (right portion) -->
+    <rect x="110" y="8" width="76" height="22" rx="11" fill="#2775d0"/>
+
+    <!-- Vertical stripes (left) -->
+    <rect x="110" y="30" width="16" height="76" rx="4" fill="#1c5bb8"/>
+    <!-- Vertical stripes (middle) -->
+    <rect x="132" y="30" width="16" height="76" rx="4" fill="#2775d0"/>
+    <!-- Vertical stripes (right - shorter/lighter) -->
+    <rect x="154" y="30" width="12" height="76" rx="4" fill="#3a8ae8"/>
+
+  </g>
+
+  <!-- "Tara" text -->
+  <text x="268" y="118"
+    font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif"
+    font-size="68"
+    font-weight="700"
+    fill="#ffffff"
+    letter-spacing="-1.5">Tara</text>
+
+  <!-- Subtitle -->
+  <text x="269" y="146"
+    font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif"
+    font-size="17"
+    font-weight="400"
+    fill="#8aaac8"
+    letter-spacing="0.4">Parimutuel Prediction Market</text>
+</svg>

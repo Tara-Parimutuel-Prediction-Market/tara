@@ -99,7 +99,7 @@ export interface Market {
   title: string;
   description: string | null;
   imageUrl: string | null;
-  status: "upcoming" | "open" | "closed" | "resolved" | "settled" | "cancelled";
+  status: "upcoming" | "open" | "closed" | "resolving" | "resolved" | "settled" | "cancelled";
   mechanism: "parimutuel" | "scpm";
   liquidityParam: string;
   totalPool: string;
@@ -107,8 +107,36 @@ export interface Market {
   opensAt: string | null;
   closesAt: string | null;
   resolvedAt: string | null;
+  proposedOutcomeId: string | null;
+  disputeDeadlineAt: string | null;
   createdAt: string;
   outcomes: Outcome[];
+}
+
+export interface Dispute {
+  id: string;
+  userId: string;
+  marketId: string;
+  bondAmount: string;
+  reason: string | null;
+  bondRefunded: boolean;
+  createdAt: string;
+}
+
+export interface SubmitDisputePayload {
+  bondAmount: number;
+  reason?: string;
+}
+
+export function getDisputes(marketId: string): Promise<Dispute[]> {
+  return request<Dispute[]>(`/markets/${marketId}/disputes`);
+}
+
+export function submitDispute(marketId: string, payload: SubmitDisputePayload): Promise<Dispute> {
+  return request<Dispute>(`/markets/${marketId}/disputes`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
 }
 
 export function getMarkets(): Promise<Market[]> {

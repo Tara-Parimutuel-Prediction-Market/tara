@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import { PwaPaymentModal } from './PwaPaymentModal';
-import type { PaymentMethod, PaymentResponse } from '@/types/payment';
+import type { PaymentMethod } from '@/types/payment';
 
 interface PwaPaymentSelectorProps {
   amount: number;
@@ -11,12 +10,9 @@ interface PwaPaymentSelectorProps {
 
 export function PwaPaymentSelector({
   amount,
-  description,
-  onPaymentSuccess,
   onPaymentFailure,
 }: PwaPaymentSelectorProps) {
   const [selectedMethod, setSelectedMethod] = useState<string>('');
-  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const paymentMethods: PaymentMethod[] = [
     {
@@ -49,23 +45,11 @@ export function PwaPaymentSelector({
 
   const handlePaymentSelect = (methodId: string) => {
     setSelectedMethod(methodId);
-    if (methodId === 'dkbank') {
-      setIsModalOpen(true);
-    } else if (methodId === 'ton') {
+    if (methodId === 'ton') {
       onPaymentFailure?.('TON payments coming soon');
     } else if (methodId === 'credits') {
       onPaymentFailure?.('Credits payments coming soon');
     }
-  };
-
-  const handleDkBankSuccess = (_payment: PaymentResponse) => {
-    setIsModalOpen(false);
-    onPaymentSuccess?.('dkbank');
-  };
-
-  const handleDkBankFailure = (error: string) => {
-    setIsModalOpen(false);
-    onPaymentFailure?.(error);
   };
 
   return (
@@ -151,14 +135,6 @@ export function PwaPaymentSelector({
         )}
       </div>
 
-      <PwaPaymentModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        amount={amount}
-        description={description}
-        onSuccess={handleDkBankSuccess}
-        onFailure={handleDkBankFailure}
-      />
     </>
   );
 }

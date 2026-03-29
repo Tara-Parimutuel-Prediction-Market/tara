@@ -1,6 +1,6 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable, NotFoundException, BadRequestException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
+import { Repository, DataSource } from "typeorm";
 import {
   IsString,
   IsOptional,
@@ -15,6 +15,10 @@ import {
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Market, MarketStatus, MarketMechanism } from "../entities/market.entity";
 import { Outcome } from "../entities/outcome.entity";
+import { Dispute } from "../entities/dispute.entity";
+import { Payment, PaymentType, PaymentMethod, PaymentStatus } from "../entities/payment.entity";
+import { Transaction, TransactionType } from "../entities/transaction.entity";
+import { User } from "../entities/user.entity";
 import { ParimutuelEngine } from "./parimutuel.engine";
 import { LMSRService } from "./lmsr.service";
 import { SCPMService } from "./scpm.service";
@@ -71,14 +75,31 @@ export class PlaceBetDto {
   @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) @Max(1) limitPrice?: number;
 }
 
+export class SubmitDisputeDto {
+  @ApiProperty({ description: "Bond amount (minimum 1 credit)" })
+  @IsNumber()
+  @Min(1)
+  bondAmount: number;
+
+  @ApiPropertyOptional({ description: "Reason for disputing the proposed outcome" })
+  @IsOptional()
+  @IsString()
+  reason?: string;
+}
+
 @Injectable()
 export class MarketsService {
   constructor(
     @InjectRepository(Market) private marketRepo: Repository<Market>,
     @InjectRepository(Outcome) private outcomeRepo: Repository<Outcome>,
+    @InjectRepository(Dispute) private disputeRepo: Repository<Dispute>,
+    @InjectRepository(Payment) private paymentRepo: Repository<Payment>,
+    @InjectRepository(Transaction) private transactionRepo: Repository<Transaction>,
+    @InjectRepository(User) private userRepo: Repository<User>,
     private engine: ParimutuelEngine,
     private lmsrService: LMSRService,
     private scpmService: SCPMService,
+    private dataSource: DataSource,
   ) {}
 
   async create(dto: CreateMarketDto): Promise<Market> {
@@ -172,12 +193,76 @@ export class MarketsService {
     return this.engine.transitionMarket(marketId, to);
   }
 
+  proposeResolution(marketId: string, proposedOutcomeId: string) {
+    return this.engine.proposeResolution(marketId, proposedOutcomeId);
+  }
+
   resolve(marketId: string, winningOutcomeId: string) {
     return this.engine.resolveMarket(marketId, winningOutcomeId);
   }
 
   cancel(marketId: string) {
     return this.engine.cancelMarket(marketId);
+  }
+
+  async submitDispute(userId: string, marketId: string, dto: SubmitDisputeDto): Promise<Dispute> {
+    const market = await this.findOne(marketId);
+    if (market.status !== MarketStatus.RESOLVING)
+      throw new BadRequestException("Disputes can only be submitted during the resolution window");
+
+    if (market.disputeDeadlineAt && new Date() > market.disputeDeadlineAt)
+      throw new BadRequestException("Dispute window has closed");
+
+    return await this.dataSource.transaction(async (em) => {
+      // Check user balance
+      const { balance } = await em.getRepository(Payment)
+        .createQueryBuilder("p")
+        .select("COALESCE(SUM(p.amount), 0)", "balance")
+        .where("p.userId = :userId", { userId })
+        .andWhere("p.method = :method", { method: PaymentMethod.CREDITS })
+        .andWhere("p.status = :status", { status: PaymentStatus.SUCCESS })
+        .getRawOne();
+      const balanceBefore = Number(balance);
+      if (balanceBefore < dto.bondAmount)
+        throw new BadRequestException("Insufficient balance for dispute bond");
+
+      // Deduct bond from balance
+      const bondPayment = await em.save(Payment, em.create(Payment, {
+        type: PaymentType.BET_PLACED,
+        status: PaymentStatus.SUCCESS,
+        method: PaymentMethod.CREDITS,
+        amount: -dto.bondAmount,
+        currency: 'CREDITS',
+        referenceId: marketId,
+        description: `Dispute bond for market: ${market.title}`,
+        userId,
+      }));
+      await em.save(Transaction, em.create(Transaction, {
+        type: TransactionType.BET_PLACED,
+        amount: -dto.bondAmount,
+        balanceBefore,
+        balanceAfter: balanceBefore - dto.bondAmount,
+        paymentId: bondPayment.id,
+        userId,
+        note: `Dispute bond for market resolution`,
+      }));
+
+      // Create dispute record
+      return em.save(Dispute, em.create(Dispute, {
+        userId,
+        marketId,
+        bondAmount: dto.bondAmount,
+        reason: dto.reason ?? null,
+        bondRefunded: false,
+      }));
+    });
+  }
+
+  getDisputesByMarket(marketId: string): Promise<Dispute[]> {
+    return this.disputeRepo.find({
+      where: { marketId },
+      order: { createdAt: "DESC" },
+    });
   }
 
   async delete(id: string): Promise<void> {

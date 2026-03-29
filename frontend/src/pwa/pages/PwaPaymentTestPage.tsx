@@ -1,21 +1,47 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { CheckCircle, XCircle } from "lucide-react";
 import { PwaPaymentSelector } from "../components/PwaPaymentSelector";
+
+const animationStyles = `
+@keyframes slideInDown {
+  from { opacity: 0; transform: translateY(-16px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes bounceIcon {
+  0%   { transform: scale(0.5); opacity: 0; }
+  60%  { transform: scale(1.2); opacity: 1; }
+  100% { transform: scale(1); }
+}
+@keyframes shakeIcon {
+  0%, 100% { transform: translateX(0); }
+  20%       { transform: translateX(-6px); }
+  40%       { transform: translateX(6px); }
+  60%       { transform: translateX(-4px); }
+  80%       { transform: translateX(4px); }
+}
+`;
 
 export function PwaPaymentTestPage() {
   const [paymentResult, setPaymentResult] = useState<string>('');
+  const [resultKey, setResultKey] = useState(0);
   const [testAmount] = useState(100); // 100 BTN
 
   const handlePaymentSuccess = (method: string) => {
     setPaymentResult(`✅ Payment successful using ${method}!`);
+    setResultKey(k => k + 1);
   };
 
   const handlePaymentFailure = (error: string) => {
     setPaymentResult(`❌ Payment failed: ${error}`);
+    setResultKey(k => k + 1);
   };
+
+  const isSuccess = paymentResult.includes('✅');
 
   return (
     <div style={{ maxWidth: "680px", margin: "0 auto", padding: "20px 16px" }}>
+      <style>{animationStyles}</style>
       <Link
         to="/"
         style={{
@@ -77,15 +103,25 @@ export function PwaPaymentTestPage() {
         </div>
 
         {paymentResult && (
-          <div style={{
-            backgroundColor: paymentResult.includes('✅') ? '#4caf50' : '#ff4757',
+          <div key={resultKey} style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            backgroundColor: isSuccess ? '#1a3a2a' : '#3a1a1a',
+            border: `1px solid ${isSuccess ? '#4caf50' : '#ff4757'}`,
             color: '#fff',
-            padding: '16px',
-            borderRadius: '8px',
+            padding: '14px 16px',
+            borderRadius: '10px',
             marginBottom: '20px',
             fontSize: '0.9rem',
+            animation: 'slideInDown 0.3s ease forwards',
           }}>
-            {paymentResult}
+            <span style={{ animation: isSuccess ? 'bounceIcon 0.45s ease forwards' : 'shakeIcon 0.4s ease forwards', display: 'flex', flexShrink: 0 }}>
+              {isSuccess
+                ? <CheckCircle size={22} color="#4caf50" />
+                : <XCircle size={22} color="#ff4757" />}
+            </span>
+            <span>{isSuccess ? paymentResult.replace('✅ ', '') : paymentResult.replace('❌ ', '')}</span>
           </div>
         )}
 

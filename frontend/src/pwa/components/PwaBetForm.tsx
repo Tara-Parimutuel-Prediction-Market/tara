@@ -41,7 +41,6 @@ export const PwaBetForm: FC<PwaBetFormProps> = ({ market, onBetPlaced }) => {
 
   const handlePaymentSuccess = async (payment: PaymentResponse) => {
     if (!selectedOutcomeId) return;
-    setShowPaymentModal(false);
     try {
       const freshMarket = await getMarket(market.id);
       const payload = freshMarket.mechanism === 'scpm'

@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
-import { getMarket, Market } from "@/api/client";
+import { getMarket, getDisputes, submitDispute, Market, Dispute } from "@/api/client";
 import { PwaBetForm } from "../components/PwaBetForm";
 import { useBreakpoint } from "../hooks/useBreakpoint";
 
@@ -9,6 +9,12 @@ export function PwaMarketDetailPage() {
   const [market, setMarket] = useState<Market | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [disputes, setDisputes] = useState<Dispute[]>([]);
+  const [bondAmount, setBondAmount] = useState("10");
+  const [disputeReason, setDisputeReason] = useState("");
+  const [disputeSubmitting, setDisputeSubmitting] = useState(false);
+  const [disputeError, setDisputeError] = useState<string | null>(null);
+  const [disputeSuccess, setDisputeSuccess] = useState(false);
 
   const refreshMarket = useCallback((updatedMarket?: Market) => {
     if (updatedMarket) {
@@ -29,6 +35,28 @@ export function PwaMarketDetailPage() {
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, [id]);
+
+  useEffect(() => {
+    if (!id || !market || market.status !== "resolving") return;
+    getDisputes(id).then(setDisputes).catch(() => {});
+  }, [id, market?.status]);
+
+  const handleSubmitDispute = async () => {
+    if (!id) return;
+    const amount = parseFloat(bondAmount);
+    if (!amount || amount < 1) { setDisputeError("Minimum bond is 1 credit."); return; }
+    setDisputeSubmitting(true);
+    setDisputeError(null);
+    try {
+      await submitDispute(id, { bondAmount: amount, reason: disputeReason || undefined });
+      setDisputeSuccess(true);
+      getDisputes(id).then(setDisputes).catch(() => {});
+    } catch (e: any) {
+      setDisputeError(e.message || "Failed to submit dispute");
+    } finally {
+      setDisputeSubmitting(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -62,7 +90,21 @@ export function PwaMarketDetailPage() {
   );
 
   const isOpen = market.status === "open";
+  const isResolving = market.status === "resolving";
   const bp = useBreakpoint();
+
+  const proposedOutcome = isResolving && market.proposedOutcomeId
+    ? market.outcomes.find((o) => o.id === market.proposedOutcomeId)
+    : null;
+
+  const disputeTimeLeft = (() => {
+    if (!market.disputeDeadlineAt) return null;
+    const diff = new Date(market.disputeDeadlineAt).getTime() - Date.now();
+    if (diff <= 0) return "Dispute window closed";
+    const h = Math.floor(diff / 3600000);
+    const m = Math.floor((diff % 3600000) / 60000);
+    return `${h}h ${m}m remaining`;
+  })();
 
   return (
     <div style={{ maxWidth: "680px", margin: "0 auto", padding: bp === "mobile" ? "16px 12px 80px" : "20px 16px" }}>
@@ -140,7 +182,7 @@ export function PwaMarketDetailPage() {
           >
             STATUS
           </div>
-          <div style={{ color: isOpen ? "#4CAF50" : "#9ca3af", fontWeight: 700 }}>
+          <div style={{ color: isOpen ? "#4CAF50" : isResolving ? "#f59e0b" : "#9ca3af", fontWeight: 700 }}>
             {market.status.toUpperCase()}
           </div>
         </div>
@@ -217,6 +259,76 @@ export function PwaMarketDetailPage() {
 
       {isOpen ? (
         <PwaBetForm market={market} onBetPlaced={refreshMarket} />
+      ) : isResolving ? (
+        <div style={{ border: "1px solid #f59e0b", borderRadius: "12px", overflow: "hidden" }}>
+          {/* Header */}
+          <div style={{ background: "#fef3c7", padding: "14px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <div style={{ fontWeight: 700, color: "#92400e", fontSize: "0.95rem" }}>Dispute Window Open</div>
+              <div style={{ fontSize: "0.8rem", color: "#b45309", marginTop: "2px" }}>{disputeTimeLeft}</div>
+            </div>
+            <div style={{ fontSize: "1.5rem" }}>⚖️</div>
+          </div>
+          {/* Proposed outcome */}
+          <div style={{ padding: "16px", background: "#fff" }}>
+            <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#9ca3af", letterSpacing: "0.05em", marginBottom: "8px" }}>PROPOSED OUTCOME</div>
+            {proposedOutcome ? (
+              <div style={{ display: "inline-flex", alignItems: "center", gap: "8px", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "8px", padding: "8px 14px" }}>
+                <span style={{ color: "#16a34a", fontWeight: 700 }}>{proposedOutcome.label}</span>
+              </div>
+            ) : (
+              <div style={{ color: "#9ca3af", fontSize: "0.85rem" }}>Outcome pending</div>
+            )}
+            <div style={{ marginTop: "8px", fontSize: "0.8rem", color: "#6b7280" }}>
+              {disputes.length} dispute{disputes.length !== 1 ? "s" : ""} submitted
+            </div>
+          </div>
+          {/* Dispute form */}
+          <div style={{ padding: "16px", borderTop: "1px solid #f3f4f6", background: "#fafafa" }}>
+            {disputeSuccess ? (
+              <div style={{ textAlign: "center", padding: "12px", color: "#16a34a", fontWeight: 600, fontSize: "0.9rem" }}>
+                Dispute submitted. Your bond will be refunded after resolution.
+              </div>
+            ) : (
+              <>
+                <div style={{ fontSize: "0.8rem", fontWeight: 700, color: "#374151", marginBottom: "10px" }}>
+                  Disagree with the proposed outcome?
+                </div>
+                <div style={{ marginBottom: "10px" }}>
+                  <label style={{ fontSize: "0.75rem", color: "#6b7280", display: "block", marginBottom: "4px" }}>Bond Amount (credits)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={bondAmount}
+                    onChange={(e) => setBondAmount(e.target.value)}
+                    style={{ width: "100%", boxSizing: "border-box", padding: "8px 12px", borderRadius: "8px", border: "1.5px solid #e5e7eb", fontSize: "0.9rem", outline: "none" }}
+                  />
+                </div>
+                <div style={{ marginBottom: "12px" }}>
+                  <label style={{ fontSize: "0.75rem", color: "#6b7280", display: "block", marginBottom: "4px" }}>Reason (optional)</label>
+                  <textarea
+                    value={disputeReason}
+                    onChange={(e) => setDisputeReason(e.target.value)}
+                    rows={2}
+                    placeholder="Why do you think this outcome is wrong?"
+                    style={{ width: "100%", boxSizing: "border-box", padding: "8px 12px", borderRadius: "8px", border: "1.5px solid #e5e7eb", fontSize: "0.85rem", outline: "none", resize: "none", fontFamily: "inherit" }}
+                  />
+                </div>
+                {disputeError && <div style={{ color: "#dc2626", fontSize: "0.8rem", marginBottom: "8px" }}>{disputeError}</div>}
+                <button
+                  onClick={handleSubmitDispute}
+                  disabled={disputeSubmitting}
+                  style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "none", background: disputeSubmitting ? "#d1d5db" : "#f59e0b", color: "#fff", fontWeight: 700, fontSize: "0.9rem", cursor: disputeSubmitting ? "not-allowed" : "pointer" }}
+                >
+                  {disputeSubmitting ? "Submitting…" : "Submit Dispute"}
+                </button>
+                <div style={{ fontSize: "0.72rem", color: "#9ca3af", marginTop: "8px", textAlign: "center" }}>
+                  Bond is always refunded after admin makes the final call.
+                </div>
+              </>
+            )}
+          </div>
+        </div>
       ) : market.status === "upcoming" ? (
         <div
           style={{

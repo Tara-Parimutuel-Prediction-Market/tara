@@ -15,6 +15,7 @@ import {
   PaymentStatus,
   PaymentType,
 } from "../entities/payment.entity";
+import { Transaction, TransactionType } from "../entities/transaction.entity";
 import { DKGatewayService } from "./services/dk-gateway/dk-gateway.service";
 
 export interface DKBankPaymentRequest {
@@ -425,6 +426,16 @@ export class DKBankPaymentService {
         payment.confirmedAt = new Date();
         payment.failureReason = null;
 
+        // Snapshot balance before crediting
+        const { balance: rawBefore } = await em.getRepository(Payment)
+          .createQueryBuilder("p")
+          .select("COALESCE(SUM(p.amount), 0)", "balance")
+          .where("p.userId = :userId", { userId: params.userId })
+          .andWhere("p.method = :method", { method: PaymentMethod.CREDITS })
+          .andWhere("p.status = :status", { status: PaymentStatus.SUCCESS })
+          .getRawOne();
+        const balanceBefore = Number(rawBefore);
+
         // Credit the user's CREDITS balance so placeBet can succeed
         const credits = em.create(Payment, {
           type: PaymentType.DEPOSIT,
@@ -438,6 +449,17 @@ export class DKBankPaymentService {
         });
         await em.save(Payment, credits);
         this.logger.log(`[CREDITS] Credited ${payment.amount} CREDITS to user ${params.userId} from DK payment ${payment.id}`);
+
+        // Audit transaction record
+        await em.save(Transaction, em.create(Transaction, {
+          type: TransactionType.DEPOSIT,
+          amount: Number(payment.amount),
+          balanceBefore,
+          balanceAfter: balanceBefore + Number(payment.amount),
+          paymentId: credits.id,
+          userId: params.userId,
+          note: `DK Bank deposit confirmed (dk_payment: ${payment.id})`,
+        }));
       } else if (mapped === PaymentStatus.FAILED) {
         payment.status = PaymentStatus.FAILED;
         payment.failureReason = params.dkStatusDesc || "Payment failed";

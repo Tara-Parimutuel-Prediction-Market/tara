@@ -2,22 +2,15 @@ import { FC, useState, useEffect } from "react";
 import { Spinner } from "@telegram-apps/telegram-ui";
 import { Page } from "@/tma/components/Page";
 import { getMarkets, placeBet, type Market } from "@/api/client";
-import { formatBTN } from "@/api/dkbank";
 import { useAuth } from "@/tma/hooks/useAuth";
 import { TmaPaymentModal } from "@/tma/components/TmaPaymentModal";
-import config from "@/config";
+import type { PaymentResponse } from "@/types/payment";
+import { PoolDetails } from "@/components/PoolDetails";
 
-const DEFAULT_AMOUNT = 100;
-const QUICK_AMOUNTS = [50, 100, 200, 500];
-const COLORS = ["#2481cc", "#e05c5c", "#30d158", "#e8a838"];
-
-function calcWin(market: Market, outcomeId: string, bet: number): number {
-  const o = market.outcomes.find((x) => x.id === outcomeId);
-  if (!o || bet <= 0) return 0;
-  const tp = Number(market.totalPool), op = Number(o.totalBetAmount);
-  const newOp = op + bet, newTp = tp + bet;
-  const edge = Number(market.houseEdgePct) / 100;
-  return newOp > 0 ? (bet / newOp) * newTp * (1 - edge) : 0;
+function outcomeColor(rank: number, total: number): string {
+  if (rank === 0) return "#22c55e";
+  if (rank === total - 1 && total > 1) return "#ef4444";
+  return "#f59e0b";
 }
 
 function useCountdown(closesAt: string | null): string {
@@ -37,131 +30,141 @@ function useCountdown(closesAt: string | null): string {
   return label;
 }
 
-interface CardState { outcomeId: string | null; amount: string; success: boolean; }
-
-function MarketCard({ market, state, onSelectOutcome, onSelectAmount, onPay }: {
-  market: Market; state: CardState;
-  onSelectOutcome: (id: string) => void;
-  onSelectAmount: (a: string) => void;
-  onPay: () => void;
+function MarketCard({ market, onBet, lastUpdated }: {
+  market: Market;
+  onBet: (outcomeId: string) => void;
+  lastUpdated?: Date | null;
 }) {
-  const { outcomeId, amount, success } = state;
+  const [showAll, setShowAll] = useState(false);
   const countdown = useCountdown(market.closesAt);
-  const selectedOutcome = market.outcomes.find((o) => o.id === outcomeId);
-  const selectedIdx = market.outcomes.findIndex((o) => o.id === outcomeId);
-  const selectedColor = COLORS[selectedIdx] ?? COLORS[0];
-  const betAmount = parseFloat(amount) || 0;
-  const winAmount = outcomeId ? calcWin(market, outcomeId, betAmount) : 0;
-  const isReady = !!outcomeId && betAmount >= config.payments.dkBank.minBet;
   const totalPool = Number(market.totalPool);
 
-  const sentiment = market.outcomes.map((o, i) => ({
-    ...o,
-    pct: totalPool > 0 ? (Number(o.totalBetAmount) / totalPool) * 100 : 100 / market.outcomes.length,
-    color: COLORS[i] ?? COLORS[COLORS.length - 1],
-  }));
+  const sentiment = (() => {
+    const raw = market.outcomes.map((o) => ({
+      ...o,
+      pct: totalPool > 0 ? (Number(o.totalBetAmount) / totalPool) * 100 : 100 / market.outcomes.length,
+    }));
+    const sorted = [...raw].sort((a, b) => b.pct - a.pct);
+    return raw.map((o) => {
+      const rank = sorted.findIndex((s) => s.id === o.id);
+      return { ...o, color: outcomeColor(rank, raw.length) };
+    });
+  })();
 
-  const hint = "var(--tg-theme-hint-color, #8e8e93)";
-  const textColor = "var(--tg-theme-text-color, #fff)";
-  const cardBg = "var(--tg-theme-secondary-bg-color, #1c1c1e)";
+  const isBinary = sentiment.length <= 2;
 
   return (
-    <div style={{ background: cardBg, border: "1px solid rgba(255,255,255,0.07)", borderRadius: 18, padding: "16px 14px 12px", marginBottom: 10 }}>
-
-      {/* Question */}
-      <div style={{ fontSize: 15, fontWeight: 700, lineHeight: 1.4, color: textColor, marginBottom: 12 }}>
+    <div style={{
+      background: "#ffffff",
+      border: "1px solid #e5e7eb",
+      borderRadius: 14,
+      padding: "14px",
+      marginBottom: 10,
+      boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+      display: "flex",
+      flexDirection: "column",
+      gap: 10,
+    }}>
+      {/* Title */}
+      <div style={{ fontSize: 15, fontWeight: 700, lineHeight: 1.4, color: "#111827" }}>
         {market.title}
       </div>
 
-      {/* Outcome buttons — probability lives inside */}
-      <div style={{ display: "grid", gridTemplateColumns: market.outcomes.length <= 2 ? "1fr 1fr" : "1fr", gap: 8 }}>
-        {sentiment.map((s, i) => {
-          const sel = outcomeId === s.id;
-          const previewWin = calcWin(market, s.id, DEFAULT_AMOUNT);
-          return (
-            <button key={s.id} onClick={() => onSelectOutcome(s.id)} style={{
-              padding: "11px 12px",
-              borderRadius: 10,
-              border: `1.5px solid ${sel ? s.color : "rgba(255,255,255,0.08)"}`,
-              background: sel ? `${s.color}1a` : "rgba(255,255,255,0.04)",
-              cursor: "pointer", textAlign: "left",
-              transition: "all 0.15s",
-            }}>
-              {/* Label + probability on same row */}
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontSize: 13, fontWeight: 700, color: sel ? s.color : textColor }}>
-                  {s.label}
-                </span>
-                <span style={{ fontSize: 15, fontWeight: 900, color: s.color, lineHeight: 1 }}>
-                  {s.pct.toFixed(0)}%
-                </span>
+      {/* Outcomes */}
+      {isBinary ? (
+        <>
+          {/* Probability display */}
+          <div style={{ display: "flex", gap: 8 }}>
+            {sentiment.map((s) => (
+              <div key={s.id} style={{ flex: 1, textAlign: "center" }}>
+                <div style={{ fontSize: 18, fontWeight: 900, color: s.color }}>{s.pct.toFixed(0)}%</div>
+                <div style={{ fontSize: 10, color: "#9ca3af", marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.label}</div>
               </div>
-              {/* Win preview */}
-              {previewWin > 0 && (
-                <div style={{ fontSize: 11, color: sel ? s.color : "#30d158", marginTop: 4, fontWeight: 600 }}>
-                  Win {formatBTN(previewWin)}
-                </div>
-              )}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Probability bar — thin, right under buttons */}
-      <div style={{ display: "flex", height: 4, borderRadius: 2, overflow: "hidden", gap: 2, marginTop: 8 }}>
-        {sentiment.map((s) => (
-          <div key={s.id} style={{ width: `${s.pct}%`, background: s.color, transition: "width 0.4s ease", minWidth: s.pct > 0 ? 3 : 0 }} />
-        ))}
-      </div>
-
-      {/* Confirm strip */}
-      {outcomeId && (
-        <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-          {/* Win hero */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-            <div>
-              <div style={{ fontSize: 11, color: hint }}>
-                Win if <span style={{ color: selectedColor, fontWeight: 700 }}>{selectedOutcome?.label}</span>
-              </div>
-              <div style={{ fontSize: 28, fontWeight: 900, color: "#30d158", lineHeight: 1.1 }}>
-                {winAmount > 0 ? formatBTN(winAmount) : "—"}
-              </div>
-              <div style={{ fontSize: 10, color: hint, marginTop: 2 }}>Estimated · final at close</div>
-            </div>
-            {/* Amount chips stacked vertically on right */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 5, alignItems: "flex-end" }}>
-              {QUICK_AMOUNTS.map((q) => {
-                const sel = amount === q.toString();
-                return (
-                  <button key={q} onClick={() => onSelectAmount(q.toString())} style={{
-                    padding: "4px 13px", borderRadius: 20, border: "none",
-                    background: sel ? selectedColor : "rgba(255,255,255,0.08)",
-                    color: sel ? "#fff" : hint,
-                    fontSize: 12, fontWeight: 700, cursor: "pointer",
-                    transition: "all 0.15s",
-                  }}>{q}</button>
-                );
-              })}
-            </div>
+            ))}
           </div>
-
-          {success && <div style={{ textAlign: "center", marginBottom: 8, fontWeight: 700, color: "#30d158" }}>✅ Bet placed!</div>}
-
-          <button disabled={!isReady || success} onClick={onPay} style={{
-            width: "100%", padding: "13px", borderRadius: 11, border: "none",
-            background: isReady && !success ? selectedColor : "rgba(255,255,255,0.06)",
-            color: isReady && !success ? "#fff" : hint,
-            fontSize: 14, fontWeight: 700,
-            cursor: isReady && !success ? "pointer" : "not-allowed",
-          }}>
-            {success ? "Bet placed ✓" : isReady ? `Pay ${formatBTN(betAmount)} on ${selectedOutcome?.label}` : `Min Nu ${config.payments.dkBank.minBet}`}
-          </button>
+          {/* Probability bar */}
+          <div style={{ display: "flex", height: 3, borderRadius: 2, overflow: "hidden", gap: 1 }}>
+            {sentiment.map((s) => (
+              <div key={s.id} style={{ width: `${s.pct}%`, background: s.color, minWidth: s.pct > 0 ? 2 : 0 }} />
+            ))}
+          </div>
+          {/* Bet buttons */}
+          <div style={{ display: "flex", gap: 6 }}>
+            {sentiment.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => onBet(s.id)}
+                style={{
+                  flex: 1, padding: "9px 0", borderRadius: 9,
+                  border: `1.5px solid ${s.color}`,
+                  background: s.color, color: "#ffffff",
+                  fontSize: 12, fontWeight: 700, cursor: "pointer",
+                  transition: "opacity 0.12s",
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.85")}
+                onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
+              >
+                Bet {s.label}
+              </button>
+            ))}
+          </div>
+        </>
+      ) : (
+        /* Multi-outcome: collapsible rows */
+        <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+          {(showAll ? sentiment : sentiment.slice(0, 2)).map((s) => (
+            <button
+              key={s.id}
+              onClick={() => onBet(s.id)}
+              style={{
+                display: "flex", alignItems: "center", gap: 8,
+                padding: "8px 10px", borderRadius: 9,
+                border: "1.5px solid #e5e7eb",
+                background: "#f9fafb", cursor: "pointer",
+                transition: "all 0.12s", textAlign: "left",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = s.color;
+                e.currentTarget.style.background = `${s.color}0f`;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = "#e5e7eb";
+                e.currentTarget.style.background = "#f9fafb";
+              }}
+            >
+              <span style={{ fontSize: 12, fontWeight: 600, color: "#111827", flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.label}</span>
+              <div style={{ width: 48, height: 3, borderRadius: 2, background: "#e5e7eb", overflow: "hidden", flexShrink: 0 }}>
+                <div style={{ width: `${s.pct}%`, height: "100%", background: s.color }} />
+              </div>
+              <span style={{ fontSize: 11, fontWeight: 800, color: s.color, minWidth: 28, textAlign: "right", flexShrink: 0 }}>{s.pct.toFixed(0)}%</span>
+              <span style={{
+                fontSize: 10, fontWeight: 700, color: "#ffffff",
+                background: s.color, borderRadius: 6, padding: "2px 7px", flexShrink: 0,
+              }}>Bet</span>
+            </button>
+          ))}
+          {sentiment.length > 2 && (
+            <button
+              onClick={() => setShowAll((v) => !v)}
+              style={{
+                padding: "6px 10px", borderRadius: 9,
+                border: "1.5px solid #e5e7eb",
+                background: "transparent", cursor: "pointer",
+                fontSize: 11, fontWeight: 700, color: "#6b7280",
+                textAlign: "center", transition: "all 0.12s",
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#9ca3af"; e.currentTarget.style.color = "#374151"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#e5e7eb"; e.currentTarget.style.color = "#6b7280"; }}
+            >
+              {showAll ? "Show less" : `+${sentiment.length - 2} more`}
+            </button>
+          )}
         </div>
       )}
 
       {/* Footer */}
-      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 10, fontSize: 11, color: hint }}>
-        <span>Nu {totalPool.toLocaleString()} pool</span>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11, color: "#9ca3af" }}>
+        <PoolDetails market={market} lastUpdated={lastUpdated} />
         <span>{countdown}</span>
       </div>
     </div>
@@ -170,38 +173,51 @@ function MarketCard({ market, state, onSelectOutcome, onSelectAmount, onPay }: {
 
 // ── Feed page ─────────────────────────────────────────────────────────────────
 
+interface ActiveBet { marketId: string; outcomeId: string; }
+
 export const TmaFeedPage: FC = () => {
   const { user } = useAuth();
   const [markets, setMarkets] = useState<Market[]>([]);
   const [loading, setLoading] = useState(true);
-  const [cardStates, setCardStates] = useState<Record<string, CardState>>({});
-  const [activeMarketId, setActiveMarketId] = useState<string | null>(null);
+  const [activeBet, setActiveBet] = useState<ActiveBet | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   useEffect(() => {
     getMarkets()
-      .then((d) => setMarkets(d.filter((m) => m.status === "open")))
+      .then((d) => { setMarkets(d.filter((m) => m.status === "open")); setLastUpdated(new Date()); })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
 
-  const getCard = (id: string): CardState =>
-    cardStates[id] ?? { outcomeId: null, amount: DEFAULT_AMOUNT.toString(), success: false };
+  const handlePaymentSuccess = async (_payment: PaymentResponse) => {
+    if (!activeBet) return;
+    const betAmt = _payment?.amount ?? 0;
 
-  const setCard = (id: string, fields: Partial<CardState>) =>
-    setCardStates((p) => ({ ...p, [id]: { ...getCard(id), ...fields } }));
+    setMarkets((prev) => prev.map((m) => {
+      if (m.id !== activeBet.marketId) return m;
+      return {
+        ...m,
+        totalPool: String(Number(m.totalPool) + betAmt),
+        outcomes: m.outcomes.map((o) =>
+          o.id === activeBet.outcomeId
+            ? { ...o, totalBetAmount: String(Number(o.totalBetAmount) + betAmt) }
+            : o
+        ),
+      };
+    }));
 
-  const handlePaymentSuccess = async () => {
-    if (!activeMarketId) return;
-    const market = markets.find((m) => m.id === activeMarketId);
-    const { outcomeId, amount } = getCard(activeMarketId);
-    if (market && outcomeId && user) {
-      try { await placeBet(market.id, { outcomeId, amount: parseFloat(amount) }); }
+    const bet = activeBet;
+    setActiveBet(null);
+
+    const market = markets.find((m) => m.id === bet.marketId);
+    if (market && user) {
+      try { await placeBet(market.id, { outcomeId: bet.outcomeId, amount: betAmt }); }
       catch (e: any) { console.warn(e.message); }
     }
-    const mid = activeMarketId;
-    setActiveMarketId(null);
-    setCard(mid, { success: true });
-    setTimeout(() => setCard(mid, { outcomeId: null, success: false }), 2000);
+
+    getMarkets()
+      .then((d) => { setMarkets(d.filter((m) => m.status === "open")); setLastUpdated(new Date()); })
+      .catch(console.error);
   };
 
   if (loading) return (
@@ -216,36 +232,35 @@ export const TmaFeedPage: FC = () => {
     <Page>
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "60vh", gap: 12, textAlign: "center", padding: "0 32px" }}>
         <div style={{ fontSize: 48 }}>🔮</div>
-        <div style={{ fontSize: 18, fontWeight: 700, color: "var(--tg-theme-text-color, #fff)" }}>No open predictions</div>
-        <div style={{ fontSize: 13, color: "var(--tg-theme-hint-color, #8e8e93)" }}>Check back soon.</div>
+        <div style={{ fontSize: 18, fontWeight: 700, color: "#111827" }}>No open predictions</div>
+        <div style={{ fontSize: 13, color: "#9ca3af" }}>Check back soon.</div>
       </div>
     </Page>
   );
 
-  const activeMarket = activeMarketId ? markets.find((m) => m.id === activeMarketId) : null;
-  const activeCard = activeMarketId ? getCard(activeMarketId) : null;
-  const activeOutcome = activeMarket?.outcomes.find((o) => o.id === activeCard?.outcomeId);
+  const activeMarket = activeBet ? markets.find((m) => m.id === activeBet.marketId) : null;
 
   return (
     <Page>
-      <div style={{ padding: "10px 10px 80px" }}>
-        <div style={{ fontSize: 11, fontWeight: 600, color: "var(--tg-theme-hint-color, #8e8e93)", marginBottom: 10, paddingLeft: 2 }}>
+      <div style={{ padding: "10px 10px 80px", background: "#f5f5f7", minHeight: "100vh" }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: "#9ca3af", marginBottom: 10, paddingLeft: 2 }}>
           {markets.length} open prediction{markets.length !== 1 ? "s" : ""}
         </div>
         {markets.map((market) => (
-          <MarketCard key={market.id} market={market} state={getCard(market.id)}
-            onSelectOutcome={(id) => setCard(market.id, { outcomeId: getCard(market.id).outcomeId === id ? null : id })}
-            onSelectAmount={(a) => setCard(market.id, { amount: a })}
-            onPay={() => setActiveMarketId(market.id)}
+          <MarketCard
+            key={market.id}
+            market={market}
+            onBet={(outcomeId) => setActiveBet({ marketId: market.id, outcomeId })}
+            lastUpdated={lastUpdated}
           />
         ))}
       </div>
-      {activeMarket && activeCard && (
+      {activeMarket && activeBet && (
         <TmaPaymentModal
-          isOpen={!!activeMarketId}
-          onClose={() => setActiveMarketId(null)}
-          amount={parseFloat(activeCard.amount) || 0}
-          description={`Predict: ${activeMarket.title} — ${activeOutcome?.label}`}
+          isOpen={true}
+          onClose={() => setActiveBet(null)}
+          market={activeMarket}
+          outcomeId={activeBet.outcomeId}
           onSuccess={handlePaymentSuccess}
           onFailure={(e) => console.error(e)}
         />

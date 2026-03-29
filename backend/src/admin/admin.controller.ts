@@ -25,6 +25,7 @@ import { FixturesService } from "./fixtures.service";
 import { Market, MarketStatus } from "../entities/market.entity";
 import { Outcome } from "../entities/outcome.entity";
 import { Settlement } from "../entities/settlement.entity";
+import { Dispute } from "../entities/dispute.entity";
 import { Bet } from "../entities/bet.entity";
 import { User } from "../entities/user.entity";
 import { Payment } from "../entities/payment.entity";
@@ -41,6 +42,12 @@ class ResolveDto {
   winningOutcomeId: string;
 }
 
+class ProposeResolutionDto {
+  @ApiProperty({ description: "UUID of the proposed winning outcome" })
+  @IsUUID()
+  proposedOutcomeId: string;
+}
+
 @ApiTags("admin")
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, AdminGuard)
@@ -51,6 +58,7 @@ export class AdminController {
     private fixturesService: FixturesService,
     @InjectRepository(Settlement)
     private settlementRepo: Repository<Settlement>,
+    @InjectRepository(Dispute) private disputeRepo: Repository<Dispute>,
     @InjectRepository(Bet) private betRepo: Repository<Bet>,
     @InjectRepository(User) private userRepo: Repository<User>,
     @InjectRepository(Payment) private paymentRepo: Repository<Payment>,
@@ -83,11 +91,24 @@ export class AdminController {
     return this.marketsService.transition(id, dto.status);
   }
 
+  @Post("markets/:id/propose")
+  @HttpCode(200)
+  @ApiOperation({ summary: "Propose winning outcome — opens 24h dispute window (Closed → Resolving)" })
+  proposeResolution(@Param("id") id: string, @Body() dto: ProposeResolutionDto) {
+    return this.marketsService.proposeResolution(id, dto.proposedOutcomeId);
+  }
+
   @Post("markets/:id/resolve")
   @HttpCode(200)
-  @ApiOperation({ summary: "Resolve market: set winner & auto-settle payouts" })
+  @ApiOperation({ summary: "Final resolution after dispute window — set winner & auto-settle (Resolving → Settled)" })
   resolveMarket(@Param("id") id: string, @Body() dto: ResolveDto) {
     return this.marketsService.resolve(id, dto.winningOutcomeId);
+  }
+
+  @Get("markets/:id/disputes")
+  @ApiOperation({ summary: "List all disputes for a market" })
+  getMarketDisputes(@Param("id") id: string) {
+    return this.marketsService.getDisputesByMarket(id);
   }
 
   @Post("markets/:id/cancel")

@@ -3,6 +3,7 @@ import { initiateDKBankPayment, checkDKBankPaymentStatus, formatBTN } from '@/ap
 import { loginWithDKBank } from '@/api/client';
 import type { Market } from '@/api/client';
 import type { DKBankPaymentRequest, PaymentResponse } from '@/types/payment';
+import { PayoutBreakdown } from '@/components/PayoutBreakdown';
 
 const QUICK_AMOUNTS = [50, 100, 200, 500];
 const MIN_BET = 50;
@@ -86,10 +87,9 @@ export function PwaPaymentModal({
       const payment = await initiateDKBankPayment(req);
       if (payment.status === 'success') {
         setStatus('success');
-        onSuccess?.({ ...payment, amount: betAmount });
-        setTimeout(() => { onClose(); resetForm(); }, 2500);
+        setTimeout(() => { onClose(); resetForm(); onSuccess?.({ ...payment, amount: betAmount }); }, 2500);
       } else {
-        pollStatus(payment.paymentId);
+        pollStatus(payment.paymentId, payment);
       }
     } catch (err: any) {
       setError(err.message || 'Payment failed');
@@ -98,7 +98,7 @@ export function PwaPaymentModal({
     }
   };
 
-  const pollStatus = async (paymentId: string) => {
+  const pollStatus = async (paymentId: string, initiatedPayment: PaymentResponse) => {
     const max = 30;
     let attempts = 0;
     const poll = async () => {
@@ -106,8 +106,7 @@ export function PwaPaymentModal({
         const s = await checkDKBankPaymentStatus(paymentId);
         if (s.status === 'success') {
           setStatus('success');
-          onSuccess?.({ ...(currentPayment!), amount: betAmount });
-          setTimeout(() => { onClose(); resetForm(); }, 2500);
+          setTimeout(() => { onClose(); resetForm(); onSuccess?.({ ...initiatedPayment, amount: betAmount }); }, 2500);
         } else if (s.status === 'failed') {
           setError(s.failureReason || 'Payment failed');
           setStatus('failed');
@@ -137,33 +136,93 @@ export function PwaPaymentModal({
       }}
       onClick={(e) => { if (e.target === e.currentTarget) handleClose(); }}
     >
+      <style>{`
+        @keyframes modalSlideUp {
+          from { opacity: 0; transform: translateY(24px) scale(0.97); }
+          to   { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes successPop {
+          0%   { transform: scale(0.3) rotate(-10deg); opacity: 0; }
+          55%  { transform: scale(1.25) rotate(4deg); opacity: 1; }
+          75%  { transform: scale(0.92) rotate(-2deg); }
+          100% { transform: scale(1) rotate(0deg); }
+        }
+        @keyframes successGlow {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(22,163,74,0.4); }
+          50%       { box-shadow: 0 0 0 18px rgba(22,163,74,0); }
+        }
+        @keyframes failShake {
+          0%, 100% { transform: translateX(0) rotate(0deg); }
+          15%       { transform: translateX(-8px) rotate(-6deg); }
+          30%       { transform: translateX(8px) rotate(6deg); }
+          45%       { transform: translateX(-6px) rotate(-3deg); }
+          60%       { transform: translateX(6px) rotate(3deg); }
+          75%       { transform: translateX(-3px); }
+        }
+        @keyframes fadeSlideIn {
+          from { opacity: 0; transform: translateY(8px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
       <div style={{
         background: '#ffffff', borderRadius: 20,
         padding: '24px 20px 28px',
         width: '100%', maxWidth: 460, margin: '0 16px',
         boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
+        animation: 'modalSlideUp 0.3s cubic-bezier(0.34,1.56,0.64,1) forwards',
       }}>
 
         {/* ── Result screens ──────────────────────────────────────────────── */}
         {status === 'success' && (
-          <div style={{ textAlign: 'center', padding: '24px 0' }}>
-            <div style={{ fontSize: 52, marginBottom: 12 }}>✅</div>
-            <div style={{ fontSize: 16, fontWeight: 800, color: '#16a34a', marginBottom: 6 }}>Bet Placed!</div>
-            <div style={{ fontSize: 13, color: '#6b7280' }}>Your payment was confirmed</div>
+          <div style={{ textAlign: 'center', padding: '32px 0 24px' }}>
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              width: 72, height: 72, borderRadius: '50%',
+              background: 'linear-gradient(135deg, #dcfce7, #bbf7d0)',
+              marginBottom: 16,
+              animation: 'successPop 0.55s cubic-bezier(0.34,1.56,0.64,1) forwards, successGlow 1.2s ease 0.55s 2',
+            }}>
+              <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            </div>
+            <div style={{ fontSize: 18, fontWeight: 800, color: '#16a34a', marginBottom: 6, animation: 'fadeSlideIn 0.35s ease 0.3s both' }}>
+              Bet Placed!
+            </div>
+            <div style={{ fontSize: 13, color: '#6b7280', animation: 'fadeSlideIn 0.35s ease 0.45s both' }}>
+              Your payment was confirmed
+            </div>
           </div>
         )}
 
         {status === 'failed' && (
-          <div style={{ textAlign: 'center', padding: '24px 0' }}>
-            <div style={{ fontSize: 52, marginBottom: 12 }}>❌</div>
-            <div style={{ fontSize: 16, fontWeight: 800, color: '#ef4444', marginBottom: 6 }}>Payment Failed</div>
-            <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 20 }}>{error || 'Could not complete payment'}</div>
-            <button
-              onClick={() => { setStatus('idle'); setError(''); }}
-              style={{ padding: '12px 28px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}
-            >
-              Try Again
-            </button>
+          <div style={{ textAlign: 'center', padding: '32px 0 24px' }}>
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              width: 72, height: 72, borderRadius: '50%',
+              background: 'linear-gradient(135deg, #fee2e2, #fecaca)',
+              marginBottom: 16,
+              animation: 'failShake 0.55s cubic-bezier(0.36,0.07,0.19,0.97) forwards',
+            }}>
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </div>
+            <div style={{ fontSize: 18, fontWeight: 800, color: '#ef4444', marginBottom: 8, animation: 'fadeSlideIn 0.35s ease 0.3s both' }}>
+              Payment Failed
+            </div>
+            <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 24, lineHeight: 1.5, animation: 'fadeSlideIn 0.35s ease 0.45s both' }}>
+              {error || 'Could not complete payment'}
+            </div>
+            <div style={{ animation: 'fadeSlideIn 0.35s ease 0.55s both' }}>
+              <button
+                onClick={() => { setStatus('idle'); setError(''); }}
+                style={{ padding: '12px 28px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}
+              >
+                Try Again
+              </button>
+            </div>
           </div>
         )}
 
@@ -306,6 +365,11 @@ export function PwaPaymentModal({
                   )}
                 </div>
               </div>
+            )}
+
+            {/* Payout breakdown */}
+            {isValidAmount && (
+              <PayoutBreakdown market={market} outcomeId={outcomeId} betAmount={betAmount} />
             )}
 
             {/* CID */}

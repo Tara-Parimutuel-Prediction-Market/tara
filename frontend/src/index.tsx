@@ -9,14 +9,16 @@ const root = ReactDOM.createRoot(document.getElementById("root")!);
  * Detect whether we're running inside a real Telegram client.
  * Check multiple indicators:
  * - TelegramGameProxy (older method)
- * - Telegram.WebApp object
- * - tgWebAppData in URL parameters
+ * - TelegramWebviewProxy (desktop/macOS Telegram)
+ * - Telegram.WebApp object with actual initData
+ * - Any tgWebApp* params in the URL (search or hash)
  */
+const urlParams = window.location.search + window.location.hash;
 const isInsideTelegram =
   !!(window as any).TelegramGameProxy ||
-  !!(window as any).Telegram?.WebApp ||
-  new URLSearchParams(window.location.search).has("tgWebAppData") ||
-  window.location.hash.includes("tgWebAppData");
+  !!(window as any).TelegramWebviewProxy ||
+  !!(window as any).Telegram?.WebApp?.initData ||
+  /tgWebApp/i.test(urlParams);
 
 if (isInsideTelegram) {
   // ── TMA path ─────────────────────────────────────────────────────────────

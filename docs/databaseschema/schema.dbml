@@ -23,6 +23,7 @@ Table markets {
   description text
   imageUrl varchar
 
+  // market_status: upcoming | open | closed | resolving | resolved | settled | cancelled
   status market_status [default: 'upcoming']
   mechanism market_mechanism [default: 'parimutuel']
 
@@ -30,6 +31,8 @@ Table markets {
   houseEdgePct decimal(5,2) [default: 5]
 
   resolvedOutcomeId uuid
+  proposedOutcomeId uuid     // Set when admin proposes a winner (RESOLVING state)
+  disputeDeadlineAt timestamptz // 24h window after proposal
 
   opensAt timestamptz
   closesAt timestamptz
@@ -139,6 +142,19 @@ Table settlements {
   settledAt timestamp
 }
 
+Table disputes {
+  id uuid [primary key]
+
+  bondAmount decimal(18,2) [not null]  // Deducted from user credits, always refunded after resolution
+  reason text                           // Optional explanation from bettor
+  bondRefunded boolean [default: false]
+
+  createdAt timestamp
+
+  userId uuid [not null]
+  marketId uuid [not null]
+}
+
 Table auth_methods {
   id uuid [primary key]
   provider auth_provider [default: 'telegram']
@@ -172,5 +188,8 @@ Ref: payments.userId > users.id
 Ref: transactions.userId > users.id
 
 Ref: settlements.marketId > markets.id
+
+Ref: disputes.userId > users.id
+Ref: disputes.marketId > markets.id
 
 
