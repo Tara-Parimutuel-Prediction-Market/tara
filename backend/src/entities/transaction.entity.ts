@@ -15,6 +15,8 @@ export enum TransactionType {
   BET_PLACED = "bet_placed",
   BET_PAYOUT = "bet_payout",
   REFUND = "refund",
+  DISPUTE_BOND = "dispute_bond",
+  DISPUTE_REFUND = "dispute_refund",
 }
 
 @Entity("transactions")

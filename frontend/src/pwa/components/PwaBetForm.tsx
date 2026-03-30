@@ -43,10 +43,7 @@ export const PwaBetForm: FC<PwaBetFormProps> = ({ market, onBetPlaced }) => {
     if (!selectedOutcomeId) return;
     try {
       const freshMarket = await getMarket(market.id);
-      const payload = freshMarket.mechanism === 'scpm'
-        ? { outcomeId: selectedOutcomeId, maxShares: payment.amount, limitPrice: 1.0 }
-        : { outcomeId: selectedOutcomeId, amount: payment.amount };
-      await placeBet(market.id, payload);
+      await placeBet(market.id, { outcomeId: selectedOutcomeId, amount: payment.amount });
       setBetSuccess(true);
       if (onBetPlaced) onBetPlaced(freshMarket);
     } catch (e: any) {

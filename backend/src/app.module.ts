@@ -17,6 +17,7 @@ import { Bet } from "./entities/bet.entity";
 import { Payment } from "./entities/payment.entity";
 import { Transaction } from "./entities/transaction.entity";
 import { Settlement } from "./entities/settlement.entity";
+import { Dispute } from "./entities/dispute.entity";
 import { DKGatewayAuthToken } from "./entities/dk-gateway-auth-token.entity";
 
 @Module({
@@ -42,10 +43,16 @@ import { DKGatewayAuthToken } from "./entities/dk-gateway-auth-token.entity";
           Payment,
           Transaction,
           Settlement,
+          Dispute,
           DKGatewayAuthToken,
         ],
-        synchronize: config.get("DB_SYNC", "true") === "true",
+        synchronize: false,
         logging: false,
+        extra: {
+          max: 5,
+          idleTimeoutMillis: 10000,
+          connectionTimeoutMillis: 5000,
+        },
       }),
     }),
     AuthModule,

@@ -267,7 +267,7 @@ export function PwaMarketsPage() {
   const otherMarkets = markets.filter((m) => !["open", "upcoming"].includes(m.status));
 
   return (
-    <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "16px" }}>
+    <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "19px" }}>
       {/* ↓ flex column + gap replaces marginBottom on each section, fixing margin collapse */}
       <div style={{ display: "flex", flexDirection: "column", gap: "25px" }}>
         {openMarkets.length > 0 && (

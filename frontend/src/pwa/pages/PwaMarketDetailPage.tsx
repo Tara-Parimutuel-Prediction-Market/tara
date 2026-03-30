@@ -135,11 +135,6 @@ export function PwaMarketDetailPage() {
           >
             {market.title}
           </h1>
-          {market.mechanism === "scpm" && (
-            <span style={{ fontSize: "0.7rem", color: "#3b82f6", fontWeight: 700, border: "1px solid #3b82f6", padding: "2px 6px", borderRadius: "100px" }}>
-              SCPM / LMSR
-            </span>
-          )}
         </div>
       </div>
 

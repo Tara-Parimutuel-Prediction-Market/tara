@@ -22,7 +22,6 @@ export enum MarketStatus {
 
 export enum MarketMechanism {
   PARIMUTUEL = "parimutuel",
-  SCPM = "scpm",
 }
 
 @Entity("markets")

@@ -27,7 +27,7 @@ export interface DKBankPaymentRequest {
   customerPhone: string;
   customerName?: string;
   description: string;
-  merchantTxnId: string;
+  merchantTxnId?: string;
 }
 
 export interface DKBankResponse {

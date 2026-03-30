@@ -100,7 +100,7 @@ export interface Market {
   description: string | null;
   imageUrl: string | null;
   status: "upcoming" | "open" | "closed" | "resolving" | "resolved" | "settled" | "cancelled";
-  mechanism: "parimutuel" | "scpm";
+  mechanism: "parimutuel";
   liquidityParam: string;
   totalPool: string;
   houseEdgePct: string;
@@ -124,7 +124,8 @@ export interface Dispute {
 }
 
 export interface SubmitDisputePayload {
-  bondAmount: number;
+  bondAmount?: number;
+  paymentId?: string;
   reason?: string;
 }
 
@@ -151,9 +152,7 @@ export function getMarket(id: string): Promise<Market> {
 
 export interface PlaceBetPayload {
   outcomeId: string;
-  amount?: number;
-  maxShares?: number;
-  limitPrice?: number;
+  amount: number;
 }
 
 export function placeBet(marketId: string, payload: PlaceBetPayload) {
@@ -182,8 +181,6 @@ export function getMyTransactions() {
 export interface WalletBetPayload {
   outcomeId: string;
   amount: number; // in TON
-  maxShares?: number;
-  limitPrice?: number;
   walletAddress: string;
   txHash?: string; // proof of payment
 }

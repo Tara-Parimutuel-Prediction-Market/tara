@@ -12,7 +12,6 @@ import { MarketsService } from "./markets.service";
 import { MarketsController } from "./markets.controller";
 import { ParimutuelEngine } from "./parimutuel.engine";
 import { LMSRService } from "./lmsr.service";
-import { SCPMService } from "./scpm.service";
 import { KeeperService } from "./keeper.service";
 
 @Module({
@@ -28,8 +27,8 @@ import { KeeperService } from "./keeper.service";
       Dispute,
     ]),
   ],
-  providers: [MarketsService, ParimutuelEngine, LMSRService, SCPMService, KeeperService],
+  providers: [MarketsService, ParimutuelEngine, LMSRService, KeeperService],
   controllers: [MarketsController],
-  exports: [MarketsService, ParimutuelEngine, SCPMService],
+  exports: [MarketsService, ParimutuelEngine],
 })
 export class MarketsModule {}

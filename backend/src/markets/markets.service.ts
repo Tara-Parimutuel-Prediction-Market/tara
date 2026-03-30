@@ -10,8 +10,8 @@ import {
   Min,
   Max,
   IsArray,
-  IsEnum,
 } from "class-validator";
+
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Market, MarketStatus, MarketMechanism } from "../entities/market.entity";
 import { Outcome } from "../entities/outcome.entity";
@@ -21,8 +21,6 @@ import { Transaction, TransactionType } from "../entities/transaction.entity";
 import { User } from "../entities/user.entity";
 import { ParimutuelEngine } from "./parimutuel.engine";
 import { LMSRService } from "./lmsr.service";
-import { SCPMService } from "./scpm.service";
-
 export class CreateMarketDto {
   @ApiProperty() @IsString() title: string;
   @ApiPropertyOptional() @IsOptional() @IsString() description?: string;
@@ -35,11 +33,6 @@ export class CreateMarketDto {
   @Min(0)
   @Max(50)
   houseEdgePct?: number;
-
-  @ApiPropertyOptional({ enum: MarketMechanism })
-  @IsOptional()
-  @IsEnum(MarketMechanism)
-  mechanism?: MarketMechanism;
 
   @ApiPropertyOptional()
   @IsOptional()
@@ -62,24 +55,23 @@ export class UpdateMarketDto {
   @ApiPropertyOptional() @IsOptional() @IsDateString() opensAt?: string;
   @ApiPropertyOptional() @IsOptional() @IsDateString() closesAt?: string;
   @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) @Max(50) houseEdgePct?: number;
-  @ApiPropertyOptional({ enum: MarketMechanism }) @IsOptional() @IsEnum(MarketMechanism) mechanism?: MarketMechanism;
   @ApiPropertyOptional() @IsOptional() @IsNumber() liquidityParam?: number;
 }
 
 export class PlaceBetDto {
   @ApiProperty() @IsUUID() outcomeId: string;
-  @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(1) amount?: number;
-
-  // SCPM fields
-  @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) maxShares?: number;
-  @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) @Max(1) limitPrice?: number;
+  @ApiProperty() @IsNumber() @Min(1) amount: number;
 }
 
 export class SubmitDisputeDto {
-  @ApiProperty({ description: "Bond amount (minimum 1 credit)" })
-  @IsNumber()
-  @Min(1)
-  bondAmount: number;
+  @ApiPropertyOptional({ description: "Bond amount in credits (used when paying from credit balance)" })
+  @IsOptional()
+  bondAmount?: number;
+
+  @ApiPropertyOptional({ description: "Completed DK Bank payment ID to use as bond" })
+  @IsOptional()
+  @IsUUID()
+  paymentId?: string;
 
   @ApiPropertyOptional({ description: "Reason for disputing the proposed outcome" })
   @IsOptional()
@@ -98,7 +90,6 @@ export class MarketsService {
     @InjectRepository(User) private userRepo: Repository<User>,
     private engine: ParimutuelEngine,
     private lmsrService: LMSRService,
-    private scpmService: SCPMService,
     private dataSource: DataSource,
   ) {}
 
@@ -137,7 +128,7 @@ export class MarketsService {
         opensAt: dto.opensAt ? new Date(dto.opensAt) : undefined,
         closesAt: dto.closesAt ? new Date(dto.closesAt) : undefined,
         houseEdgePct: dto.houseEdgePct ?? 5,
-        mechanism: dto.mechanism ?? MarketMechanism.PARIMUTUEL,
+        mechanism: MarketMechanism.PARIMUTUEL,
         liquidityParam: liquidityParam,
         outcomes: outcomes,
         totalPool: 0,
@@ -175,18 +166,13 @@ export class MarketsService {
     if (dto.opensAt) market.opensAt = new Date(dto.opensAt);
     if (dto.closesAt) market.closesAt = new Date(dto.closesAt);
     if (dto.houseEdgePct !== undefined) market.houseEdgePct = dto.houseEdgePct;
-    if (dto.mechanism) market.mechanism = dto.mechanism;
     if (dto.liquidityParam !== undefined) market.liquidityParam = dto.liquidityParam;
 
     return this.marketRepo.save(market);
   }
 
   async placeBet(userId: string, marketId: string, dto: PlaceBetDto) {
-    const market = await this.findOne(marketId);
-    if (market.mechanism === MarketMechanism.SCPM) {
-      return this.engine.placeBetSCPM(userId, market, dto);
-    }
-    return this.engine.placeBet(userId, marketId, dto.outcomeId, dto.amount!);
+    return this.engine.placeBet(userId, marketId, dto.outcomeId, dto.amount);
   }
 
   transition(marketId: string, to: MarketStatus) {
@@ -206,6 +192,9 @@ export class MarketsService {
   }
 
   async submitDispute(userId: string, marketId: string, dto: SubmitDisputeDto): Promise<Dispute> {
+    if (!dto.paymentId && !dto.bondAmount)
+      throw new BadRequestException("Either paymentId (DK Bank) or bondAmount (credits) is required");
+
     const market = await this.findOne(marketId);
     if (market.status !== MarketStatus.RESOLVING)
       throw new BadRequestException("Disputes can only be submitted during the resolution window");
@@ -214,47 +203,73 @@ export class MarketsService {
       throw new BadRequestException("Dispute window has closed");
 
     return await this.dataSource.transaction(async (em) => {
-      // Check user balance
-      const { balance } = await em.getRepository(Payment)
-        .createQueryBuilder("p")
-        .select("COALESCE(SUM(p.amount), 0)", "balance")
-        .where("p.userId = :userId", { userId })
-        .andWhere("p.method = :method", { method: PaymentMethod.CREDITS })
-        .andWhere("p.status = :status", { status: PaymentStatus.SUCCESS })
-        .getRawOne();
-      const balanceBefore = Number(balance);
-      if (balanceBefore < dto.bondAmount)
-        throw new BadRequestException("Insufficient balance for dispute bond");
+      let bondAmount: number;
 
-      // Deduct bond from balance
-      const bondPayment = await em.save(Payment, em.create(Payment, {
-        type: PaymentType.BET_PLACED,
-        status: PaymentStatus.SUCCESS,
-        method: PaymentMethod.CREDITS,
-        amount: -dto.bondAmount,
-        currency: 'CREDITS',
-        referenceId: marketId,
-        description: `Dispute bond for market: ${market.title}`,
-        userId,
-      }));
-      await em.save(Transaction, em.create(Transaction, {
-        type: TransactionType.BET_PLACED,
-        amount: -dto.bondAmount,
-        balanceBefore,
-        balanceAfter: balanceBefore - dto.bondAmount,
-        paymentId: bondPayment.id,
-        userId,
-        note: `Dispute bond for market resolution`,
-      }));
+      if (dto.paymentId) {
+        // ── DK Bank path: verify a completed payment ──────────────────────────
+        const payment = await em.getRepository(Payment).findOne({
+          where: { id: dto.paymentId, userId, status: PaymentStatus.SUCCESS, method: PaymentMethod.DK_BANK },
+        });
+        if (!payment)
+          throw new BadRequestException("DK Bank payment not found, not completed, or does not belong to you");
 
-      // Create dispute record
-      return em.save(Dispute, em.create(Dispute, {
-        userId,
-        marketId,
-        bondAmount: dto.bondAmount,
-        reason: dto.reason ?? null,
-        bondRefunded: false,
-      }));
+        // Ensure this payment hasn't already been used for a dispute
+        const existing = await em.getRepository(Dispute).findOne({ where: { bondPaymentId: dto.paymentId } });
+        if (existing)
+          throw new BadRequestException("This payment has already been used for a dispute");
+
+        bondAmount = Number(payment.amount);
+
+        return em.save(Dispute, em.create(Dispute, {
+          userId,
+          marketId,
+          bondAmount,
+          bondPaymentId: dto.paymentId,
+          reason: dto.reason ?? null,
+          bondRefunded: false,
+        }));
+      } else {
+        // ── Credits path: deduct from balance ─────────────────────────────────
+        bondAmount = dto.bondAmount!;
+        const { balance } = await em.getRepository(Payment)
+          .createQueryBuilder("p")
+          .select("COALESCE(SUM(p.amount), 0)", "balance")
+          .where("p.userId = :userId", { userId })
+          .andWhere("p.method = :method", { method: PaymentMethod.CREDITS })
+          .andWhere("p.status = :status", { status: PaymentStatus.SUCCESS })
+          .getRawOne();
+        const balanceBefore = Number(balance);
+        if (balanceBefore < bondAmount)
+          throw new BadRequestException("Insufficient balance for dispute bond");
+
+        const bondPayment = await em.save(Payment, em.create(Payment, {
+          type: PaymentType.BET_PLACED,
+          status: PaymentStatus.SUCCESS,
+          method: PaymentMethod.CREDITS,
+          amount: -bondAmount,
+          currency: 'CREDITS',
+          referenceId: marketId,
+          description: `Dispute bond for market: ${market.title}`,
+          userId,
+        }));
+        await em.save(Transaction, em.create(Transaction, {
+          type: TransactionType.DISPUTE_BOND,
+          amount: -bondAmount,
+          balanceBefore,
+          balanceAfter: balanceBefore - bondAmount,
+          paymentId: bondPayment.id,
+          userId,
+          note: `Dispute bond for market resolution`,
+        }));
+
+        return em.save(Dispute, em.create(Dispute, {
+          userId,
+          marketId,
+          bondAmount,
+          reason: dto.reason ?? null,
+          bondRefunded: false,
+        }));
+      }
     });
   }
 

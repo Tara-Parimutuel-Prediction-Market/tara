@@ -1,5 +1,5 @@
 import { request } from './client';
-import type { Market } from './client';
+import type { Market, Dispute } from './client';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -68,8 +68,11 @@ export const adminCancel = (id: string) =>
 export const adminDelete = (id: string) =>
   request(`/admin/markets/${id}`, { method: 'DELETE' });
 
-// ─── Users / Payments / Settlements ──────────────────────────────────────────
+// ─── Users / Payments / Settlements / Disputes ───────────────────────────────
 
 export const adminGetUsers = () => request<AdminUser[]>('/admin/users');
 export const adminGetPayments = () => request<AdminPayment[]>('/admin/payments');
 export const adminGetSettlements = () => request<AdminSettlement[]>('/admin/settlements');
+export const adminGetAllDisputes = () => request<Dispute[]>('/admin/disputes');
+
+export type { Dispute };

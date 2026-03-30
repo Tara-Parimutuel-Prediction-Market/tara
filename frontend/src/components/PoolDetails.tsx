@@ -33,7 +33,7 @@ export function PoolDetails({ market, lastUpdated }: { market: Market; lastUpdat
   }));
 
   return (
-    <div>
+    <div style={{ position: 'relative' }}>
       <button
         onClick={() => setOpen((v) => !v)}
         style={{
@@ -58,8 +58,11 @@ export function PoolDetails({ market, lastUpdated }: { market: Market; lastUpdat
 
       {open && (
         <div style={{
-          marginTop: 8, background: '#f8fafc', borderRadius: 8,
-          border: '1px solid #f0f0f0', padding: '10px 12px',
+          position: 'absolute', bottom: '100%', left: 0, marginBottom: 8,
+          background: '#ffffff', borderRadius: 10,
+          border: '1px solid #e5e7eb', padding: '10px 12px',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.10)',
+          zIndex: 20, minWidth: 220,
         }}>
           <div style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>
             Pool Breakdown

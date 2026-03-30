@@ -1,30 +1,233 @@
 import { useState, useEffect } from "react";
-import { getMarkets, placeBet, type Market } from "@/api/client";
+import { getMarkets, getDisputes, submitDispute, placeBet, loginWithDKBank, type Market, type Dispute } from "@/api/client";
+import { initiateDKBankPayment, checkDKBankPaymentStatus } from "@/api/dkbank";
 import { PwaPaymentModal } from "../components/PwaPaymentModal";
 import type { PaymentResponse } from "@/types/payment";
 import { useBreakpoint } from "../hooks/useBreakpoint";
 import { PoolDetails } from "@/components/PoolDetails";
+
 function outcomeColor(rank: number, total: number): string {
   if (rank === 0) return "#22c55e";                          // highest → green
   if (rank === total - 1 && total > 1) return "#ef4444";    // lowest  → red
   return "#f59e0b";                                          // middle  → amber
 }
 
-function useCountdown(closesAt: string | null): string {
+function useCountdown(targetAt: string | null): string {
   const [label, setLabel] = useState("Open");
   useEffect(() => {
-    if (!closesAt) return;
+    if (!targetAt) return;
     const tick = () => {
-      const ms = new Date(closesAt).getTime() - Date.now();
-      if (ms <= 0) { setLabel("Closing"); return; }
+      const ms = new Date(targetAt).getTime() - Date.now();
+      if (ms <= 0) { setLabel("Expired"); return; }
       const h = Math.floor(ms / 3_600_000), m = Math.floor((ms % 3_600_000) / 60_000);
       setLabel(h > 24 ? `${Math.floor(h / 24)}d left` : h > 0 ? `${h}h ${m}m left` : `${m}m left`);
     };
     tick();
     const id = setInterval(tick, 30_000);
     return () => clearInterval(id);
-  }, [closesAt]);
+  }, [targetAt]);
   return label;
+}
+
+// ── Dispute Panel ───────────────────────────────────────────────────────────
+
+type DisputeStep = "form" | "processing" | "success" | "failed";
+type DisputeMethod = "dkbank" | "ton";
+
+function DisputePanel({ market }: { market: Market }) {
+  const [disputes, setDisputes] = useState<Dispute[]>([]);
+  const [method, setMethod] = useState<DisputeMethod>("dkbank");
+  const [cid, setCid] = useState("");
+  const [bondAmount, setBondAmount] = useState("50");
+  const [reason, setReason] = useState("");
+  const [step, setStep] = useState<DisputeStep>("form");
+  const [statusMsg, setStatusMsg] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const deadline = useCountdown(market.disputeDeadlineAt ?? null);
+
+  useEffect(() => {
+    getDisputes(market.id).then(setDisputes).catch(() => {});
+  }, [market.id]);
+
+  const proposedOutcome = market.outcomes.find((o) => o.id === market.proposedOutcomeId);
+  const amt = Number(bondAmount);
+  const canSubmit = method === "dkbank" && cid.length === 11 && amt >= 1 && step === "form";
+
+  const pollStatus = async (paymentId: string, amount: number) => {
+    const max = 24; // 4 min
+    let attempts = 0;
+    const poll = async () => {
+      try {
+        const s = await checkDKBankPaymentStatus(paymentId);
+        if (s.status === "success") {
+          await submitDispute(market.id, { paymentId, reason: reason.trim() || undefined });
+          setDisputes((prev) => [...prev, { id: Date.now().toString(), bondAmount: String(amount), reason: reason.trim() || null, bondRefunded: false, createdAt: new Date().toISOString(), userId: "", marketId: market.id }]);
+          setStep("success");
+        } else if (s.status === "failed") {
+          setError(s.failureReason || "Payment failed");
+          setStep("failed");
+        } else if (attempts < max) {
+          attempts++;
+          setStatusMsg(`Waiting for DK Bank confirmation… (${attempts})`);
+          setTimeout(poll, 10_000);
+        } else {
+          setError("Payment verification timeout. Please try again.");
+          setStep("failed");
+        }
+      } catch {
+        if (attempts < max) { attempts++; setTimeout(poll, 10_000); }
+        else { setError("Unable to verify payment"); setStep("failed"); }
+      }
+    };
+    poll();
+  };
+
+  const handleSubmit = async () => {
+    if (!canSubmit) return;
+    setStep("processing");
+    setStatusMsg("Verifying CID with DK Bank…");
+    setError(null);
+    try {
+      await loginWithDKBank(cid);
+      setStatusMsg("Initiating bond payment…");
+      const payment = await initiateDKBankPayment({
+        amount: amt,
+        customerPhone: cid,
+        description: `Dispute bond: ${market.title}`,
+      });
+      if (payment.status === "success") {
+        await submitDispute(market.id, { paymentId: payment.paymentId, reason: reason.trim() || undefined });
+        setDisputes((prev) => [...prev, { id: Date.now().toString(), bondAmount: String(amt), reason: reason.trim() || null, bondRefunded: false, createdAt: new Date().toISOString(), userId: "", marketId: market.id }]);
+        setStep("success");
+      } else {
+        setStatusMsg("OTP sent to your DK Bank phone. Waiting for confirmation…");
+        pollStatus(payment.paymentId, amt);
+      }
+    } catch (e: any) {
+      setError(e.message ?? "Payment failed");
+      setStep("failed");
+    }
+  };
+
+  return (
+    <div style={{
+      background: "#fffbeb", border: "1.5px solid #f59e0b",
+      borderRadius: 10, padding: "10px 12px",
+      display: "flex", flexDirection: "column", gap: 8,
+    }}>
+      {/* Header */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ fontSize: 11, fontWeight: 800, color: "#b45309", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+          ⚖️ Dispute Window
+        </div>
+        <div style={{ fontSize: 10, color: "#92400e" }}>{deadline}</div>
+      </div>
+
+      {/* Proposed outcome */}
+      {proposedOutcome && (
+        <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11 }}>
+          <span style={{ color: "#6b7280" }}>Proposed:</span>
+          <span style={{ fontWeight: 700, color: "#111827" }}>{proposedOutcome.label}</span>
+          <span style={{ background: "#f59e0b", color: "#fff", fontSize: 9, fontWeight: 800, padding: "1px 5px", borderRadius: 4 }}>Admin</span>
+        </div>
+      )}
+
+      {disputes.length > 0 && (
+        <div style={{ fontSize: 10, color: "#92400e" }}>
+          {disputes.length} dispute{disputes.length !== 1 ? "s" : ""} submitted
+        </div>
+      )}
+
+      {/* States */}
+      {step === "success" ? (
+        <div style={{ fontSize: 12, color: "#059669", fontWeight: 600, textAlign: "center", padding: "4px 0" }}>
+          Dispute recorded. Your bond payment was verified via DK Bank OTP and will be refunded after admin resolution.
+        </div>
+      ) : step === "failed" ? (
+        <>
+          <div style={{ fontSize: 11, color: "#ef4444" }}>{error}</div>
+          <button onClick={() => { setStep("form"); setError(null); }} style={{ padding: "6px 0", borderRadius: 7, background: "#f59e0b", border: "none", color: "#fff", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+            Try Again
+          </button>
+        </>
+      ) : step === "processing" ? (
+        <div style={{ fontSize: 11, color: "#92400e", textAlign: "center", padding: "4px 0" }}>
+          {statusMsg}<br />
+          <span style={{ fontSize: 9, opacity: 0.8 }}>Confirm the OTP sent to your registered DK Bank number</span>
+        </div>
+      ) : (
+        <>
+          {/* Payment method selector */}
+          <div style={{ display: "flex", gap: 6 }}>
+            <button
+              onClick={() => setMethod("dkbank")}
+              style={{
+                flex: 1, padding: "6px 0", borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: "pointer",
+                border: `1.5px solid ${method === "dkbank" ? "#f59e0b" : "#e5e7eb"}`,
+                background: method === "dkbank" ? "#fef3c7" : "#f9fafb",
+                color: method === "dkbank" ? "#92400e" : "#9ca3af",
+              }}
+            >DK Bank</button>
+            <button
+              onClick={() => setMethod("ton")}
+              style={{
+                flex: 1, padding: "6px 0", borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: "not-allowed",
+                border: "1.5px solid #f3f4f6", background: "#f9fafb", color: "#d1d5db", opacity: 0.6,
+              }}
+              disabled
+            >TON · Soon</button>
+          </div>
+
+          {method === "dkbank" && (
+            <>
+              <input
+                type="number"
+                min={1}
+                value={bondAmount}
+                onChange={(e) => setBondAmount(e.target.value)}
+                placeholder="Bond amount (Nu)"
+                style={{ padding: "6px 8px", borderRadius: 7, border: "1px solid #fcd34d", background: "#fff", fontSize: 12, color: "#111827", outline: "none", width: "100%", boxSizing: "border-box" }}
+              />
+              <input
+                type="text"
+                inputMode="numeric"
+                value={cid}
+                onChange={(e) => setCid(e.target.value.replace(/\D/g, "").slice(0, 11))}
+                placeholder="Your 11-digit CID"
+                style={{ padding: "6px 8px", borderRadius: 7, border: `1px solid ${cid.length > 0 && cid.length !== 11 ? "#fca5a5" : "#fcd34d"}`, background: "#fff", fontSize: 12, color: "#111827", outline: "none", width: "100%", boxSizing: "border-box" }}
+              />
+              <div style={{ fontSize: 9, color: "#92400e" }}>
+                An OTP will be sent to the phone registered with your CID to verify payment
+              </div>
+              <input
+                type="text"
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="Reason (optional)"
+                style={{ padding: "6px 8px", borderRadius: 7, border: "1px solid #fcd34d", background: "#fff", fontSize: 12, color: "#111827", outline: "none", width: "100%", boxSizing: "border-box" }}
+              />
+              {error && <div style={{ fontSize: 10, color: "#ef4444" }}>{error}</div>}
+              <button
+                onClick={handleSubmit}
+                disabled={!canSubmit}
+                style={{
+                  padding: "8px 0", borderRadius: 8,
+                  background: canSubmit ? "#f59e0b" : "#e5e7eb",
+                  border: "none", color: canSubmit ? "#fff" : "#9ca3af",
+                  fontSize: 12, fontWeight: 700, cursor: canSubmit ? "pointer" : "not-allowed",
+                }}
+              >
+                {cid.length !== 11 ? "Enter 11-digit CID" : `Pay Nu ${amt} via DK Bank`}
+              </button>
+              <div style={{ fontSize: 9, color: "#92400e", textAlign: "center" }}>
+                Bond is fully refunded after admin resolution
+              </div>
+            </>
+          )}
+        </>
+      )}
+    </div>
+  );
 }
 
 // ── Market Card ────────────────────────────────────────────────────────────────
@@ -36,6 +239,7 @@ function MarketCard({ market, onBet, lastUpdated }: {
 }) {
   const [showAll, setShowAll] = useState(false);
   const isUpcoming = market.status === "upcoming";
+  const isResolving = market.status === "resolving";
   const countdown = useCountdown(isUpcoming ? market.opensAt ?? null : market.closesAt);
   const totalPool = Number(market.totalPool);
 
@@ -53,10 +257,12 @@ function MarketCard({ market, onBet, lastUpdated }: {
 
   const isBinary = sentiment.length <= 2;
 
+  const cardBorder = isResolving ? "1.5px solid #f59e0b" : isUpcoming ? "1px solid #dbeafe" : "1px solid #e5e7eb";
+
   return (
     <div style={{
       background: "#ffffff",
-      border: isUpcoming ? "1px solid #dbeafe" : "1px solid #e5e7eb",
+      border: cardBorder,
       borderRadius: 14,
       padding: "14px",
       display: "flex",
@@ -75,6 +281,14 @@ function MarketCard({ market, onBet, lastUpdated }: {
           borderBottomLeftRadius: 8, textTransform: "uppercase", letterSpacing: "0.05em",
         }}>Soon</div>
       )}
+      {isResolving && (
+        <div style={{
+          position: "absolute", top: 0, right: 0,
+          background: "linear-gradient(90deg, #f59e0b, #d97706)",
+          color: "#fff", padding: "2px 8px", fontSize: "0.55rem", fontWeight: 800,
+          borderBottomLeftRadius: 8, textTransform: "uppercase", letterSpacing: "0.05em",
+        }}>Resolving</div>
+      )}
 
       {/* Title */}
       <div style={{
@@ -85,8 +299,10 @@ function MarketCard({ market, onBet, lastUpdated }: {
         {market.title}
       </div>
 
-      {/* Outcomes */}
-      {isUpcoming ? (
+      {/* Outcomes / Dispute panel */}
+      {isResolving ? (
+        <DisputePanel market={market} />
+      ) : isUpcoming ? (
         <div style={{ display: "flex", gap: 8 }}>
           {sentiment.map((s) => (
             <div key={s.id} style={{ flex: 1, textAlign: "center" }}>
@@ -191,7 +407,7 @@ function MarketCard({ market, onBet, lastUpdated }: {
           ? <PoolDetails market={market} lastUpdated={lastUpdated} />
           : <span>Upcoming</span>
         }
-        <span>{isUpcoming ? `Opens ${countdown}` : countdown}</span>
+        <span>{isUpcoming ? `Opens ${countdown}` : isResolving ? "Dispute window" : countdown}</span>
       </div>
     </div>
   );
@@ -210,7 +426,10 @@ export function PwaFeedPage() {
 
   useEffect(() => {
     getMarkets()
-      .then((d) => { setMarkets(d.filter((m) => m.status === "open" || m.status === "upcoming")); setLastUpdated(new Date()); })
+      .then((d) => {
+        setMarkets(d.filter((m) => m.status === "open" || m.status === "upcoming" || m.status === "resolving"));
+        setLastUpdated(new Date());
+      })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
@@ -238,17 +457,17 @@ export function PwaFeedPage() {
     const market = markets.find((m) => m.id === activeBet.marketId);
     if (market) {
       try {
-        const payload = market.mechanism === 'scpm'
-          ? { outcomeId: activeBet.outcomeId, maxShares: betAmt, limitPrice: 1.0 }
-          : { outcomeId: activeBet.outcomeId, amount: betAmt };
-        await placeBet(market.id, payload);
+        await placeBet(market.id, { outcomeId: activeBet.outcomeId, amount: betAmt });
       }
       catch (e: any) { console.warn(e.message); }
     }
 
     // Refresh from server to get accurate numbers
     getMarkets()
-      .then((d) => { setMarkets(d.filter((m) => m.status === "open" || m.status === "upcoming")); setLastUpdated(new Date()); })
+      .then((d) => {
+        setMarkets(d.filter((m) => m.status === "open" || m.status === "upcoming" || m.status === "resolving"));
+        setLastUpdated(new Date());
+      })
       .catch(console.error);
   };
 
@@ -272,6 +491,7 @@ export function PwaFeedPage() {
   const gridCols = bp === "mobile" ? "1fr" : bp === "tablet" ? "repeat(2, 1fr)" : "repeat(4, 1fr)";
 
   const openMarkets = markets.filter((m) => m.status === "open");
+  const resolvingMarkets = markets.filter((m) => m.status === "resolving");
   const upcomingMarkets = markets.filter((m) => m.status === "upcoming");
   const activeMarket = activeBet ? markets.find((m) => m.id === activeBet.marketId) : null;
 
@@ -296,6 +516,14 @@ export function PwaFeedPage() {
             🟢 Active — {openMarkets.length} open
           </div>
           {grid(openMarkets)}
+        </section>
+      )}
+      {resolvingMarkets.length > 0 && (
+        <section>
+          <div style={{ fontSize: 11, fontWeight: 800, color: "#f59e0b", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>
+             Dispute Window — {resolvingMarkets.length} pending
+          </div>
+          {grid(resolvingMarkets)}
         </section>
       )}
       {upcomingMarkets.length > 0 && (

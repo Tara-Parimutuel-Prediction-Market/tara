@@ -11,8 +11,6 @@ import { Dispute } from "../entities/dispute.entity";
 import { User } from "../entities/user.entity";
 import { LMSRService } from "./lmsr.service";
 
-import { SCPMService } from "./scpm.service";
-import { PlaceBetDto } from "./markets.service";
 
 // ─── Valid state machine transitions ────────────────────────────────────────
 const VALID_TRANSITIONS: Record<MarketStatus, MarketStatus[]> = {
@@ -40,7 +38,6 @@ export class ParimutuelEngine {
     @InjectRepository(Dispute) private disputeRepo: Repository<Dispute>,
     private dataSource: DataSource,
     private lmsrService: LMSRService,
-    private scpmService: SCPMService,
   ) {}
 
   private async getCreditsBalance(em: { getRepository: Function }, userId: string): Promise<number> {
@@ -63,109 +60,6 @@ export class ParimutuelEngine {
     if (outcomePool === 0) return 0;
     const payoutPool = totalPool * (1 - houseEdgePct / 100);
     return payoutPool / outcomePool;
-  }
-
-  /**
-   * SCPM implementation: Fill shares based on limit price
-   */
-  async placeBetSCPM(
-    userId: string,
-    market: Market,
-    dto: PlaceBetDto,
-  ): Promise<Bet> {
-    const { outcomeId, maxShares, limitPrice } = dto;
-    if (!maxShares || !limitPrice) {
-      throw new BadRequestException("SCPM requires maxShares and limitPrice");
-    }
-
-    return await this.dataSource.transaction(async (em) => {
-      // 1. Refresh market state within transaction
-      const currentMarket = await em.findOne(Market, {
-        where: { id: market.id },
-        relations: ["outcomes"],
-      });
-      if (!currentMarket) throw new BadRequestException("Market not found");
-      if (currentMarket.status !== MarketStatus.OPEN)
-        throw new BadRequestException("Market is not open");
-
-      const outcome = currentMarket.outcomes.find((o) => o.id === outcomeId);
-      if (!outcome) throw new BadRequestException("Outcome not found");
-
-      // 2. Process SCPM order
-      const fill = this.scpmService.processOrder(
-        currentMarket.outcomes,
-        { outcomeId, maxShares, limitPrice },
-        Number(currentMarket.liquidityParam),
-      );
-
-      if (fill.sharesFilled <= 0) {
-        throw new BadRequestException(
-          "Order cannot be filled within limit price",
-        );
-      }
-
-      // 3. Check user balance from ledger
-      const user = await em.findOne(User, { where: { id: userId } });
-      if (!user) throw new BadRequestException("User not found");
-      const balanceBefore = await this.getCreditsBalance(em, userId);
-      if (balanceBefore < fill.totalCost) {
-        throw new BadRequestException("Insufficient balance");
-      }
-
-      // 4. Record payment (balance is derived from ledger — no user mutation)
-      const betPayment = await em.save(
-        Payment,
-        em.create(Payment, {
-          type: PaymentType.BET_PLACED,
-          status: PaymentStatus.SUCCESS,
-          method: PaymentMethod.CREDITS,
-          amount: -fill.totalCost,
-          currency: 'CREDITS',
-          referenceId: market.id,
-          description: `SCPM Bet: ${fill.sharesFilled} shares of ${outcome.label} @ max ${limitPrice}`,
-          userId,
-        }),
-      );
-
-      // Update pools & outcome probabilities
-      outcome.totalBetAmount = Number(outcome.totalBetAmount) + fill.sharesFilled;
-      currentMarket.totalPool = Number(currentMarket.totalPool) + fill.totalCost;
-
-      // Update all outcomes with new probabilities from SCPM fill
-      currentMarket.outcomes.forEach((o, i) => {
-        o.lmsrProbability = fill.newProbabilities[i];
-      });
-
-      await em.save(Outcome, currentMarket.outcomes);
-      await em.save(Market, currentMarket);
-
-      // Create bet record
-      const bet = em.create(Bet, {
-        userId,
-        marketId: market.id,
-        outcomeId,
-        amount: fill.totalCost,
-        shares: fill.sharesFilled,
-        limitPrice: limitPrice,
-        status: BetStatus.PENDING,
-        oddsAtPlacement: fill.pricePerShare > 0 ? 1 / fill.pricePerShare : 0,
-      });
-      const savedBet = await em.save(Bet, bet);
-
-      // Audit transaction record
-      await em.save(Transaction, em.create(Transaction, {
-        type: TransactionType.BET_PLACED,
-        amount: -fill.totalCost,
-        balanceBefore,
-        balanceAfter: balanceBefore - fill.totalCost,
-        paymentId: betPayment.id,
-        betId: savedBet.id,
-        userId,
-        note: `SCPM bet: ${fill.sharesFilled} shares of ${outcome.label} @ max ${limitPrice}`,
-      }));
-
-      return savedBet;
-    });
   }
 
   // ── Accept a bet ──────────────────────────────────────────────────────────
@@ -352,7 +246,7 @@ export class ParimutuelEngine {
           userId: dispute.userId,
         }));
         await em.save(Transaction, em.create(Transaction, {
-          type: TransactionType.REFUND,
+          type: TransactionType.DISPUTE_REFUND,
           amount: Number(dispute.bondAmount),
           balanceBefore,
           balanceAfter: balanceBefore + Number(dispute.bondAmount),

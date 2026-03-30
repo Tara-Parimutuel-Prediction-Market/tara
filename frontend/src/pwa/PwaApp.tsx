@@ -32,10 +32,6 @@ function PwaLayout() {
       <header
         style={{
           background: "#ffffff",
-          padding: "0 24px",
-          height: 56,
-          display: "flex",
-          alignItems: "center",
           borderBottom: "1px solid #f0f0f0",
           position: "sticky",
           top: 0,
@@ -43,6 +39,7 @@ function PwaLayout() {
           boxShadow: "0 1px 8px rgba(0,0,0,0.06)",
         }}
       >
+        <div style={{ maxWidth: 1400, margin: "0 auto", padding: "0 16px", height: 56, display: "flex", alignItems: "center" }}>
         {/* Logo + wordmark */}
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {/* T icon mark */}
@@ -94,6 +91,7 @@ function PwaLayout() {
             </svg>
             Telegram
           </a>
+        </div>
         </div>
       </header>
 

@@ -8,7 +8,8 @@ import {
   UseGuards,
   Request,
 } from "@nestjs/common";
-import { ApiBearerAuth, ApiTags, ApiOperation } from "@nestjs/swagger";
+import { ApiBearerAuth, ApiTags, ApiOperation, ApiResponse } from "@nestjs/swagger";
+import { Dispute } from "../entities/dispute.entity";
 import { JwtAuthGuard, Public, AdminGuard } from "../auth/guards";
 import { MarketsService, PlaceBetDto, UpdateMarketDto, SubmitDisputeDto } from "./markets.service";
 
@@ -49,12 +50,14 @@ export class MarketsController {
   @Get(":id/disputes")
   @Public()
   @ApiOperation({ summary: "Get disputes for a market" })
+  @ApiResponse({ status: 200, type: [Dispute] })
   getDisputes(@Param("id") id: string) {
     return this.marketsService.getDisputesByMarket(id);
   }
 
   @Post(":id/disputes")
-  @ApiOperation({ summary: "Submit a dispute bond during resolution window" })
+  @ApiOperation({ summary: "Submit a dispute bond during the 24h resolution window" })
+  @ApiResponse({ status: 201, type: Dispute })
   submitDispute(@Param("id") id: string, @Body() dto: SubmitDisputeDto, @Request() req) {
     return this.marketsService.submitDispute(req.user.userId, id, dto);
   }
@@ -68,8 +71,6 @@ export class MarketsController {
     dto: {
       outcomeId: string;
       amount: number;
-      maxShares?: number;
-      limitPrice?: number;
       walletAddress: string;
       txHash?: string;
     },

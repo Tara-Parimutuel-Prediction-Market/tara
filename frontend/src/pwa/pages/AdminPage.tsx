@@ -3,7 +3,7 @@ import { getMe, loginWithDKBank, type AuthUser, type Market, type Dispute } from
 import {
   adminGetMarkets, adminCreateMarket, adminTransition,
   adminPropose, adminResolve, adminCancel, adminDelete,
-  adminGetMarketDisputes,
+  adminGetMarketDisputes, adminGetAllDisputes,
   adminGetUsers, adminGetPayments, adminGetSettlements,
   type AdminUser, type AdminPayment, type AdminSettlement, type CreateMarketPayload,
 } from '@/api/admin';
@@ -60,7 +60,7 @@ function Badge({ label }: { label: string }) {
 }
 
 // ─── Nav item ─────────────────────────────────────────────────────────────────
-function NavItem({ icon, label, active, onClick }: { icon: string; label: string; active: boolean; onClick: () => void }) {
+function NavItem({ icon, label, active, onClick, badge }: { icon: string; label: string; active: boolean; onClick: () => void; badge?: number }) {
   return (
     <button onClick={onClick} style={{
       display: 'flex', alignItems: 'center', gap: 10,
@@ -71,7 +71,12 @@ function NavItem({ icon, label, active, onClick }: { icon: string; label: string
       textAlign: 'left', transition: 'all 0.12s',
     }}>
       <span style={{ fontSize: 15 }}>{icon}</span>
-      {label}
+      <span style={{ flex: 1 }}>{label}</span>
+      {badge ? (
+        <span style={{ fontSize: 10, fontWeight: 800, background: C.danger, color: '#fff', borderRadius: 20, padding: '1px 6px', minWidth: 16, textAlign: 'center' }}>
+          {badge}
+        </span>
+      ) : null}
     </button>
   );
 }
@@ -585,6 +590,44 @@ function SettlementsView({ settlements }: { settlements: AdminSettlement[] }) {
   );
 }
 
+// ─── Disputes View ────────────────────────────────────────────────────────────
+function DisputesView({ disputes, markets }: { disputes: Dispute[]; markets: Market[] }) {
+  const getMarketTitle = (marketId: string) =>
+    markets.find((m) => m.id === marketId)?.title ?? marketId.slice(0, 8);
+
+  const pending = disputes.filter((d) => !d.bondRefunded);
+  const refunded = disputes.filter((d) => d.bondRefunded);
+
+  return (
+    <div>
+      <SectionHeader title={`Disputes (${disputes.length})`} />
+      {pending.length > 0 && (
+        <div style={{ background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 10, padding: '10px 16px', marginBottom: 16, fontSize: 13, color: '#92400e', fontWeight: 600 }}>
+          {pending.length} open dispute{pending.length !== 1 ? 's' : ''} awaiting resolution
+        </div>
+      )}
+      <Table
+        cols={['Market', 'Bond', 'Reason', 'Status', 'Submitted']}
+        rows={disputes.map((d) => [
+          <span style={{ fontWeight: 600, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}>
+            {getMarketTitle(d.marketId)}
+          </span>,
+          <span style={{ fontWeight: 700, color: C.warning }}>
+            {Number(d.bondAmount).toLocaleString()} credits
+          </span>,
+          <span style={{ color: C.muted, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}>
+            {d.reason || '—'}
+          </span>,
+          d.bondRefunded
+            ? <Badge label="refunded" />
+            : <span style={{ fontSize: 11, fontWeight: 700, color: C.warning, background: C.warningBg, padding: '2px 8px', borderRadius: 20 }}>open</span>,
+          fmtDate(d.createdAt),
+        ])}
+      />
+    </div>
+  );
+}
+
 // ─── Admin Login ──────────────────────────────────────────────────────────────
 function AdminLogin({ onLogin }: { onLogin: (user: AuthUser) => void }) {
   const [cid, setCid] = useState('');
@@ -648,7 +691,7 @@ function AdminLogin({ onLogin }: { onLogin: (user: AuthUser) => void }) {
 
 // ─── Main Admin Page ───────────────────────────────────────────────────────────
 
-type View = 'dashboard' | 'markets' | 'users' | 'payments' | 'settlements';
+type View = 'dashboard' | 'markets' | 'users' | 'payments' | 'settlements' | 'disputes';
 
 export function AdminPage() {
   const [adminUser, setAdminUser] = useState<AuthUser | null>(null);
@@ -657,6 +700,7 @@ export function AdminPage() {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [payments, setPayments] = useState<AdminPayment[]>([]);
   const [settlements, setSettlements] = useState<AdminSettlement[]>([]);
+  const [disputes, setDisputes] = useState<Dispute[]>([]);
   const [loading, setLoading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
@@ -671,10 +715,10 @@ export function AdminPage() {
     if (!adminUser) return;
     setLoading(true);
     try {
-      const [m, u, p, s] = await Promise.all([
-        adminGetMarkets(), adminGetUsers(), adminGetPayments(), adminGetSettlements(),
+      const [m, u, p, s, d] = await Promise.all([
+        adminGetMarkets(), adminGetUsers(), adminGetPayments(), adminGetSettlements(), adminGetAllDisputes(),
       ]);
-      setMarkets(m); setUsers(u); setPayments(p); setSettlements(s);
+      setMarkets(m); setUsers(u); setPayments(p); setSettlements(s); setDisputes(d);
     } catch { /* ignore */ }
     finally { setLoading(false); }
   }, [adminUser]);
@@ -683,12 +727,15 @@ export function AdminPage() {
 
   if (!adminUser) return <AdminLogin onLogin={setAdminUser} />;
 
-  const NAV: { view: View; icon: string; label: string }[] = [
+  const openDisputeCount = disputes.filter((d) => !d.bondRefunded).length;
+
+  const NAV: { view: View; icon: string; label: string; badge?: number }[] = [
     { view: 'dashboard',   icon: '📊', label: 'Dashboard' },
     { view: 'markets',     icon: '🏷️', label: 'Markets' },
     { view: 'users',       icon: '👥', label: 'Users' },
     { view: 'payments',    icon: '💳', label: 'Payments' },
     { view: 'settlements', icon: '🏆', label: 'Settlements' },
+    { view: 'disputes',    icon: '⚖️', label: 'Disputes', badge: openDisputeCount || undefined },
   ];
 
   return (
@@ -716,7 +763,7 @@ export function AdminPage() {
         {/* Nav */}
         <nav style={{ flex: 1, padding: '12px 12px', display: 'flex', flexDirection: 'column', gap: 2 }}>
           {NAV.map((n) => (
-            <NavItem key={n.view} icon={n.icon} label={n.label} active={view === n.view} onClick={() => setView(n.view)} />
+            <NavItem key={n.view} icon={n.icon} label={n.label} active={view === n.view} onClick={() => setView(n.view)} badge={n.badge} />
           ))}
         </nav>
 
@@ -747,6 +794,11 @@ export function AdminPage() {
           >☰</button>
           <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>
             {NAV.find((n) => n.view === view)?.label}
+            {view === 'disputes' && openDisputeCount > 0 && (
+              <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 600, color: C.warning }}>
+                {openDisputeCount} open
+              </span>
+            )}
           </div>
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
             {loading && <span style={{ fontSize: 12, color: C.muted }}>Refreshing…</span>}
@@ -766,6 +818,7 @@ export function AdminPage() {
           {view === 'users'       && <UsersView       users={users} />}
           {view === 'payments'    && <PaymentsView    payments={payments} />}
           {view === 'settlements' && <SettlementsView settlements={settlements} />}
+          {view === 'disputes'    && <DisputesView    disputes={disputes} markets={markets} />}
         </main>
       </div>
     </div>

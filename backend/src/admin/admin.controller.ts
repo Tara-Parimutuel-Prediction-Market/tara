@@ -15,6 +15,7 @@ import {
   ApiTags,
   ApiOperation,
   ApiProperty,
+  ApiResponse,
 } from "@nestjs/swagger";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
@@ -94,6 +95,7 @@ export class AdminController {
   @Post("markets/:id/propose")
   @HttpCode(200)
   @ApiOperation({ summary: "Propose winning outcome — opens 24h dispute window (Closed → Resolving)" })
+  @ApiResponse({ status: 200, type: Market })
   proposeResolution(@Param("id") id: string, @Body() dto: ProposeResolutionDto) {
     return this.marketsService.proposeResolution(id, dto.proposedOutcomeId);
   }
@@ -106,9 +108,20 @@ export class AdminController {
   }
 
   @Get("markets/:id/disputes")
-  @ApiOperation({ summary: "List all disputes for a market" })
+  @ApiOperation({ summary: "List disputes for a specific market" })
+  @ApiResponse({ status: 200, type: [Dispute] })
   getMarketDisputes(@Param("id") id: string) {
     return this.marketsService.getDisputesByMarket(id);
+  }
+
+  @Get("disputes")
+  @ApiOperation({ summary: "List all disputes across all markets" })
+  @ApiResponse({ status: 200, type: [Dispute] })
+  getAllDisputes() {
+    return this.disputeRepo.find({
+      order: { createdAt: "DESC" },
+      take: 500,
+    });
   }
 
   @Post("markets/:id/cancel")
