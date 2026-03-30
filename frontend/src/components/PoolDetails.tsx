@@ -89,7 +89,7 @@ export function PoolDetails({ market, lastUpdated }: { market: Market; lastUpdat
             <span style={{ fontSize: 12, fontWeight: 800, color: '#111827' }}>Nu {totalPool.toLocaleString()}</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 3 }}>
-            <span style={{ fontSize: 10, color: '#9ca3af' }}>House edge</span>
+            <span style={{ fontSize: 10, color: '#9ca3af' }}>Platform fee</span>
             <span style={{ fontSize: 10, color: '#9ca3af' }}>{market.houseEdgePct}%</span>
           </div>
           {relativeTime && (

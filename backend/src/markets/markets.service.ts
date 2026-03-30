@@ -16,7 +16,7 @@ import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Market, MarketStatus, MarketMechanism } from "../entities/market.entity";
 import { Outcome } from "../entities/outcome.entity";
 import { Dispute } from "../entities/dispute.entity";
-import { Payment, PaymentType, PaymentMethod, PaymentStatus } from "../entities/payment.entity";
+import { Payment, PaymentMethod, PaymentStatus } from "../entities/payment.entity";
 import { Transaction, TransactionType } from "../entities/transaction.entity";
 import { User } from "../entities/user.entity";
 import { ParimutuelEngine } from "./parimutuel.engine";
@@ -231,33 +231,20 @@ export class MarketsService {
       } else {
         // ── Credits path: deduct from balance ─────────────────────────────────
         bondAmount = dto.bondAmount!;
-        const { balance } = await em.getRepository(Payment)
-          .createQueryBuilder("p")
-          .select("COALESCE(SUM(p.amount), 0)", "balance")
-          .where("p.userId = :userId", { userId })
-          .andWhere("p.method = :method", { method: PaymentMethod.CREDITS })
-          .andWhere("p.status = :status", { status: PaymentStatus.SUCCESS })
+        const { balance } = await em.getRepository(Transaction)
+          .createQueryBuilder("t")
+          .select("COALESCE(SUM(t.amount), 0)", "balance")
+          .where("t.userId = :userId", { userId })
           .getRawOne();
         const balanceBefore = Number(balance);
         if (balanceBefore < bondAmount)
           throw new BadRequestException("Insufficient balance for dispute bond");
 
-        const bondPayment = await em.save(Payment, em.create(Payment, {
-          type: PaymentType.BET_PLACED,
-          status: PaymentStatus.SUCCESS,
-          method: PaymentMethod.CREDITS,
-          amount: -bondAmount,
-          currency: 'CREDITS',
-          referenceId: marketId,
-          description: `Dispute bond for market: ${market.title}`,
-          userId,
-        }));
         await em.save(Transaction, em.create(Transaction, {
           type: TransactionType.DISPUTE_BOND,
           amount: -bondAmount,
           balanceBefore,
           balanceAfter: balanceBefore - bondAmount,
-          paymentId: bondPayment.id,
           userId,
           note: `Dispute bond for market resolution`,
         }));

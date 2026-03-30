@@ -5,9 +5,20 @@ const isDevelopment =
 const forceDevMode =
   new URLSearchParams(window.location.search).get("dev") === "true";
 
-// Only mock if NOT inside a real Telegram WebApp
+// Only mock if NOT inside a real Telegram WebApp.
+// Must match the same detection used in index.tsx — real TMA clients expose
+// TelegramWebviewProxy or window.Telegram.WebApp, NOT TelegramGameProxy
+// (that's only for Telegram Games, a separate feature).
+const urlParams = typeof window !== "undefined"
+  ? window.location.search + window.location.hash
+  : "";
 const isRealTelegram =
-  typeof window !== "undefined" && !!(window as any).TelegramGameProxy;
+  typeof window !== "undefined" && (
+    !!(window as any).TelegramGameProxy ||
+    !!(window as any).TelegramWebviewProxy ||
+    !!(window as any).Telegram?.WebApp?.initData ||
+    /tgWebApp/i.test(urlParams)
+  );
 
 if (!isRealTelegram && (isDevelopment || forceDevMode)) {
   const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";

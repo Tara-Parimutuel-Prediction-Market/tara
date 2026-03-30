@@ -16,7 +16,11 @@ import {
   PaymentType,
 } from "../entities/payment.entity";
 import { Transaction, TransactionType } from "../entities/transaction.entity";
+import { PaymentOtp, OtpStatus } from "../entities/payment-otp.entity";
 import { DKGatewayService } from "./services/dk-gateway/dk-gateway.service";
+
+/** OTP window: 10 minutes to match typical DK Bank OTP validity. */
+const OTP_TTL_MS = 10 * 60 * 1000;
 
 export interface DKBankPaymentRequest {
   amount: number;
@@ -24,6 +28,10 @@ export interface DKBankPaymentRequest {
   customerName?: string;
   description: string;
   merchantTxnId?: string;
+  /** Optional: links this payment's OTP session to a market (e.g. top-up before betting). */
+  marketId?: string;
+  /** Optional: links this payment's OTP session to a dispute bond. */
+  disputeId?: string;
 }
 
 export interface PaymentInitiateResponse {
@@ -61,6 +69,7 @@ export class DKBankPaymentService {
     private readonly configService: ConfigService,
     @InjectRepository(User) private readonly userRepo: Repository<User>,
     @InjectRepository(Payment) private readonly paymentRepo: Repository<Payment>,
+    @InjectRepository(PaymentOtp) private readonly otpRepo: Repository<PaymentOtp>,
   ) {}
 
   /**
@@ -115,6 +124,23 @@ export class DKBankPaymentService {
         dkStatusDesc: "Staging bypass",
         isFromWebhook: false,
       });
+
+      // Record OTP as immediately verified (staging has no real OTP)
+      const now = new Date();
+      await this.otpRepo.save(this.otpRepo.create({
+        paymentId: payment.id,
+        userId,
+        marketId: dto.marketId || null,
+        disputeId: dto.disputeId || null,
+        status: OtpStatus.VERIFIED,
+        expiresAt: new Date(now.getTime() + OTP_TTL_MS),
+        lastRequestedAt: now,
+        verifiedAt: now,
+        requestCount: 1,
+        failedAttempts: 0,
+        bfsTxnId: null,
+      }));
+
       return {
         success: true,
         paymentId: payment.id,
@@ -123,7 +149,7 @@ export class DKBankPaymentService {
         currency: "BTN",
         method: "dkbank",
         message: "Payment successful.",
-        timestamp: new Date().toISOString(),
+        timestamp: now.toISOString(),
       };
     }
     // ─────────────────────────────────────────────────────────────────────────
@@ -158,6 +184,22 @@ export class DKBankPaymentService {
       };
       await this.paymentRepo.save(payment);
 
+      // 4) Create the OTP tracking record
+      const now = new Date();
+      await this.otpRepo.save(this.otpRepo.create({
+        paymentId: payment.id,
+        userId,
+        marketId: dto.marketId || null,
+        disputeId: dto.disputeId || null,
+        status: OtpStatus.PENDING,
+        expiresAt: new Date(now.getTime() + OTP_TTL_MS),
+        lastRequestedAt: now,
+        verifiedAt: null,
+        requestCount: 1,
+        failedAttempts: 0,
+        bfsTxnId: auth.bfsTxnId,
+      }));
+
       return {
         success: true,
         paymentId: payment.id,
@@ -166,7 +208,7 @@ export class DKBankPaymentService {
         currency: "BTN",
         method: "dkbank",
         message: "OTP sent to your registered DK Bank phone number. Please enter it to complete the payment.",
-        timestamp: new Date().toISOString(),
+        timestamp: now.toISOString(),
         otpRequired: true,
       };
     } catch (e: any) {
@@ -205,6 +247,19 @@ export class DKBankPaymentService {
 
     this.logger.log(`[OTP] paymentId=${paymentId} otp=${otp}`);
 
+    // Load the OTP tracking record for this payment
+    const otpRecord = await this.otpRepo.findOne({
+      where: { paymentId, userId },
+      order: { createdAt: "DESC" },
+    });
+
+    // Guard: check OTP session hasn't expired
+    if (otpRecord && otpRecord.status === OtpStatus.PENDING && otpRecord.expiresAt < new Date()) {
+      otpRecord.status = OtpStatus.EXPIRED;
+      await this.otpRepo.save(otpRecord);
+      throw new BadRequestException("OTP has expired. Please initiate a new payment.");
+    }
+
     // ── Staging bypass ────────────────────────────────────────────────────────
     const bypassOtp = this.configService.get<string>("DK_STAGING_OTP_BYPASS");
     if (bypassOtp && otp === bypassOtp) {
@@ -217,6 +272,14 @@ export class DKBankPaymentService {
         dkStatusDesc: "Staging bypass",
         isFromWebhook: false,
       });
+
+      if (otpRecord) {
+        const now = new Date();
+        otpRecord.status = OtpStatus.VERIFIED;
+        otpRecord.verifiedAt = now;
+        await this.otpRepo.save(otpRecord);
+      }
+
       return {
         success: true,
         paymentId: payment.id,
@@ -242,14 +305,22 @@ export class DKBankPaymentService {
         description: payment.description,
       });
 
+      const now = new Date();
       payment.dkTxnStatusId = result.txnStatusId;
       payment.externalPaymentId = result.txnStatusId;
       payment.metadata = {
         ...(payment.metadata || {}),
         dkExecuteResponse: result.raw,
-        otpConfirmedAt: new Date().toISOString(),
+        otpConfirmedAt: now.toISOString(),
       };
       await this.paymentRepo.save(payment);
+
+      // Mark OTP as verified
+      if (otpRecord) {
+        otpRecord.status = OtpStatus.VERIFIED;
+        otpRecord.verifiedAt = now;
+        await this.otpRepo.save(otpRecord);
+      }
 
       return {
         success: true,
@@ -259,7 +330,7 @@ export class DKBankPaymentService {
         currency: payment.currency,
         method: "dkbank",
         message: "Payment submitted. Waiting for DK Bank confirmation.",
-        timestamp: new Date().toISOString(),
+        timestamp: now.toISOString(),
         paymentUrl: result.paymentUrl,
         qrCode: result.qrCode,
       };
@@ -271,6 +342,13 @@ export class DKBankPaymentService {
         dkConfirmError: { message: payment.failureReason, otpAttemptedAt: new Date().toISOString() },
       };
       await this.paymentRepo.save(payment);
+
+      // Increment failed attempts on the OTP record
+      if (otpRecord && otpRecord.status === OtpStatus.PENDING) {
+        otpRecord.failedAttempts += 1;
+        await this.otpRepo.save(otpRecord);
+      }
+
       throw e;
     }
   }
@@ -427,36 +505,21 @@ export class DKBankPaymentService {
         payment.failureReason = null;
 
         // Snapshot balance before crediting
-        const { balance: rawBefore } = await em.getRepository(Payment)
-          .createQueryBuilder("p")
-          .select("COALESCE(SUM(p.amount), 0)", "balance")
-          .where("p.userId = :userId", { userId: params.userId })
-          .andWhere("p.method = :method", { method: PaymentMethod.CREDITS })
-          .andWhere("p.status = :status", { status: PaymentStatus.SUCCESS })
+        const { balance: rawBefore } = await em.getRepository(Transaction)
+          .createQueryBuilder("t")
+          .select("COALESCE(SUM(t.amount), 0)", "balance")
+          .where("t.userId = :userId", { userId: params.userId })
           .getRawOne();
         const balanceBefore = Number(rawBefore);
 
-        // Credit the user's CREDITS balance so placeBet can succeed
-        const credits = em.create(Payment, {
-          type: PaymentType.DEPOSIT,
-          status: PaymentStatus.SUCCESS,
-          method: PaymentMethod.CREDITS,
-          amount: payment.amount,
-          currency: 'CREDITS',
-          userId: params.userId,
-          description: `Credits from DK Bank payment ${payment.id}`,
-          referenceId: payment.id,
-        });
-        await em.save(Payment, credits);
-        this.logger.log(`[CREDITS] Credited ${payment.amount} CREDITS to user ${params.userId} from DK payment ${payment.id}`);
+        this.logger.log(`[CREDITS] Crediting ${payment.amount} to user ${params.userId} from DK payment ${payment.id}`);
 
-        // Audit transaction record
         await em.save(Transaction, em.create(Transaction, {
           type: TransactionType.DEPOSIT,
           amount: Number(payment.amount),
           balanceBefore,
           balanceAfter: balanceBefore + Number(payment.amount),
-          paymentId: credits.id,
+          paymentId: payment.id,
           userId: params.userId,
           note: `DK Bank deposit confirmed (dk_payment: ${payment.id})`,
         }));

@@ -4,7 +4,8 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { JwtAuthGuard } from "../auth/guards";
 import { User } from "../entities/user.entity";
-import { Payment, PaymentMethod, PaymentStatus } from "../entities/payment.entity";
+import { Payment } from "../entities/payment.entity";
+import { Transaction } from "../entities/transaction.entity";
 
 @ApiTags("users")
 @ApiBearerAuth()
@@ -14,6 +15,7 @@ export class UsersController {
   constructor(
     @InjectRepository(User) private userRepo: Repository<User>,
     @InjectRepository(Payment) private paymentRepo: Repository<Payment>,
+    @InjectRepository(Transaction) private transactionRepo: Repository<Transaction>,
   ) {}
 
   @Get("me")
@@ -24,22 +26,15 @@ export class UsersController {
       select: ["id", "firstName", "lastName", "username", "photoUrl", "isAdmin", "createdAt"],
     });
 
-    const rows: { method: string; balance: string }[] = await this.paymentRepo
-      .createQueryBuilder("p")
-      .select("p.method", "method")
-      .addSelect("COALESCE(SUM(p.amount), 0)", "balance")
-      .where("p.userId = :userId", { userId: req.user.userId })
-      .andWhere("p.status = :status", { status: PaymentStatus.SUCCESS })
-      .groupBy("p.method")
-      .getRawMany();
-
-    const bal = Object.fromEntries(rows.map((r) => [r.method, Number(r.balance)]));
+    const { creditsBalance } = await this.transactionRepo
+      .createQueryBuilder("t")
+      .select("COALESCE(SUM(t.amount), 0)", "creditsBalance")
+      .where("t.userId = :userId", { userId: req.user.userId })
+      .getRawOne();
 
     return {
       ...user,
-      creditsBalance: bal[PaymentMethod.CREDITS] ?? 0,
-      btnBalance: bal[PaymentMethod.DK_BANK] ?? 0,
-      usdtBalance: bal[PaymentMethod.TON] ?? 0,
+      creditsBalance: Number(creditsBalance),
     };
   }
 

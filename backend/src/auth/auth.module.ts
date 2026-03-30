@@ -9,12 +9,13 @@ import { JwtStrategy } from "./jwt.strategy";
 import { User } from "../entities/user.entity";
 import { AuthMethod } from "../entities/auth-method.entity";
 import { Payment } from "../entities/payment.entity";
+import { Transaction } from "../entities/transaction.entity";
 import { DKGatewayAuthToken } from "../entities/dk-gateway-auth-token.entity";
 import { DKGatewayService } from "../payment/services/dk-gateway/dk-gateway.service";
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, AuthMethod, Payment, DKGatewayAuthToken]),
+    TypeOrmModule.forFeature([User, AuthMethod, Payment, Transaction, DKGatewayAuthToken]),
     PassportModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],

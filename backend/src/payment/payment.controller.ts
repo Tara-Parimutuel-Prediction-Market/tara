@@ -13,7 +13,7 @@ import {
 } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiResponse, ApiBody } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
-import { IsString, IsNotEmpty, MinLength, MaxLength, IsNumber, IsIn } from 'class-validator';
+import { IsString, IsNotEmpty, MinLength, MaxLength, IsNumber, IsIn, IsOptional, IsUUID } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards';
 import { DKBankPaymentService } from './dkbank-payment.service';
@@ -37,6 +37,16 @@ class InitiatePaymentDto {
   @IsString()
   @IsNotEmpty()
   customerPhone: string;
+
+  @ApiProperty({ description: 'Market ID to link this payment to (optional)', required: false })
+  @IsOptional()
+  @IsUUID()
+  marketId?: string;
+
+  @ApiProperty({ description: 'Dispute ID to link this payment to (optional)', required: false })
+  @IsOptional()
+  @IsUUID()
+  disputeId?: string;
 }
 
 // DTO class for OTP confirmation
@@ -99,6 +109,8 @@ export class PaymentController {
       amount: paymentData.amount,
       customerPhone: paymentData.customerPhone,
       description: paymentData.description,
+      marketId: paymentData.marketId,
+      disputeId: paymentData.disputeId,
     });
   }
 

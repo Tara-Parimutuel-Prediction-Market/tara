@@ -4,7 +4,7 @@ import { Repository, DataSource } from "typeorm";
 import { Market, MarketStatus } from "../entities/market.entity";
 import { Outcome } from "../entities/outcome.entity";
 import { Bet, BetStatus } from "../entities/bet.entity";
-import { Payment, PaymentType, PaymentMethod, PaymentStatus } from "../entities/payment.entity";
+import { Payment } from "../entities/payment.entity";
 import { Transaction, TransactionType } from "../entities/transaction.entity";
 import { Settlement } from "../entities/settlement.entity";
 import { Dispute } from "../entities/dispute.entity";
@@ -41,12 +41,10 @@ export class ParimutuelEngine {
   ) {}
 
   private async getCreditsBalance(em: { getRepository: Function }, userId: string): Promise<number> {
-    const { balance } = await em.getRepository(Payment)
-      .createQueryBuilder("p")
-      .select("COALESCE(SUM(p.amount), 0)", "balance")
-      .where("p.userId = :userId", { userId })
-      .andWhere("p.method = :method", { method: PaymentMethod.CREDITS })
-      .andWhere("p.status = :status", { status: PaymentStatus.SUCCESS })
+    const { balance } = await em.getRepository(Transaction)
+      .createQueryBuilder("t")
+      .select("COALESCE(SUM(t.amount), 0)", "balance")
+      .where("t.userId = :userId", { userId })
       .getRawOne();
     return Number(balance);
   }
@@ -92,18 +90,6 @@ export class ParimutuelEngine {
       if (balanceBefore < amount)
         throw new BadRequestException("Insufficient balance");
 
-      // Record payment (balance is derived from ledger — no user mutation)
-      const betPayment = await em.save(Payment, em.create(Payment, {
-        type: PaymentType.BET_PLACED,
-        status: PaymentStatus.SUCCESS,
-        method: PaymentMethod.CREDITS,
-        amount: -amount,
-        currency: 'CREDITS',
-        referenceId: marketId,
-        description: `Bet on outcome: ${outcome.label}`,
-        userId,
-      }));
-
       // Update outcome pool
       outcome.totalBetAmount = Number(outcome.totalBetAmount) + amount;
 
@@ -145,13 +131,11 @@ export class ParimutuelEngine {
       });
       const savedBet = await em.save(Bet, bet);
 
-      // Audit transaction record
       await em.save(Transaction, em.create(Transaction, {
         type: TransactionType.BET_PLACED,
         amount: -amount,
         balanceBefore,
         balanceAfter: balanceBefore - amount,
-        paymentId: betPayment.id,
         betId: savedBet.id,
         userId,
         note: `Bet on outcome: ${outcome.label}`,
@@ -235,22 +219,11 @@ export class ParimutuelEngine {
     for (const dispute of disputes) {
       await this.dataSource.transaction(async (em) => {
         const balanceBefore = await this.getCreditsBalance(em, dispute.userId);
-        const refundPayment = await em.save(Payment, em.create(Payment, {
-          type: PaymentType.REFUND,
-          status: PaymentStatus.SUCCESS,
-          method: PaymentMethod.CREDITS,
-          amount: Number(dispute.bondAmount),
-          currency: 'CREDITS',
-          referenceId: marketId,
-          description: 'Dispute bond refund',
-          userId: dispute.userId,
-        }));
         await em.save(Transaction, em.create(Transaction, {
           type: TransactionType.DISPUTE_REFUND,
           amount: Number(dispute.bondAmount),
           balanceBefore,
           balanceAfter: balanceBefore + Number(dispute.bondAmount),
-          paymentId: refundPayment.id,
           userId: dispute.userId,
           note: 'Dispute bond refund after market resolution',
         }));
@@ -287,22 +260,11 @@ export class ParimutuelEngine {
           winningBets++;
 
           const balanceBefore = await this.getCreditsBalance(em, bet.userId);
-          const payoutPayment = await em.save(Payment, em.create(Payment, {
-            type: PaymentType.BET_PAYOUT,
-            status: PaymentStatus.SUCCESS,
-            method: PaymentMethod.CREDITS,
-            amount: payout,
-            currency: 'CREDITS',
-            referenceId: market.id,
-            description: `Won bet on: ${winner.label}`,
-            userId: bet.userId,
-          }));
           await em.save(Transaction, em.create(Transaction, {
             type: TransactionType.BET_PAYOUT,
             amount: payout,
             balanceBefore,
             balanceAfter: balanceBefore + payout,
-            paymentId: payoutPayment.id,
             betId: bet.id,
             userId: bet.userId,
             note: `Payout for winning bet on: ${winner.label}`,
@@ -311,22 +273,11 @@ export class ParimutuelEngine {
           // Refund on cancellation via ledger entry
           bet.status = BetStatus.REFUNDED;
           const balanceBefore = await this.getCreditsBalance(em, bet.userId);
-          const refundPayment = await em.save(Payment, em.create(Payment, {
-            type: PaymentType.REFUND,
-            status: PaymentStatus.SUCCESS,
-            method: PaymentMethod.CREDITS,
-            amount: Number(bet.amount),
-            currency: 'CREDITS',
-            referenceId: market.id,
-            description: "Market cancelled — refund",
-            userId: bet.userId,
-          }));
           await em.save(Transaction, em.create(Transaction, {
             type: TransactionType.REFUND,
             amount: Number(bet.amount),
             balanceBefore,
             balanceAfter: balanceBefore + Number(bet.amount),
-            paymentId: refundPayment.id,
             betId: bet.id,
             userId: bet.userId,
             note: 'Market cancelled — refund',
@@ -370,22 +321,11 @@ export class ParimutuelEngine {
       for (const bet of bets) {
         if (bet.status === BetStatus.PENDING) {
           const balanceBefore = await this.getCreditsBalance(em, bet.userId);
-          const refundPayment = await em.save(Payment, em.create(Payment, {
-            type: PaymentType.REFUND,
-            status: PaymentStatus.SUCCESS,
-            method: PaymentMethod.CREDITS,
-            amount: Number(bet.amount),
-            currency: 'CREDITS',
-            referenceId: marketId,
-            description: "Market cancelled — refund",
-            userId: bet.userId,
-          }));
           await em.save(Transaction, em.create(Transaction, {
             type: TransactionType.REFUND,
             amount: Number(bet.amount),
             balanceBefore,
             balanceAfter: balanceBefore + Number(bet.amount),
-            paymentId: refundPayment.id,
             betId: bet.id,
             userId: bet.userId,
             note: 'Market cancelled — refund',

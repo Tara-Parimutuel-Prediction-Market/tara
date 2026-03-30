@@ -5,7 +5,7 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { User } from "../entities/user.entity";
 import { AuthMethod, AuthProvider } from "../entities/auth-method.entity";
-import { Payment, PaymentMethod, PaymentStatus, PaymentType } from "../entities/payment.entity";
+import { Transaction, TransactionType } from "../entities/transaction.entity";
 import { DKGatewayService } from "../payment/services/dk-gateway/dk-gateway.service";
 
 export interface TelegramInitData {
@@ -23,7 +23,7 @@ export class AuthService {
   constructor(
     @InjectRepository(User) private userRepo: Repository<User>,
     @InjectRepository(AuthMethod) private authMethodRepo: Repository<AuthMethod>,
-    @InjectRepository(Payment) private paymentRepo: Repository<Payment>,
+    @InjectRepository(Transaction) private transactionRepo: Repository<Transaction>,
     private jwtService: JwtService,
     private dkGateway: DKGatewayService,
   ) {}
@@ -90,16 +90,15 @@ export class AuthService {
       });
       await this.userRepo.save(user);
 
-      // Seed 1000 starter credits as a ledger entry
-      await this.paymentRepo.save(
-        this.paymentRepo.create({
-          type: PaymentType.DEPOSIT,
-          status: PaymentStatus.SUCCESS,
-          method: PaymentMethod.CREDITS,
+      // Seed 1000 starter credits as a transaction entry
+      await this.transactionRepo.save(
+        this.transactionRepo.create({
+          type: TransactionType.DEPOSIT,
           amount: 1000,
-          currency: "CREDITS",
-          description: "Starter credits",
+          balanceBefore: 0,
+          balanceAfter: 1000,
           userId: user.id,
+          note: "Starter credits",
         }),
       );
 
@@ -150,16 +149,15 @@ export class AuthService {
       });
       await this.userRepo.save(user);
 
-      // Seed 1000 starter credits as a ledger entry
-      await this.paymentRepo.save(
-        this.paymentRepo.create({
-          type: PaymentType.DEPOSIT,
-          status: PaymentStatus.SUCCESS,
-          method: PaymentMethod.CREDITS,
+      // Seed 1000 starter credits as a transaction entry
+      await this.transactionRepo.save(
+        this.transactionRepo.create({
+          type: TransactionType.DEPOSIT,
           amount: 1000,
-          currency: "CREDITS",
-          description: "Starter credits",
+          balanceBefore: 0,
+          balanceAfter: 1000,
           userId: user.id,
+          note: "Starter credits",
         }),
       );
 

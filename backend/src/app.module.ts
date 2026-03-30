@@ -19,6 +19,7 @@ import { Transaction } from "./entities/transaction.entity";
 import { Settlement } from "./entities/settlement.entity";
 import { Dispute } from "./entities/dispute.entity";
 import { DKGatewayAuthToken } from "./entities/dk-gateway-auth-token.entity";
+import { PaymentOtp } from "./entities/payment-otp.entity";
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { DKGatewayAuthToken } from "./entities/dk-gateway-auth-token.entity";
           Settlement,
           Dispute,
           DKGatewayAuthToken,
+          PaymentOtp,
         ],
         synchronize: false,
         logging: false,
