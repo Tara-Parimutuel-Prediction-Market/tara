@@ -12,10 +12,17 @@ import { Payment } from "../entities/payment.entity";
 import { Transaction } from "../entities/transaction.entity";
 import { DKGatewayAuthToken } from "../entities/dk-gateway-auth-token.entity";
 import { DKGatewayService } from "../payment/services/dk-gateway/dk-gateway.service";
+import { TelegramVerificationService } from "../telegram/telegram-verification.service";
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, AuthMethod, Payment, Transaction, DKGatewayAuthToken]),
+    TypeOrmModule.forFeature([
+      User,
+      AuthMethod,
+      Payment,
+      Transaction,
+      DKGatewayAuthToken,
+    ]),
     PassportModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
@@ -26,7 +33,12 @@ import { DKGatewayService } from "../payment/services/dk-gateway/dk-gateway.serv
       }),
     }),
   ],
-  providers: [AuthService, JwtStrategy, DKGatewayService],
+  providers: [
+    AuthService,
+    JwtStrategy,
+    DKGatewayService,
+    TelegramVerificationService,
+  ],
   controllers: [AuthController],
   exports: [AuthService, JwtModule],
 })

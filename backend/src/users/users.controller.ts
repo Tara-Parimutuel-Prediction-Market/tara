@@ -1,5 +1,13 @@
 import { Controller, Get, UseGuards, Request, Query } from "@nestjs/common";
-import { ApiBearerAuth, ApiTags, ApiOperation, ApiResponse, ApiProperty, ApiPropertyOptional, ApiQuery } from "@nestjs/swagger";
+import {
+  ApiBearerAuth,
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiProperty,
+  ApiPropertyOptional,
+  ApiQuery,
+} from "@nestjs/swagger";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { JwtAuthGuard } from "../auth/guards";
@@ -16,16 +24,26 @@ class ProfileResponse {
   @ApiProperty({ example: "Sonam" }) firstName: string;
   @ApiPropertyOptional({ example: "Tenzin" }) lastName: string;
   @ApiPropertyOptional({ example: "sonam_t" }) username: string;
-  @ApiPropertyOptional({ example: "https://cdn.example.com/photo.jpg" }) photoUrl: string;
+  @ApiPropertyOptional({ example: "https://cdn.example.com/photo.jpg" })
+  photoUrl: string;
   @ApiProperty({ example: false }) isAdmin: boolean;
-  @ApiProperty({ example: 1500.5, description: "Credits balance computed from transaction ledger" }) creditsBalance: number;
+  @ApiProperty({
+    example: 1500.5,
+    description: "Credits balance computed from transaction ledger",
+  })
+  creditsBalance: number;
   @ApiProperty() createdAt: Date;
 }
 
 class TransactionResponse {
   @ApiProperty({ example: "uuid-5678" }) id: string;
-  @ApiProperty({ enum: TransactionType, example: TransactionType.BET_PLACED }) type: TransactionType;
-  @ApiProperty({ example: -100.0, description: "Negative = debit, positive = credit" }) amount: number;
+  @ApiProperty({ enum: TransactionType, example: TransactionType.BET_PLACED })
+  type: TransactionType;
+  @ApiProperty({
+    example: -100.0,
+    description: "Negative = debit, positive = credit",
+  })
+  amount: number;
   @ApiProperty({ example: 1600.0 }) balanceBefore: number;
   @ApiProperty({ example: 1500.0 }) balanceAfter: number;
   @ApiPropertyOptional({ example: "Bet on outcome: Team A" }) note: string;
@@ -37,14 +55,25 @@ class TransactionResponse {
 class BetResponse {
   @ApiProperty({ example: "uuid-bet" }) id: string;
   @ApiProperty({ example: 100.0 }) amount: number;
-  @ApiProperty({ enum: BetStatus, example: BetStatus.PENDING }) status: BetStatus;
-  @ApiPropertyOptional({ example: 1.8, description: "Parimutuel odds at time of placement" }) oddsAtPlacement: number;
-  @ApiPropertyOptional({ example: 180.0, description: "Payout amount (only set after settlement)" }) payout: number;
+  @ApiProperty({ enum: BetStatus, example: BetStatus.PENDING })
+  status: BetStatus;
+  @ApiPropertyOptional({
+    example: 1.8,
+    description: "Parimutuel odds at time of placement",
+  })
+  oddsAtPlacement: number;
+  @ApiPropertyOptional({
+    example: 180.0,
+    description: "Payout amount (only set after settlement)",
+  })
+  payout: number;
   @ApiProperty() placedAt: Date;
   @ApiProperty({ example: "uuid-market" }) marketId: string;
   @ApiProperty({ example: "uuid-outcome" }) outcomeId: string;
-  @ApiPropertyOptional({ description: "Market details (eager loaded)" }) market: any;
-  @ApiPropertyOptional({ description: "Outcome details (eager loaded)" }) outcome: any;
+  @ApiPropertyOptional({ description: "Market details (eager loaded)" })
+  market: any;
+  @ApiPropertyOptional({ description: "Outcome details (eager loaded)" })
+  outcome: any;
 }
 
 @ApiTags("users")
@@ -55,7 +84,8 @@ export class UsersController {
   constructor(
     @InjectRepository(User) private userRepo: Repository<User>,
     @InjectRepository(Payment) private paymentRepo: Repository<Payment>,
-    @InjectRepository(Transaction) private transactionRepo: Repository<Transaction>,
+    @InjectRepository(Transaction)
+    private transactionRepo: Repository<Transaction>,
     @InjectRepository(Bet) private betRepo: Repository<Bet>,
     private readonly redis: RedisService,
   ) {}
@@ -68,11 +98,26 @@ export class UsersController {
 
     const user = await this.userRepo.findOne({
       where: { id: userId },
-      select: ["id", "firstName", "lastName", "username", "photoUrl", "isAdmin", "createdAt"],
+      select: [
+        "id",
+        "firstName",
+        "lastName",
+        "username",
+        "photoUrl",
+        "isAdmin",
+        "createdAt",
+        "telegramId",
+        "dkCid",
+        "dkAccountName",
+        "dkPhoneHash",
+        "telegramPhoneHash",
+        "telegramLinkedAt",
+      ],
     });
 
     const balanceCacheKey = `tara:cache:balance:${userId}`;
-    let creditsBalance: number | null = await this.redis.getJson<number>(balanceCacheKey);
+    let creditsBalance: number | null =
+      await this.redis.getJson<number>(balanceCacheKey);
 
     if (creditsBalance === null) {
       const { creditsBalance: raw } = await this.transactionRepo
@@ -104,8 +149,18 @@ export class UsersController {
 
   @Get("me/transactions")
   @ApiOperation({ summary: "Get my transaction ledger (wallet history)" })
-  @ApiQuery({ name: "limit", required: false, example: 50, description: "Max rows to return (default 50)" })
-  @ApiQuery({ name: "type", required: false, enum: TransactionType, description: "Filter by transaction type" })
+  @ApiQuery({
+    name: "limit",
+    required: false,
+    example: 50,
+    description: "Max rows to return (default 50)",
+  })
+  @ApiQuery({
+    name: "type",
+    required: false,
+    enum: TransactionType,
+    description: "Filter by transaction type",
+  })
   @ApiResponse({ status: 200, type: [TransactionResponse] })
   getTransactions(
     @Request() req,
@@ -126,12 +181,14 @@ export class UsersController {
 
   @Get("me/bets")
   @ApiOperation({ summary: "Get my predictions (all bets)" })
-  @ApiQuery({ name: "status", required: false, enum: BetStatus, description: "Filter by bet status" })
+  @ApiQuery({
+    name: "status",
+    required: false,
+    enum: BetStatus,
+    description: "Filter by bet status",
+  })
   @ApiResponse({ status: 200, type: [BetResponse] })
-  getMyBets(
-    @Request() req,
-    @Query("status") status?: BetStatus,
-  ) {
+  getMyBets(@Request() req, @Query("status") status?: BetStatus) {
     const where: any = { userId: req.user.userId };
     if (status) where.status = status;
     return this.betRepo.find({
@@ -144,7 +201,9 @@ export class UsersController {
   // ── Results: settled bets ─────────────────────────────────────────────────
 
   @Get("me/results")
-  @ApiOperation({ summary: "Get my results — bets that have been won, lost, or refunded" })
+  @ApiOperation({
+    summary: "Get my results — bets that have been won, lost, or refunded",
+  })
   @ApiResponse({ status: 200, type: [BetResponse] })
   getResults(@Request() req) {
     return this.betRepo

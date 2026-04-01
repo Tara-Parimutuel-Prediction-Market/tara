@@ -8,7 +8,7 @@ import {
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { InjectRepository } from "@nestjs/typeorm";
-import axios, { AxiosInstance } from "axios";
+// NOTE: axios removed — using Node.js built-in fetch (v18+) to avoid supply-chain risk.
 import * as jwt from "jsonwebtoken";
 import { Repository } from "typeorm";
 import { createHmac, randomUUID } from "crypto";
@@ -44,7 +44,8 @@ interface DKAuthResponse {
 @Injectable()
 export class DKGatewayService {
   private readonly logger = new Logger(DKGatewayService.name);
-  private readonly httpClient: AxiosInstance;
+  private readonly baseUrl: string;
+  private readonly timeoutMs = 60_000;
   private privateKeyCache: string | null = null;
 
   constructor(
@@ -52,24 +53,41 @@ export class DKGatewayService {
     @InjectRepository(DKGatewayAuthToken)
     private readonly tokenRepo: Repository<DKTokenRow>,
   ) {
-    this.httpClient = axios.create({
-      baseURL: this.configService.get<string>("DK_BASE_URL"),
-      timeout: 60_000,
-      headers: { "Content-Type": "application/json" },
-    });
+    this.baseUrl = (
+      this.configService.get<string>("DK_BASE_URL") || ""
+    ).replace(/\/$/, "");
   }
 
-  private get apiKey(): string { return this.configService.getOrThrow<string>("DK_API_KEY"); }
-  private get username(): string { return this.configService.getOrThrow<string>("DK_USERNAME"); }
-  private get password(): string { return this.configService.getOrThrow<string>("DK_PASSWORD"); }
-  private get clientId(): string { return this.configService.getOrThrow<string>("DK_CLIENT_ID"); }
-  private get clientSecret(): string { return this.configService.getOrThrow<string>("DK_CLIENT_SECRET"); }
-  private get sourceApp(): string { return this.configService.getOrThrow<string>("DK_SOURCE_APP"); }
-  private get beneficiaryAccount(): string { return this.configService.getOrThrow<string>("DK_BENEFICIARY_ACCOUNT"); }
-  private get beneficiaryName(): string {
-    return this.configService.get<string>("DK_BENEFICIARY_ACCOUNT_NAME") || "Lucky Pem";
+  private get apiKey(): string {
+    return this.configService.getOrThrow<string>("DK_API_KEY");
   }
-  private get bankCode(): string { return this.configService.getOrThrow<string>("DK_BANK_CODE"); }
+  private get username(): string {
+    return this.configService.getOrThrow<string>("DK_USERNAME");
+  }
+  private get password(): string {
+    return this.configService.getOrThrow<string>("DK_PASSWORD");
+  }
+  private get clientId(): string {
+    return this.configService.getOrThrow<string>("DK_CLIENT_ID");
+  }
+  private get clientSecret(): string {
+    return this.configService.getOrThrow<string>("DK_CLIENT_SECRET");
+  }
+  private get sourceApp(): string {
+    return this.configService.getOrThrow<string>("DK_SOURCE_APP");
+  }
+  private get beneficiaryAccount(): string {
+    return this.configService.getOrThrow<string>("DK_BENEFICIARY_ACCOUNT");
+  }
+  private get beneficiaryName(): string {
+    return (
+      this.configService.get<string>("DK_BENEFICIARY_ACCOUNT_NAME") ||
+      "Lucky Pem"
+    );
+  }
+  private get bankCode(): string {
+    return this.configService.getOrThrow<string>("DK_BANK_CODE");
+  }
   private get webhookSecret(): string | null {
     return this.configService.get<string>("DK_WEBHOOK_SECRET") || null;
   }
@@ -79,7 +97,8 @@ export class DKGatewayService {
     if (obj && typeof obj === "object") {
       const rec = obj as Record<string, unknown>;
       const out: Record<string, unknown> = {};
-      for (const k of Object.keys(rec).sort()) out[k] = this.canonicalize(rec[k]);
+      for (const k of Object.keys(rec).sort())
+        out[k] = this.canonicalize(rec[k]);
       return out;
     }
     return obj;
@@ -89,7 +108,9 @@ export class DKGatewayService {
     return `${Date.now()}-${randomUUID().replace(/-/g, "").slice(0, 10)}`;
   }
 
-  private generateNonce(): string { return randomUUID().replace(/-/g, ""); }
+  private generateNonce(): string {
+    return randomUUID().replace(/-/g, "");
+  }
 
   private generateDkTimestamp(): string {
     return new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
@@ -102,12 +123,19 @@ export class DKGatewayService {
 
   private async signHeaders(requestBody: Record<string, unknown>) {
     if (!this.privateKeyCache) await this.fetchPrivateKey();
-    if (!this.privateKeyCache) throw new UnauthorizedException("DK RSA private key not available");
+    if (!this.privateKeyCache)
+      throw new UnauthorizedException("DK RSA private key not available");
 
     const timestamp = this.generateDkTimestamp();
     const nonce = this.generateNonce();
-    const bodyBase64 = Buffer.from(JSON.stringify(this.canonicalize(requestBody))).toString("base64");
-    const signature = jwt.sign({ data: bodyBase64, timestamp, nonce }, this.privateKeyCache, { algorithm: "RS256" });
+    const bodyBase64 = Buffer.from(
+      JSON.stringify(this.canonicalize(requestBody)),
+    ).toString("base64");
+    const signature = jwt.sign(
+      { data: bodyBase64, timestamp, nonce },
+      this.privateKeyCache,
+      { algorithm: "RS256" },
+    );
 
     return {
       "DK-Signature": `DKSignature ${signature}`,
@@ -116,15 +144,67 @@ export class DKGatewayService {
     };
   }
 
+  /**
+   * Thin native-fetch wrapper — replaces axios to avoid supply-chain risk.
+   * Throws on non-2xx or network timeout.
+   */
+  private async nativeFetch<T = unknown>(
+    endpoint: string,
+    body: string,
+    headers: Record<string, string>,
+  ): Promise<T> {
+    const url = `${this.baseUrl}${endpoint}`;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), this.timeoutMs);
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers,
+        body,
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+      const text = await res.text();
+      if (!res.ok) {
+        this.logger.error(`DK HTTP ${res.status} on ${endpoint}: ${text}`);
+        if (res.status === 502 || res.status === 503 || res.status === 504) {
+          throw new ServiceUnavailableException(
+            "DK payment gateway unavailable",
+          );
+        }
+        throw new BadRequestException(`DK gateway HTTP ${res.status}: ${text}`);
+      }
+      // Some DK endpoints return a raw PEM string, not JSON
+      try {
+        return JSON.parse(text) as T;
+      } catch {
+        return text as unknown as T;
+      }
+    } catch (err: any) {
+      clearTimeout(timer);
+      if (err?.name === "AbortError" || err?.message?.includes("abort")) {
+        throw new RequestTimeoutException("DK payment request timed out");
+      }
+      throw err;
+    }
+  }
+
   private async fetchPrivateKey(): Promise<void> {
     const token = await this.getValidAccessToken();
-    const res = await this.httpClient.post(
-      "/v1/sign/key",
-      { request_id: this.generateRequestId(), source_app: this.sourceApp },
-      { headers: { Authorization: `Bearer ${token}`, "X-gravitee-api-key": this.apiKey } },
-    );
-    const data = res.data;
-    if (typeof data === "string" && data.includes("BEGIN") && data.includes("PRIVATE KEY")) {
+    const body = JSON.stringify({
+      request_id: this.generateRequestId(),
+      source_app: this.sourceApp,
+    });
+    const data = await this.nativeFetch<string>("/v1/sign/key", body, {
+      "Content-Type": "application/json",
+      "X-gravitee-api-key": this.apiKey,
+      Authorization: `Bearer ${token}`,
+    });
+    if (
+      typeof data === "string" &&
+      data.includes("BEGIN") &&
+      data.includes("PRIVATE KEY")
+    ) {
       this.privateKeyCache = data;
       return;
     }
@@ -135,7 +215,9 @@ export class DKGatewayService {
     const bufferMs = 2 * 60 * 1000;
     const tokenRow = await this.tokenRepo
       .createQueryBuilder("t")
-      .where("t.expiresAt > :cutoff", { cutoff: new Date(Date.now() + bufferMs) })
+      .where("t.expiresAt > :cutoff", {
+        cutoff: new Date(Date.now() + bufferMs),
+      })
       .orderBy("t.updatedAt", "DESC")
       .getOne();
     if (tokenRow?.accessToken) return tokenRow.accessToken;
@@ -143,7 +225,9 @@ export class DKGatewayService {
     await this.refreshAccessToken();
     const refreshed = await this.tokenRepo
       .createQueryBuilder("t")
-      .where("t.expiresAt > :cutoff", { cutoff: new Date(Date.now() + bufferMs) })
+      .where("t.expiresAt > :cutoff", {
+        cutoff: new Date(Date.now() + bufferMs),
+      })
       .orderBy("t.updatedAt", "DESC")
       .getOne();
     if (!refreshed?.accessToken) throw new Error("DK token refresh failed");
@@ -161,18 +245,31 @@ export class DKGatewayService {
     params.append("source_app", this.sourceApp);
     params.append("request_id", this.generateRequestId());
 
-    const res = await this.httpClient.post("/v1/auth/token", params.toString(), {
-      headers: { "Content-Type": "application/x-www-form-urlencoded", "X-gravitee-api-key": this.apiKey },
-    });
-
-    const data = res.data as DKAuthResponse;
-    if (data.response_code !== DK_RESPONSE_CODES.SUCCESS || !data.response_data) {
-      throw new Error(`DK token fetch failed: ${data.response_description || data.response_message || data.response_code}`);
+    const res = await this.nativeFetch<DKAuthResponse>(
+      "/v1/auth/token",
+      params.toString(),
+      {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "X-gravitee-api-key": this.apiKey,
+      },
+    );
+    const data = res;
+    if (
+      data.response_code !== DK_RESPONSE_CODES.SUCCESS ||
+      !data.response_data
+    ) {
+      throw new Error(
+        `DK token fetch failed: ${data.response_description || data.response_message || data.response_code}`,
+      );
     }
 
     const tokenData = data.response_data;
     const expiresAt = new Date(Date.now() + tokenData.expires_in * 1000);
-    await this.tokenRepo.save({ accessToken: tokenData.access_token, refreshToken: tokenData.refresh_token || null, expiresAt });
+    await this.tokenRepo.save({
+      accessToken: tokenData.access_token,
+      refreshToken: tokenData.refresh_token || null,
+      expiresAt,
+    });
     this.privateKeyCache = null;
     this.logger.log("DK access token refreshed");
   }
@@ -198,33 +295,21 @@ export class DKGatewayService {
 
     try {
       this.logger.log(`DK POST ${endpoint} → ${JSON.stringify(requestBody)}`);
-      const res = await this.httpClient.post(endpoint, requestBody, { headers });
-      this.logger.log(`DK POST ${endpoint} ← ${JSON.stringify(res.data)}`);
-      return res.data as T;
-    } catch (err: any) {
-      if (err?.code === "ECONNABORTED" || err?.message?.includes("timeout")) {
-        throw new RequestTimeoutException("DK payment request timed out");
-      }
-      const responseStatus = err?.response?.status;
-      const responseData = err?.response?.data;
-      if (responseStatus === 502 || responseStatus === 503 || responseStatus === 504) {
-        throw new ServiceUnavailableException("DK payment gateway unavailable");
-      }
-      const details =
-        responseData !== undefined
-          ? typeof responseData === "string" ? responseData : JSON.stringify(responseData)
-          : undefined;
-      this.logger.error(`DK POST ${endpoint} failed: ${responseStatus ?? "NO_STATUS"} ${details ?? ""}`.trim());
-      throw new BadRequestException(
-        responseStatus
-          ? `DK gateway HTTP ${responseStatus}${details ? `: ${details}` : ""}`
-          : err?.message || "DK HTTP request failed",
+      const res = await this.nativeFetch<T>(
+        endpoint,
+        JSON.stringify(requestBody),
+        headers,
       );
+      this.logger.log(`DK POST ${endpoint} ← ${JSON.stringify(res)}`);
+      return res;
+    } catch (err: any) {
+      // nativeFetch already converts HTTP errors and timeouts — just re-throw.
+      this.logger.error(`DK POST ${endpoint} failed: ${err?.message}`);
+      throw err;
     }
   }
 
   // ── Public API methods ────────────────────────────────────────────────────────
-
   /**
    * Step 1: Look up a customer's DK Bank account by their CID.
    * Returns account number, name, and phone for use in authorizeTransaction.
@@ -248,14 +333,37 @@ export class DKGatewayService {
       }>;
     }>("/v1/client_inquiry", { id_type: "CID", id_number: cid }, true);
 
-    if (res.response_code !== DK_RESPONSE_CODES.SUCCESS || !res.response_data?.length) {
+    if (
+      res.response_code !== DK_RESPONSE_CODES.SUCCESS ||
+      !res.response_data?.length
+    ) {
+      const dkMsg = (
+        res.response_description ||
+        res.response_message ||
+        ""
+      ).toLowerCase();
+      // DK returns "Missing record/record not found" when the CID has no DK Bank account
+      if (
+        dkMsg.includes("missing record") ||
+        dkMsg.includes("not found") ||
+        res.response_code === "0001"
+      ) {
+        throw new BadRequestException(
+          "No DK Bank account found for this CID. Please check your 11-digit CID and try again.",
+        );
+      }
       throw new BadRequestException(
-        res.response_description || res.response_message || "CID account inquiry failed",
+        res.response_description ||
+          res.response_message ||
+          "CID account inquiry failed",
       );
     }
 
     const acct = res.response_data[0];
-    if (!acct?.account_number) throw new BadRequestException("Account not found for CID");
+    if (!acct?.account_number)
+      throw new BadRequestException(
+        "No DK Bank account found for this CID. Please check your 11-digit CID and try again.",
+      );
 
     const firstName = acct.first_name || "";
     const middleName = acct.middle_name ? ` ${acct.middle_name}` : "";
@@ -298,22 +406,31 @@ export class DKGatewayService {
         account_number: string;
         remitter_account_number: string;
       };
-    }>("/v1/account_auth/pull-payment", {
-      account_number: params.customerAccountNumber,
-      account_name: params.customerAccountName,
-      transaction_datetime: txDatetime,
-      stan_number: params.stanNumber,
-      transaction_amount: params.amount.toFixed(2),
-      payment_desc: params.description,
-      ...(params.customerPhone ? { phone_number: params.customerPhone } : {}),
-      remitter_account_number: params.customerAccountNumber,
-      remitter_account_name: params.customerAccountName,
-      remitter_bank_id: this.bankCode,
-    }, true);
+    }>(
+      "/v1/account_auth/pull-payment",
+      {
+        account_number: params.customerAccountNumber,
+        account_name: params.customerAccountName,
+        transaction_datetime: txDatetime,
+        stan_number: params.stanNumber,
+        transaction_amount: params.amount.toFixed(2),
+        payment_desc: params.description,
+        ...(params.customerPhone ? { phone_number: params.customerPhone } : {}),
+        remitter_account_number: params.customerAccountNumber,
+        remitter_account_name: params.customerAccountName,
+        remitter_bank_id: this.bankCode,
+      },
+      true,
+    );
 
-    if (res.response_code !== DK_RESPONSE_CODES.SUCCESS || !res.response_data?.bfs_txn_id) {
+    if (
+      res.response_code !== DK_RESPONSE_CODES.SUCCESS ||
+      !res.response_data?.bfs_txn_id
+    ) {
       throw new BadRequestException(
-        res.response_description || res.response_message || "Transaction authorization failed",
+        res.response_description ||
+          res.response_message ||
+          "Transaction authorization failed",
       );
     }
 
@@ -353,35 +470,49 @@ export class DKGatewayService {
         qr_code?: string;
         [k: string]: unknown;
       };
-    }>("/v1/debit_request/pull-payment", {
-      bfs_TxnId: params.bfsTxnId,
-      bfs_remitter_Otp: params.otp,
-      stan_number: params.stanNumber,
-      transaction_datetime: params.txDatetime,
-      transaction_amount: params.amount.toFixed(2),
-      currency: "BTN",
-      payment_type: "INTRA",
-      source_account_name: params.sourceAccountName,
-      source_account_number: params.sourceAccountNumber,
-      bene_cust_name: this.beneficiaryName,
-      bene_account_number: this.beneficiaryAccount,
-      bene_bank_code: this.bankCode,
-      narration: params.description,
-    }, true);
+    }>(
+      "/v1/debit_request/pull-payment",
+      {
+        bfs_TxnId: params.bfsTxnId,
+        bfs_remitter_Otp: params.otp,
+        stan_number: params.stanNumber,
+        transaction_datetime: params.txDatetime,
+        transaction_amount: params.amount.toFixed(2),
+        currency: "BTN",
+        payment_type: "INTRA",
+        source_account_name: params.sourceAccountName,
+        source_account_number: params.sourceAccountNumber,
+        bene_cust_name: this.beneficiaryName,
+        bene_account_number: this.beneficiaryAccount,
+        bene_bank_code: this.bankCode,
+        narration: params.description,
+      },
+      true,
+    );
 
     if (res.response_code === DK_RESPONSE_CODES.RESTRICTION) {
-      throw new BadRequestException(res.response_description || "Transaction restricted by DK");
+      throw new BadRequestException(
+        res.response_description || "Transaction restricted by DK",
+      );
     }
     if (res.response_code !== DK_RESPONSE_CODES.SUCCESS) {
-      throw new BadRequestException(res.response_description || res.response_message || "Transaction failed");
+      throw new BadRequestException(
+        res.response_description ||
+          res.response_message ||
+          "Transaction failed",
+      );
     }
 
     const txnStatusId = res.response_data?.txn_status_id;
-    if (!txnStatusId) throw new BadRequestException("DK did not return transaction status id");
+    if (!txnStatusId)
+      throw new BadRequestException("DK did not return transaction status id");
 
     return {
       txnStatusId,
-      paymentUrl: (res.response_data as any)?.payment_url || (res.response_data as any)?.paymentUrl || undefined,
+      paymentUrl:
+        (res.response_data as any)?.payment_url ||
+        (res.response_data as any)?.paymentUrl ||
+        undefined,
       qrCode: (res.response_data as any)?.qr_code || undefined,
       raw: res.response_data,
     };
@@ -403,13 +534,31 @@ export class DKGatewayService {
         };
         [k: string]: unknown;
       };
-    }>("/v1/transaction/status", { transaction_id: transactionId, bene_account_number: this.beneficiaryAccount }, true);
+    }>(
+      "/v1/transaction/status",
+      {
+        transaction_id: transactionId,
+        bene_account_number: this.beneficiaryAccount,
+      },
+      true,
+    );
 
     if (res.response_code === DK_RESPONSE_CODES.NOT_FOUND) {
-      return { status: "PENDING", statusDesc: "Transaction not found (yet)", raw: res };
+      return {
+        status: "PENDING",
+        statusDesc: "Transaction not found (yet)",
+        raw: res,
+      };
     }
-    if (res.response_code !== DK_RESPONSE_CODES.SUCCESS || !res.response_data?.status) {
-      throw new BadRequestException(res.response_description || res.response_message || "Transaction status check failed");
+    if (
+      res.response_code !== DK_RESPONSE_CODES.SUCCESS ||
+      !res.response_data?.status
+    ) {
+      throw new BadRequestException(
+        res.response_description ||
+          res.response_message ||
+          "Transaction status check failed",
+      );
     }
 
     const s = res.response_data.status;
@@ -434,11 +583,16 @@ export class DKGatewayService {
     }>("/v1/client_inquiry", dto, true);
   }
 
-  verifyWebhookSignature(body: unknown, signatureHeader: string | undefined): boolean {
+  verifyWebhookSignature(
+    body: unknown,
+    signatureHeader: string | undefined,
+  ): boolean {
     if (!this.webhookSecret) return true;
     if (!signatureHeader) return false;
     const bodyStr = JSON.stringify(body);
-    const computed = createHmac("sha256", this.webhookSecret).update(bodyStr).digest("hex");
+    const computed = createHmac("sha256", this.webhookSecret)
+      .update(bodyStr)
+      .digest("hex");
     const received = signatureHeader.replace(/^DK\s*/i, "").trim();
     return computed === received;
   }

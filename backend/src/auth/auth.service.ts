@@ -7,6 +7,7 @@ import { User } from "../entities/user.entity";
 import { AuthMethod, AuthProvider } from "../entities/auth-method.entity";
 import { Transaction, TransactionType } from "../entities/transaction.entity";
 import { DKGatewayService } from "../payment/services/dk-gateway/dk-gateway.service";
+import { TelegramVerificationService } from "../telegram/telegram-verification.service";
 
 export interface TelegramInitData {
   id: number;
@@ -24,17 +25,22 @@ export class AuthService {
 
   constructor(
     @InjectRepository(User) private userRepo: Repository<User>,
-    @InjectRepository(AuthMethod) private authMethodRepo: Repository<AuthMethod>,
-    @InjectRepository(Transaction) private transactionRepo: Repository<Transaction>,
+    @InjectRepository(AuthMethod)
+    private authMethodRepo: Repository<AuthMethod>,
+    @InjectRepository(Transaction)
+    private transactionRepo: Repository<Transaction>,
     private jwtService: JwtService,
     private dkGateway: DKGatewayService,
+    private telegramVerification: TelegramVerificationService,
   ) {}
 
   // ── HMAC-SHA-256 Telegram initData validation ──────────────────────────────
   validateTelegramInitData(rawInitData: string): TelegramInitData {
     const botToken = process.env.TELEGRAM_BOT_TOKEN?.trim();
     if (!botToken) throw new UnauthorizedException("Bot token not configured");
-    this.logger.debug(`[Auth] Using bot token: id=${botToken.split(':')[0]} len=${botToken.length}`);
+    this.logger.debug(
+      `[Auth] Using bot token: id=${botToken.split(":")[0]} len=${botToken.length}`,
+    );
 
     const params = new URLSearchParams(rawInitData);
     const hash = params.get("hash");
@@ -57,7 +63,9 @@ export class AuthService {
       .digest("hex");
 
     if (expectedHash !== hash) {
-      this.logger.warn(`[Auth] initData hash mismatch.\n  Expected : ${expectedHash}\n  Got      : ${hash}\n  dataCheckString:\n${dataCheckString}\n  rawInitData (full): ${rawInitData}`);
+      this.logger.warn(
+        `[Auth] initData hash mismatch.\n  Expected : ${expectedHash}\n  Got      : ${hash}\n  dataCheckString:\n${dataCheckString}\n  rawInitData (full): ${rawInitData}`,
+      );
       throw new UnauthorizedException("Invalid Telegram initData signature");
     }
 
@@ -93,6 +101,7 @@ export class AuthService {
         // Brand new user
         user = this.userRepo.create({
           telegramId: providerId,
+          telegramChatId: providerId,
           firstName: tgUser.first_name,
           lastName: tgUser.last_name,
           username: tgUser.username,
@@ -111,6 +120,9 @@ export class AuthService {
             note: "Starter credits",
           }),
         );
+      } else {
+        // Orphaned user — sync telegramChatId
+        await this.userRepo.update(user.id, { telegramChatId: providerId });
       }
 
       authMethod = this.authMethodRepo.create({
@@ -122,9 +134,11 @@ export class AuthService {
       });
       await this.authMethodRepo.save(authMethod);
     } else {
-      // Update profile info
+      // Update profile info + always sync telegramChatId
+      // In Telegram private chats, chat_id === user_id, so telegramId IS the chatId.
       await this.userRepo.update(authMethod.userId, {
         telegramId: providerId,
+        telegramChatId: providerId, // ← keep chat_id in sync on every login
         firstName: tgUser.first_name,
         lastName: tgUser.last_name,
         username: tgUser.username,
@@ -132,26 +146,161 @@ export class AuthService {
       });
     }
 
-    const user =
-      authMethod.user ||
-      (await this.userRepo.findOneBy({ id: authMethod.userId }));
-    const token = this.jwtService.sign({ sub: user.id, isAdmin: user.isAdmin });
+    const freshUser = await this.userRepo.findOneBy({
+      id: authMethod.user?.id ?? authMethod.userId,
+    });
+    const token = this.jwtService.sign({
+      sub: freshUser.id,
+      isAdmin: freshUser.isAdmin,
+    });
 
-    return { token, user };
+    return { token, user: freshUser };
   }
 
   // ── Login / Register via DK Bank CID ──────────────────────────────────────
-  async loginWithDKBank(cid: string) {
+  /**
+   * Links a DK Bank CID to a Tara account.
+   *
+   * @param cid - The 11-digit national ID.
+   * @param callerUserId - When called from the TMA (already JWT-authenticated),
+   *   pass the authenticated user's UUID so the DK fields + dkPhoneHash are
+   *   written to that existing Telegram user row instead of creating a new one.
+   */
+  async loginWithDKBank(cid: string, callerUserId?: string) {
     const account = await this.dkGateway.lookupAccountByCID(cid);
 
+    // ── If called by an already-authenticated Telegram user, merge into their row ──
+    if (callerUserId) {
+      const existingUser = await this.userRepo.findOneBy({ id: callerUserId });
+      if (existingUser) {
+        // ── Step 1: Clear the CID from any OTHER user row that already owns it ──
+        // Must happen BEFORE writing to callerUserId due to the unique constraint on dkCid.
+        const orphanByCid = await this.userRepo.findOneBy({ dkCid: cid });
+        if (orphanByCid && orphanByCid.id !== callerUserId) {
+          this.logger.log(
+            `[Auth] Clearing dkCid/dkAccountNumber/dkPhoneHash from orphan user ${orphanByCid.id} before merging into ${callerUserId}`,
+          );
+          await this.userRepo.update(orphanByCid.id, {
+            dkCid: null as any,
+            dkAccountNumber: null as any,
+            dkPhoneHash: null as any,
+            phoneNumber: null as any,
+          });
+        }
+        const orphanByAccount = await this.userRepo.findOneBy({
+          dkAccountNumber: account.accountNumber,
+        });
+        if (orphanByAccount && orphanByAccount.id !== callerUserId) {
+          await this.userRepo.update(orphanByAccount.id, {
+            dkCid: null as any,
+            dkAccountNumber: null as any,
+            dkPhoneHash: null as any,
+          });
+        }
+
+        // ── Step 2: Write DK fields onto the authenticated Telegram user row ──
+        await this.userRepo.update(callerUserId, {
+          dkCid: cid,
+          dkAccountNumber: account.accountNumber,
+          dkAccountName: account.accountName,
+          phoneNumber: account.phoneNumber || null,
+        });
+        // Write dkPhoneHash onto the Telegram user row — this is the key step
+        await this.telegramVerification.storeDKPhoneHash(
+          callerUserId,
+          account.phoneNumber,
+        );
+
+        // ── Step 3: Upsert the DKBANK auth method — always point it to callerUserId ──
+        let dkAuthMethod = await this.authMethodRepo.findOne({
+          where: {
+            provider: AuthProvider.DKBANK,
+            providerId: account.accountNumber,
+          },
+        });
+        if (!dkAuthMethod) {
+          dkAuthMethod = this.authMethodRepo.create({
+            provider: AuthProvider.DKBANK,
+            providerId: account.accountNumber,
+            metadata: {
+              cid,
+              accountName: account.accountName,
+              phoneNumber: account.phoneNumber,
+            },
+            user: existingUser,
+            userId: callerUserId,
+          });
+          await this.authMethodRepo.save(dkAuthMethod);
+        } else if (dkAuthMethod.userId !== callerUserId) {
+          await this.authMethodRepo.update(dkAuthMethod.id, {
+            userId: callerUserId,
+          });
+          this.logger.log(
+            `[Auth] Repointed dkbank auth_method from orphan → ${callerUserId}`,
+          );
+        }
+
+        const token = this.jwtService.sign({
+          sub: existingUser.id,
+          isAdmin: existingUser.isAdmin,
+        });
+        const updatedUser = await this.userRepo.findOneBy({ id: callerUserId });
+        return { token, user: updatedUser, dkAccount: account };
+      }
+    }
+    // ────────────────────────────────────────────────────────────────────────
+
     let authMethod = await this.authMethodRepo.findOne({
-      where: { provider: AuthProvider.DKBANK, providerId: account.accountNumber },
+      where: {
+        provider: AuthProvider.DKBANK,
+        providerId: account.accountNumber,
+      },
       relations: ["user"],
     });
 
     if (!authMethod) {
-      // New user — create account linked to DK Bank identity
-      const user = this.userRepo.create({
+      // Guard: user row may already exist (linked via TMA) but auth_method missing
+      let user = await this.userRepo.findOneBy({ dkCid: cid });
+      if (!user) {
+        user = await this.userRepo.findOneBy({
+          dkAccountNumber: account.accountNumber,
+        });
+      }
+
+      if (user) {
+        // User row exists — just ensure fields are up to date and create the missing auth_method
+        await this.userRepo.update(user.id, {
+          dkCid: cid,
+          dkAccountNumber: account.accountNumber,
+          dkAccountName: account.accountName,
+          phoneNumber: account.phoneNumber || null,
+        });
+        await this.telegramVerification.storeDKPhoneHash(
+          user.id,
+          account.phoneNumber,
+        );
+        authMethod = this.authMethodRepo.create({
+          provider: AuthProvider.DKBANK,
+          providerId: account.accountNumber,
+          metadata: {
+            cid,
+            accountName: account.accountName,
+            phoneNumber: account.phoneNumber,
+          },
+          user,
+          userId: user.id,
+        });
+        await this.authMethodRepo.save(authMethod);
+        const freshUser = await this.userRepo.findOneBy({ id: user.id });
+        const token = this.jwtService.sign({
+          sub: freshUser.id,
+          isAdmin: freshUser.isAdmin,
+        });
+        return { token, user: freshUser, dkAccount: account };
+      }
+
+      // Brand new user — create account linked to DK Bank identity
+      user = this.userRepo.create({
         firstName: account.accountName.split(" ")[0] || account.accountName,
         lastName: account.accountName.split(" ").slice(1).join(" ") || null,
         dkCid: cid,
@@ -160,6 +309,12 @@ export class AuthService {
         phoneNumber: account.phoneNumber || null,
       });
       await this.userRepo.save(user);
+
+      // Store DK phone hash for future Telegram phone verification
+      await this.telegramVerification.storeDKPhoneHash(
+        user.id,
+        account.phoneNumber,
+      );
 
       // Seed 1000 starter credits as a transaction entry
       await this.transactionRepo.save(
@@ -176,7 +331,11 @@ export class AuthService {
       authMethod = this.authMethodRepo.create({
         provider: AuthProvider.DKBANK,
         providerId: account.accountNumber,
-        metadata: { cid, accountName: account.accountName, phoneNumber: account.phoneNumber },
+        metadata: {
+          cid,
+          accountName: account.accountName,
+          phoneNumber: account.phoneNumber,
+        },
         user,
         userId: user.id,
       });
@@ -189,13 +348,21 @@ export class AuthService {
         dkAccountName: account.accountName,
         phoneNumber: account.phoneNumber || null,
       });
+      // Re-hash the DK phone in case the registered number changed
+      await this.telegramVerification.storeDKPhoneHash(
+        authMethod.userId,
+        account.phoneNumber,
+      );
     }
 
-    const user =
-      authMethod.user ||
-      (await this.userRepo.findOneBy({ id: authMethod.userId }));
-    const token = this.jwtService.sign({ sub: user.id, isAdmin: user.isAdmin });
+    const freshUser = await this.userRepo.findOneBy({
+      id: authMethod.user?.id ?? authMethod.userId,
+    });
+    const token = this.jwtService.sign({
+      sub: freshUser.id,
+      isAdmin: freshUser.isAdmin,
+    });
 
-    return { token, user, dkAccount: account };
+    return { token, user: freshUser, dkAccount: account };
   }
 }

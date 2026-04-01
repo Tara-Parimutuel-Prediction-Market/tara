@@ -1,6 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import axios from "axios";
 
 export interface FixtureMatch {
   id: number;
@@ -33,18 +32,36 @@ export class FixturesService {
   async getFixtures(query?: string): Promise<FixtureMarket[]> {
     const apiKey = this.config.get<string>("FOOTBALL_DATA_API_KEY");
     if (!apiKey) {
-      this.logger.warn("FOOTBALL_DATA_API_KEY not set — returning empty fixtures");
+      this.logger.warn(
+        "FOOTBALL_DATA_API_KEY not set — returning empty fixtures",
+      );
       return [];
     }
 
-    // Fetch upcoming matches from the World Cup competition
-    const { data } = await axios.get(
-      `${this.BASE_URL}/competitions/WC/matches`,
-      {
+    // Fetch upcoming matches using built-in fetch — no axios dependency
+    const url = new URL(`${this.BASE_URL}/competitions/WC/matches`);
+    url.searchParams.set("status", "SCHEDULED,LIVE,IN_PLAY,PAUSED");
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15_000);
+
+    let data: any;
+    try {
+      const res = await fetch(url.toString(), {
         headers: { "X-Auth-Token": apiKey },
-        params: { status: "SCHEDULED,LIVE,IN_PLAY,PAUSED" },
-      },
-    );
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+      if (!res.ok) {
+        this.logger.warn(`football-data.org returned HTTP ${res.status}`);
+        return [];
+      }
+      data = await res.json();
+    } catch (err: any) {
+      clearTimeout(timeout);
+      this.logger.error(`Failed to fetch fixtures: ${err.message}`);
+      return [];
+    }
 
     const matches: FixtureMatch[] = (data.matches || []).map((m: any) =>
       this.transform(m),
@@ -111,8 +128,7 @@ export class FixturesService {
       });
     }
     return markets.sort(
-      (a, b) =>
-        new Date(a.closesAt).getTime() - new Date(b.closesAt).getTime(),
+      (a, b) => new Date(a.closesAt).getTime() - new Date(b.closesAt).getTime(),
     );
   }
 }

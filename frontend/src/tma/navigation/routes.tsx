@@ -14,6 +14,7 @@ import { PwaMyBetsPage } from "@/pwa/pages/PwaMyBetsPage";
 import { PwaWalletPage } from "@/pwa/pages/PwaWalletPage";
 import { PwaResultsPage } from "@/pwa/pages/PwaResultsPage";
 import { TmaPageWrapper } from "@/tma/components/TmaPageWrapper";
+import { TmaProfilePage } from "@/tma/pages/TmaProfilePage";
 
 interface Route {
   path: string;
@@ -63,7 +64,32 @@ export const routes: Route[] = [
       </svg>
     ),
   },
-  { path: "/my-bets", Component: () => <TmaPageWrapper><PwaMyBetsPage /></TmaPageWrapper>, title: "My Bets" },
-  { path: "/wallet", Component: () => <TmaPageWrapper><PwaWalletPage /></TmaPageWrapper>, title: "Wallet" },
-  { path: "/results", Component: () => <TmaPageWrapper><PwaResultsPage /></TmaPageWrapper>, title: "Results" },
+  {
+    path: "/my-bets",
+    Component: () => (
+      <TmaPageWrapper>
+        <PwaMyBetsPage />
+      </TmaPageWrapper>
+    ),
+    title: "My Bets",
+  },
+  {
+    path: "/wallet",
+    Component: () => (
+      <TmaPageWrapper>
+        <PwaWalletPage />
+      </TmaPageWrapper>
+    ),
+    title: "Wallet",
+  },
+  {
+    path: "/results",
+    Component: () => (
+      <TmaPageWrapper>
+        <PwaResultsPage />
+      </TmaPageWrapper>
+    ),
+    title: "Results",
+  },
+  { path: "/profile", Component: TmaProfilePage, title: "Profile" },
 ];

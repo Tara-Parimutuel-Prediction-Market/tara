@@ -6,12 +6,21 @@ import {
   Get,
   Query,
   UnauthorizedException,
+  UseGuards,
+  Request,
 } from "@nestjs/common";
-import { ApiTags, ApiOperation, ApiQuery, ApiBody, ApiProperty } from "@nestjs/swagger";
+import {
+  ApiTags,
+  ApiOperation,
+  ApiQuery,
+  ApiBody,
+  ApiProperty,
+  ApiBearerAuth,
+} from "@nestjs/swagger";
 import { IsString, IsNotEmpty, Length } from "class-validator";
 import { createHmac } from "crypto";
 import { AuthService } from "./auth.service";
-import { Public } from "./guards";
+import { Public, JwtAuthGuard } from "./guards";
 
 class TelegramAuthDto {
   @IsString()
@@ -19,7 +28,12 @@ class TelegramAuthDto {
 }
 
 class DKBankAuthDto {
-  @ApiProperty({ description: 'CID (11-digit national ID)', example: '11000000000', minLength: 11, maxLength: 11 })
+  @ApiProperty({
+    description: "CID (11-digit national ID)",
+    example: "11000000000",
+    minLength: 11,
+    maxLength: 11,
+  })
   @IsString()
   @IsNotEmpty()
   @Length(11, 11)
@@ -44,10 +58,30 @@ export class AuthController {
   @Post("dkbank")
   @HttpCode(200)
   @Public()
-  @ApiOperation({ summary: "Login or register with DK Bank CID" })
+  @ApiOperation({
+    summary: "Login or register with DK Bank CID (no JWT required)",
+  })
   @ApiBody({ type: DKBankAuthDto })
   async dkBankLogin(@Body() dto: DKBankAuthDto) {
     return this.authService.loginWithDKBank(dto.cid);
+  }
+
+  /**
+   * Called from the TMA when an already-authenticated Telegram user links their DK Bank CID.
+   * Writes dkPhoneHash + DK fields onto the existing Telegram user row so phone
+   * verification can proceed without creating a duplicate account.
+   */
+  @Post("link-dkbank")
+  @HttpCode(200)
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary:
+      "Link DK Bank CID to the currently authenticated Telegram user (TMA use)",
+  })
+  @ApiBody({ type: DKBankAuthDto })
+  async linkDKBank(@Body() dto: DKBankAuthDto, @Request() req: any) {
+    return this.authService.loginWithDKBank(dto.cid, req.user.sub);
   }
 
   /**

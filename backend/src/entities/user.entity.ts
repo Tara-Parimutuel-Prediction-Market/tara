@@ -54,6 +54,30 @@ export class User {
   @Column({ nullable: true })
   phoneNumber: string; // Phone number from DK Bank account
 
+  /** Telegram chat_id bound during phone-verification handshake. */
+  @Index({ unique: true, sparse: true } as any)
+  @Column({ nullable: true, unique: true })
+  telegramChatId: string;
+
+  /**
+   * HMAC-SHA-256 hash of the Telegram-shared phone number.
+   * Compared against dkPhoneHash on every payment to confirm identity.
+   * NEVER stores the raw phone number.
+   */
+  @Column({ nullable: true })
+  telegramPhoneHash: string;
+
+  /**
+   * HMAC-SHA-256 hash of the phone number returned by DK Bank for this CID.
+   * Set at registration / DK-link time.
+   */
+  @Column({ nullable: true })
+  dkPhoneHash: string;
+
+  /** Timestamp when the Telegram account was successfully phone-verified. */
+  @Column({ type: "timestamptz", nullable: true })
+  telegramLinkedAt: Date | null;
+
   @CreateDateColumn()
   createdAt: Date;
 

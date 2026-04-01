@@ -20,6 +20,7 @@ import { PaymentOtp, OtpStatus } from "../entities/payment-otp.entity";
 import { DKGatewayService } from "./services/dk-gateway/dk-gateway.service";
 import { RedisService } from "../redis/redis.service";
 import { TelegramSimpleService } from "../telegram/telegram.service.simple";
+import { TelegramVerificationService } from "../telegram/telegram-verification.service";
 
 /** Shape stored in Redis for an active OTP session. */
 interface OtpSession {
@@ -85,9 +86,12 @@ export class DKBankPaymentService {
     private readonly configService: ConfigService,
     private readonly redis: RedisService,
     private readonly telegramService: TelegramSimpleService,
+    private readonly telegramVerification: TelegramVerificationService,
     @InjectRepository(User) private readonly userRepo: Repository<User>,
-    @InjectRepository(Payment) private readonly paymentRepo: Repository<Payment>,
-    @InjectRepository(PaymentOtp) private readonly otpRepo: Repository<PaymentOtp>,
+    @InjectRepository(Payment)
+    private readonly paymentRepo: Repository<Payment>,
+    @InjectRepository(PaymentOtp)
+    private readonly otpRepo: Repository<PaymentOtp>,
   ) {}
 
   /**
@@ -95,7 +99,10 @@ export class DKBankPaymentService {
    * DK sends an OTP to the customer's registered phone.
    * Returns paymentId + otpRequired: true.
    */
-  async initiatePayment(userId: string, dto: DKBankPaymentRequest): Promise<PaymentInitiateResponse> {
+  async initiatePayment(
+    userId: string,
+    dto: DKBankPaymentRequest,
+  ): Promise<PaymentInitiateResponse> {
     const amount = Number(dto.amount);
     if (!Number.isFinite(amount) || amount <= 0) {
       throw new BadRequestException("Amount must be a positive number");
@@ -111,6 +118,35 @@ export class DKBankPaymentService {
 
     const user = await this.userRepo.findOne({ where: { id: userId } });
     if (!user) throw new NotFoundException("User not found");
+
+    // ── CID ownership check — ALWAYS enforced, even in staging ───────────────
+    // The CID submitted must match the one the user linked to their account.
+    // This prevents user A from paying with user B's CID.
+    if (user.dkCid && user.dkCid !== cid) {
+      this.logger.warn(
+        `[Payment] CID mismatch for user ${userId}: submitted=${cid} linked=${user.dkCid}`,
+      );
+      throw new BadRequestException(
+        "The CID you entered does not match your linked DK Bank account. " +
+          "Please use your own CID.",
+      );
+    }
+    if (!user.dkCid) {
+      throw new BadRequestException(
+        "You have not linked a DK Bank account yet. " +
+          "Please go to Profile → Link DK Bank Account first.",
+      );
+    }
+
+    // ── Bank-level security: verify Telegram phone == DK Bank phone ──────────
+    // Skip this check in staging bypass mode so developers can test without
+    // completing the full phone-verification flow.
+    const bypassOtpCheck = this.configService.get<string>(
+      "DK_STAGING_OTP_BYPASS",
+    );
+    if (!bypassOtpCheck) {
+      await this.telegramVerification.verifyPaymentIdentity(userId);
+    }
 
     const payment = this.paymentRepo.create({
       type: PaymentType.DEPOSIT,
@@ -145,34 +181,46 @@ export class DKBankPaymentService {
       );
 
       // Record pending OTP in DB
-      await this.otpRepo.save(this.otpRepo.create({
-        paymentId: payment.id,
-        userId,
-        marketId: dto.marketId || null,
-        disputeId: dto.disputeId || null,
-        status: OtpStatus.PENDING,
-        expiresAt,
-        lastRequestedAt: now,
-        verifiedAt: null,
-        requestCount: 1,
-        failedAttempts: 0,
-        bfsTxnId: null,
-      }));
-      await this.redis.setJsonEx<OtpSession>(otpSessionKey(payment.id), OTP_TTL_MS / 1000, {
-        status: OtpStatus.PENDING,
-        expiresAt: expiresAt.toISOString(),
-        bfsTxnId: null,
-        failedAttempts: 0,
-        userId,
-      });
+      await this.otpRepo.save(
+        this.otpRepo.create({
+          paymentId: payment.id,
+          userId,
+          marketId: dto.marketId || null,
+          disputeId: dto.disputeId || null,
+          status: OtpStatus.PENDING,
+          expiresAt,
+          lastRequestedAt: now,
+          verifiedAt: null,
+          requestCount: 1,
+          failedAttempts: 0,
+          bfsTxnId: null,
+        }),
+      );
+      await this.redis.setJsonEx<OtpSession>(
+        otpSessionKey(payment.id),
+        OTP_TTL_MS / 1000,
+        {
+          status: OtpStatus.PENDING,
+          expiresAt: expiresAt.toISOString(),
+          bfsTxnId: null,
+          failedAttempts: 0,
+          userId,
+        },
+      );
 
       // Send OTP via Telegram if user has a Telegram account;
       // otherwise fall back to the bypass OTP (bypassOtp value) so DK-only users can still pay in staging.
       if (user.telegramId) {
-        await this.telegramService.sendMessage(
-          Number(user.telegramId),
-          `🔐 <b>Tara Payment OTP</b>\n\nYour one-time code:\n\n<code>${generatedOtp}</code>\n\n💰 Amount: <b>Nu. ${amount}</b>\n⏳ Valid for 60 seconds.`,
-        ).catch(err => this.logger.warn(`[STAGING] Failed to send OTP via Telegram: ${err.message}`));
+        await this.telegramService
+          .sendMessage(
+            Number(user.telegramId),
+            `🔐 <b>Tara Payment OTP</b>\n\nYour one-time code:\n\n<code>${generatedOtp}</code>\n\n💰 Amount: <b>Nu. ${amount}</b>\n⏳ Valid for 60 seconds.`,
+          )
+          .catch((err) =>
+            this.logger.warn(
+              `[STAGING] Failed to send OTP via Telegram: ${err.message}`,
+            ),
+          );
       } else {
         // No Telegram — store the bypass OTP so the user can enter it manually (shown in staging UI)
         await this.redis.setJsonEx<{ otp: string; userId: string }>(
@@ -180,7 +228,9 @@ export class DKBankPaymentService {
           TG_OTP_TTL_S,
           { otp: bypassOtp, userId },
         );
-        this.logger.warn(`[STAGING] User ${userId} has no Telegram (phone: ${user.phoneNumber ?? 'unknown'}) — using bypass OTP`);
+        this.logger.warn(
+          `[STAGING] User ${userId} has no Telegram (phone: ${user.phoneNumber ?? "unknown"}) — using bypass OTP`,
+        );
       }
 
       return {
@@ -190,7 +240,8 @@ export class DKBankPaymentService {
         amount,
         currency: "BTN",
         method: "dkbank",
-        message: "OTP sent to your Telegram. Please enter it to complete the payment.",
+        message:
+          "OTP sent to your Telegram. Please enter it to complete the payment.",
         timestamp: now.toISOString(),
         otpRequired: true,
       };
@@ -230,27 +281,33 @@ export class DKBankPaymentService {
       // 4) Create the OTP tracking record
       const now = new Date();
       const otpExpiresAt = new Date(now.getTime() + OTP_TTL_MS);
-      await this.otpRepo.save(this.otpRepo.create({
-        paymentId: payment.id,
-        userId,
-        marketId: dto.marketId || null,
-        disputeId: dto.disputeId || null,
-        status: OtpStatus.PENDING,
-        expiresAt: otpExpiresAt,
-        lastRequestedAt: now,
-        verifiedAt: null,
-        requestCount: 1,
-        failedAttempts: 0,
-        bfsTxnId: auth.bfsTxnId,
-      }));
+      await this.otpRepo.save(
+        this.otpRepo.create({
+          paymentId: payment.id,
+          userId,
+          marketId: dto.marketId || null,
+          disputeId: dto.disputeId || null,
+          status: OtpStatus.PENDING,
+          expiresAt: otpExpiresAt,
+          lastRequestedAt: now,
+          verifiedAt: null,
+          requestCount: 1,
+          failedAttempts: 0,
+          bfsTxnId: auth.bfsTxnId,
+        }),
+      );
       // Mirror in Redis for fast validation in confirmPayment
-      await this.redis.setJsonEx<OtpSession>(otpSessionKey(payment.id), OTP_TTL_MS / 1000, {
-        status: OtpStatus.PENDING,
-        expiresAt: otpExpiresAt.toISOString(),
-        bfsTxnId: auth.bfsTxnId,
-        failedAttempts: 0,
-        userId,
-      });
+      await this.redis.setJsonEx<OtpSession>(
+        otpSessionKey(payment.id),
+        OTP_TTL_MS / 1000,
+        {
+          status: OtpStatus.PENDING,
+          expiresAt: otpExpiresAt.toISOString(),
+          bfsTxnId: auth.bfsTxnId,
+          failedAttempts: 0,
+          userId,
+        },
+      );
 
       return {
         success: true,
@@ -259,7 +316,8 @@ export class DKBankPaymentService {
         amount,
         currency: "BTN",
         method: "dkbank",
-        message: "OTP sent to your registered DK Bank phone number. Please enter it to complete the payment.",
+        message:
+          "OTP sent to your registered DK Bank phone number. Please enter it to complete the payment.",
         timestamp: now.toISOString(),
         otpRequired: true,
       };
@@ -279,8 +337,14 @@ export class DKBankPaymentService {
    * Step 2: Submit the OTP to complete the payment.
    * Executes the debit_request on DK and transitions the payment to pending (awaiting DK confirmation).
    */
-  async confirmPayment(userId: string, paymentId: string, otp: string): Promise<PaymentInitiateResponse> {
-    const payment = await this.paymentRepo.findOne({ where: { id: paymentId, userId } });
+  async confirmPayment(
+    userId: string,
+    paymentId: string,
+    otp: string,
+  ): Promise<PaymentInitiateResponse> {
+    const payment = await this.paymentRepo.findOne({
+      where: { id: paymentId, userId },
+    });
     if (!payment) throw new NotFoundException("Payment not found");
     if (payment.status !== PaymentStatus.PENDING) {
       throw new BadRequestException(`Payment is already ${payment.status}`);
@@ -290,19 +354,28 @@ export class DKBankPaymentService {
     // Check this EARLY to skip standard metadata validation which is only for live DK Bank calls.
     const bypassOtp = this.configService.get<string>("DK_STAGING_OTP_BYPASS");
     if (bypassOtp) {
-      const tgOtpSession = await this.redis.getJson<{ otp: string; userId: string }>(`tara:tg-otp:${paymentId}`);
+      const tgOtpSession = await this.redis.getJson<{
+        otp: string;
+        userId: string;
+      }>(`tara:tg-otp:${paymentId}`);
 
       if (!tgOtpSession) {
-        throw new BadRequestException("OTP has expired. Please initiate a new payment.");
+        throw new BadRequestException(
+          "OTP has expired. Please initiate a new payment.",
+        );
       }
       if (tgOtpSession.userId !== userId) {
         throw new BadRequestException("Payment not found.");
       }
       if (tgOtpSession.otp !== otp) {
-        throw new BadRequestException("Invalid OTP. Please check your Telegram and try again.");
+        throw new BadRequestException(
+          "Invalid OTP. Please check your Telegram and try again.",
+        );
       }
 
-      this.logger.log(`[STAGING] Telegram OTP verified for payment ${payment.id}`);
+      this.logger.log(
+        `[STAGING] Telegram OTP verified for payment ${payment.id}`,
+      );
       await this.applyDKStatusUpdate({
         userId,
         paymentId: payment.id,
@@ -323,7 +396,10 @@ export class DKBankPaymentService {
         otpRecord.verifiedAt = now;
         await this.otpRepo.save(otpRecord);
       }
-      await this.redis.del(`tara:tg-otp:${paymentId}`, otpSessionKey(payment.id));
+      await this.redis.del(
+        `tara:tg-otp:${paymentId}`,
+        otpSessionKey(payment.id),
+      );
       await this.redis.del(`tara:cache:balance:${userId}`);
 
       return {
@@ -347,13 +423,17 @@ export class DKBankPaymentService {
     const sourceAccountName = meta.customerAccountName;
 
     if (!bfsTxnId || !stanNumber || !txDatetime || !sourceAccountNumber) {
-      throw new BadRequestException("Payment is missing authorization data — please initiate again");
+      throw new BadRequestException(
+        "Payment is missing authorization data — please initiate again",
+      );
     }
 
     this.logger.log(`[OTP] paymentId=${paymentId} otp=${otp}`);
 
     // Fast-path: check Redis session first; fall back to DB if Redis is unavailable.
-    const redisSession = await this.redis.getJson<OtpSession>(otpSessionKey(paymentId));
+    const redisSession = await this.redis.getJson<OtpSession>(
+      otpSessionKey(paymentId),
+    );
 
     if (redisSession) {
       // Ownership check
@@ -361,12 +441,23 @@ export class DKBankPaymentService {
         throw new BadRequestException("Payment not found");
       }
       // Expiry check from Redis TTL value
-      if (redisSession.status === OtpStatus.PENDING && new Date(redisSession.expiresAt) < new Date()) {
+      if (
+        redisSession.status === OtpStatus.PENDING &&
+        new Date(redisSession.expiresAt) < new Date()
+      ) {
         await this.redis.del(otpSessionKey(paymentId));
         // Update DB record too
-        const dbOtp = await this.otpRepo.findOne({ where: { paymentId, userId }, order: { createdAt: "DESC" } });
-        if (dbOtp) { dbOtp.status = OtpStatus.EXPIRED; await this.otpRepo.save(dbOtp); }
-        throw new BadRequestException("OTP has expired. Please initiate a new payment.");
+        const dbOtp = await this.otpRepo.findOne({
+          where: { paymentId, userId },
+          order: { createdAt: "DESC" },
+        });
+        if (dbOtp) {
+          dbOtp.status = OtpStatus.EXPIRED;
+          await this.otpRepo.save(dbOtp);
+        }
+        throw new BadRequestException(
+          "OTP has expired. Please initiate a new payment.",
+        );
       }
     }
 
@@ -377,10 +468,17 @@ export class DKBankPaymentService {
     });
 
     // Guard: check OTP session hasn't expired (DB fallback when Redis miss)
-    if (!redisSession && otpRecord && otpRecord.status === OtpStatus.PENDING && otpRecord.expiresAt < new Date()) {
+    if (
+      !redisSession &&
+      otpRecord &&
+      otpRecord.status === OtpStatus.PENDING &&
+      otpRecord.expiresAt < new Date()
+    ) {
       otpRecord.status = OtpStatus.EXPIRED;
       await this.otpRepo.save(otpRecord);
-      throw new BadRequestException("OTP has expired. Please initiate a new payment.");
+      throw new BadRequestException(
+        "OTP has expired. Please initiate a new payment.",
+      );
     }
 
     try {
@@ -431,7 +529,10 @@ export class DKBankPaymentService {
       payment.failureReason = e?.message || "OTP confirmation failed";
       payment.metadata = {
         ...(payment.metadata || {}),
-        dkConfirmError: { message: payment.failureReason, otpAttemptedAt: new Date().toISOString() },
+        dkConfirmError: {
+          message: payment.failureReason,
+          otpAttemptedAt: new Date().toISOString(),
+        },
       };
       await this.paymentRepo.save(payment);
 
@@ -442,7 +543,13 @@ export class DKBankPaymentService {
         if (redisSession) {
           await this.redis.setJsonEx<OtpSession>(
             otpSessionKey(payment.id),
-            Math.max(1, Math.floor((new Date(redisSession.expiresAt).getTime() - Date.now()) / 1000)),
+            Math.max(
+              1,
+              Math.floor(
+                (new Date(redisSession.expiresAt).getTime() - Date.now()) /
+                  1000,
+              ),
+            ),
             { ...redisSession, failedAttempts: otpRecord.failedAttempts },
           );
         }
@@ -452,12 +559,19 @@ export class DKBankPaymentService {
     }
   }
 
-  async getPaymentStatus(userId: string, paymentId: string): Promise<PaymentStatusResponse> {
-    const payment = await this.paymentRepo.findOne({ where: { id: paymentId, userId } });
+  async getPaymentStatus(
+    userId: string,
+    paymentId: string,
+  ): Promise<PaymentStatusResponse> {
+    const payment = await this.paymentRepo.findOne({
+      where: { id: paymentId, userId },
+    });
     if (!payment) throw new NotFoundException("Payment not found");
 
-    if (payment.status === PaymentStatus.SUCCESS) return this.mapPayment(payment);
-    if (payment.status === PaymentStatus.FAILED)  return this.mapPayment(payment);
+    if (payment.status === PaymentStatus.SUCCESS)
+      return this.mapPayment(payment);
+    if (payment.status === PaymentStatus.FAILED)
+      return this.mapPayment(payment);
 
     // If the payment hasn't been confirmed with OTP yet (no txnStatusId)
     if (!payment.dkTxnStatusId && !payment.externalPaymentId) {
@@ -470,8 +584,11 @@ export class DKBankPaymentService {
       };
     }
 
-    const txnStatusId = payment.dkTxnStatusId || payment.externalPaymentId || "";
-    let dkResult: Awaited<ReturnType<DKGatewayService["checkTransactionStatus"]>> | null = null;
+    const txnStatusId =
+      payment.dkTxnStatusId || payment.externalPaymentId || "";
+    let dkResult: Awaited<
+      ReturnType<DKGatewayService["checkTransactionStatus"]>
+    > | null = null;
     try {
       dkResult = await this.dkGateway.checkTransactionStatus(txnStatusId);
     } catch (e: any) {
@@ -495,18 +612,25 @@ export class DKBankPaymentService {
       isFromWebhook: false,
     });
 
-    const updated = await this.paymentRepo.findOne({ where: { id: payment.id, userId } });
+    const updated = await this.paymentRepo.findOne({
+      where: { id: payment.id, userId },
+    });
     if (!updated) throw new NotFoundException("Payment not found after update");
     return this.mapPayment(updated);
   }
 
   async handleWebhook(payload: any, signatureHeader?: string) {
-    const sigOk = this.dkGateway.verifyWebhookSignature(payload, signatureHeader);
+    const sigOk = this.dkGateway.verifyWebhookSignature(
+      payload,
+      signatureHeader,
+    );
     if (!sigOk) throw new BadRequestException("Invalid DK webhook signature");
 
     const inquiryId = payload?.inquiry_id || payload?.bfs_txn_id;
     if (!inquiryId || typeof inquiryId !== "string") {
-      throw new BadRequestException("Missing inquiry_id/bfs_txn_id in DK webhook payload");
+      throw new BadRequestException(
+        "Missing inquiry_id/bfs_txn_id in DK webhook payload",
+      );
     }
 
     const payment = await this.paymentRepo.findOne({
@@ -517,7 +641,10 @@ export class DKBankPaymentService {
 
     const txnStatusId = payment.dkTxnStatusId || payment.externalPaymentId;
     if (!txnStatusId) {
-      payment.metadata = { ...(payment.metadata || {}), dkWebhookPayload: payload };
+      payment.metadata = {
+        ...(payment.metadata || {}),
+        dkWebhookPayload: payload,
+      };
       await this.paymentRepo.save(payment);
       return { received: true, ignored: true };
     }
@@ -536,7 +663,9 @@ export class DKBankPaymentService {
     } catch (e: any) {
       payment.metadata = {
         ...(payment.metadata || {}),
-        dkWebhookStatusError: { message: e?.message || "DK webhook status error" },
+        dkWebhookStatusError: {
+          message: e?.message || "DK webhook status error",
+        },
         dkWebhookReceivedAt: new Date().toISOString(),
         dkWebhookPayload: payload,
       };
@@ -549,17 +678,22 @@ export class DKBankPaymentService {
 
   private mapPayment(payment: Payment): PaymentStatusResponse {
     const status =
-      payment.status === PaymentStatus.SUCCESS ? "success"
-      : payment.status === PaymentStatus.FAILED  ? "failed"
-      : payment.metadata?.bfsTxnId && !payment.dkTxnStatusId ? "otp_required"
-      : "pending";
+      payment.status === PaymentStatus.SUCCESS
+        ? "success"
+        : payment.status === PaymentStatus.FAILED
+          ? "failed"
+          : payment.metadata?.bfsTxnId && !payment.dkTxnStatusId
+            ? "otp_required"
+            : "pending";
     return {
       paymentId: payment.id,
       status,
       amount: Number(payment.amount),
       currency: payment.currency,
       method: payment.method,
-      confirmedAt: payment.confirmedAt ? payment.confirmedAt.toISOString() : undefined,
+      confirmedAt: payment.confirmedAt
+        ? payment.confirmedAt.toISOString()
+        : undefined,
       failureReason: payment.failureReason || undefined,
     };
   }
@@ -574,10 +708,11 @@ export class DKBankPaymentService {
     dkWebhookPayload?: any;
   }) {
     const statusUpper = (params.dkStatus || "PENDING").toUpperCase();
-    const mapped =
-      statusUpper.includes("SUCCESS") ? PaymentStatus.SUCCESS
-      : statusUpper.includes("FAIL")  ? PaymentStatus.FAILED
-      : PaymentStatus.PENDING;
+    const mapped = statusUpper.includes("SUCCESS")
+      ? PaymentStatus.SUCCESS
+      : statusUpper.includes("FAIL")
+        ? PaymentStatus.FAILED
+        : PaymentStatus.PENDING;
 
     await this.dataSource.transaction(async (em) => {
       const payment = await em
@@ -596,7 +731,8 @@ export class DKBankPaymentService {
         dkRaw: params.dkRaw,
         dkStatusSource: params.isFromWebhook ? "webhook" : "poll",
       };
-      if (params.dkWebhookPayload) payment.metadata.dkWebhookPayload = params.dkWebhookPayload;
+      if (params.dkWebhookPayload)
+        payment.metadata.dkWebhookPayload = params.dkWebhookPayload;
 
       if (mapped === PaymentStatus.SUCCESS) {
         payment.status = PaymentStatus.SUCCESS;
@@ -604,24 +740,30 @@ export class DKBankPaymentService {
         payment.failureReason = null;
 
         // Snapshot balance before crediting
-        const { balance: rawBefore } = await em.getRepository(Transaction)
+        const { balance: rawBefore } = await em
+          .getRepository(Transaction)
           .createQueryBuilder("t")
           .select("COALESCE(SUM(t.amount), 0)", "balance")
           .where("t.userId = :userId", { userId: params.userId })
           .getRawOne();
         const balanceBefore = Number(rawBefore);
 
-        this.logger.log(`[CREDITS] Crediting ${payment.amount} to user ${params.userId} from DK payment ${payment.id}`);
+        this.logger.log(
+          `[CREDITS] Crediting ${payment.amount} to user ${params.userId} from DK payment ${payment.id}`,
+        );
 
-        await em.save(Transaction, em.create(Transaction, {
-          type: TransactionType.DEPOSIT,
-          amount: Number(payment.amount),
-          balanceBefore,
-          balanceAfter: balanceBefore + Number(payment.amount),
-          paymentId: payment.id,
-          userId: params.userId,
-          note: `DK Bank deposit confirmed (dk_payment: ${payment.id})`,
-        }));
+        await em.save(
+          Transaction,
+          em.create(Transaction, {
+            type: TransactionType.DEPOSIT,
+            amount: Number(payment.amount),
+            balanceBefore,
+            balanceAfter: balanceBefore + Number(payment.amount),
+            paymentId: payment.id,
+            userId: params.userId,
+            note: `DK Bank deposit confirmed (dk_payment: ${payment.id})`,
+          }),
+        );
 
         // Invalidate cached balance so the next /users/me returns the updated value
         await this.redis.del(`tara:cache:balance:${params.userId}`);

@@ -42,7 +42,10 @@ export function isTokenValid(): boolean {
 }
 
 // Base fetch wrapper — automatically attaches Bearer token
-export async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+export async function request<T>(
+  path: string,
+  options: RequestInit = {},
+): Promise<T> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...(options.headers as Record<string, string>),
@@ -83,6 +86,12 @@ export interface AuthUser {
   balance: string;
   creditsBalance?: number;
   createdAt?: string;
+  // DK Bank linking fields
+  dkCid?: string | null;
+  dkAccountName?: string | null;
+  dkPhoneHash?: string | null;
+  telegramPhoneHash?: string | null;
+  telegramLinkedAt?: string | null;
 }
 
 export interface AuthResponse {
@@ -112,6 +121,18 @@ export async function loginWithDKBank(cid: string): Promise<AuthResponse> {
   return result;
 }
 
+/**
+ * Link a DK Bank CID to the currently authenticated Telegram user.
+ * Requires a valid JWT. Stores dkPhoneHash on the user row so that
+ * the bot's /verify phone check can compare Telegram phone == DK phone.
+ */
+export async function linkDKBank(cid: string): Promise<AuthResponse> {
+  return request<AuthResponse>("/auth/link-dkbank", {
+    method: "POST",
+    body: JSON.stringify({ cid }),
+  });
+}
+
 // ─── Markets ─────────────────────────────────────────────────────────────────
 
 export interface Outcome {
@@ -129,7 +150,14 @@ export interface Market {
   title: string;
   description: string | null;
   imageUrl: string | null;
-  status: "upcoming" | "open" | "closed" | "resolving" | "resolved" | "settled" | "cancelled";
+  status:
+    | "upcoming"
+    | "open"
+    | "closed"
+    | "resolving"
+    | "resolved"
+    | "settled"
+    | "cancelled";
   mechanism: "parimutuel";
   liquidityParam: string;
   totalPool: string;
@@ -163,9 +191,12 @@ export function getDisputes(marketId: string): Promise<Dispute[]> {
   return request<Dispute[]>(`/markets/${marketId}/disputes`);
 }
 
-export function submitDispute(marketId: string, payload: SubmitDisputePayload): Promise<Dispute> {
+export function submitDispute(
+  marketId: string,
+  payload: SubmitDisputePayload,
+): Promise<Dispute> {
   return request<Dispute>(`/markets/${marketId}/disputes`, {
-    method: 'POST',
+    method: "POST",
     body: JSON.stringify(payload),
   });
 }
@@ -207,7 +238,14 @@ export interface Bet {
 
 export interface Transaction {
   id: string;
-  type: "deposit" | "withdrawal" | "bet_placed" | "bet_payout" | "refund" | "dispute_bond" | "dispute_refund";
+  type:
+    | "deposit"
+    | "withdrawal"
+    | "bet_placed"
+    | "bet_payout"
+    | "refund"
+    | "dispute_bond"
+    | "dispute_refund";
   amount: number;
   balanceBefore: number;
   balanceAfter: number;
@@ -232,7 +270,9 @@ export function getMe(): Promise<AuthUser> {
   return request<AuthUser>("/users/me");
 }
 
-export function getMyTransactions(type?: Transaction["type"]): Promise<Transaction[]> {
+export function getMyTransactions(
+  type?: Transaction["type"],
+): Promise<Transaction[]> {
   const qs = type ? `?type=${type}` : "";
   return request<Transaction[]>(`/users/me/transactions${qs}`);
 }
