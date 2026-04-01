@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
-import { LayoutGrid, Ticket, Trophy, Wallet, UserCircle } from "lucide-react";
+import { LayoutGrid, Ticket, Trophy, UserCircle } from "lucide-react";
 
 export const PwaBottomNav: React.FC = () => {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -17,7 +17,6 @@ export const PwaBottomNav: React.FC = () => {
     { to: "/", label: "Feed", icon: LayoutGrid },
     { to: "/my-bets", label: "My Bets", icon: Ticket },
     { to: "/results", label: "Results", icon: Trophy },
-    { to: "/wallet", label: "Wallet", icon: Wallet },
     { to: "/profile", label: "Profile", icon: UserCircle },
   ];
 

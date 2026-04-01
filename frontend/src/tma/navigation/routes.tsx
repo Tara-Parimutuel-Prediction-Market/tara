@@ -11,7 +11,6 @@ import { LaunchParamsPage } from "@/tma/pages/LaunchParamsPage.tsx";
 import { ThemeParamsPage } from "@/tma/pages/ThemeParamsPage.tsx";
 import { TONConnectPage } from "@/tma/pages/TONConnectPage/TONConnectPage";
 import { PwaMyBetsPage } from "@/pwa/pages/PwaMyBetsPage";
-import { PwaWalletPage } from "@/pwa/pages/PwaWalletPage";
 import { PwaResultsPage } from "@/pwa/pages/PwaResultsPage";
 import { TmaPageWrapper } from "@/tma/components/TmaPageWrapper";
 import { TmaProfilePage } from "@/tma/pages/TmaProfilePage";
@@ -72,15 +71,6 @@ export const routes: Route[] = [
       </TmaPageWrapper>
     ),
     title: "My Bets",
-  },
-  {
-    path: "/wallet",
-    Component: () => (
-      <TmaPageWrapper>
-        <PwaWalletPage />
-      </TmaPageWrapper>
-    ),
-    title: "Wallet",
   },
   {
     path: "/results",
