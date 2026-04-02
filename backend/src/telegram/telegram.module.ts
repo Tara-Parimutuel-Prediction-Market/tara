@@ -4,6 +4,9 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 import { User } from "../entities/user.entity";
 import { Market } from "../entities/market.entity";
 import { Bet } from "../entities/bet.entity";
+import { AuthMethod } from "../entities/auth-method.entity";
+import { Transaction } from "../entities/transaction.entity";
+import { Payment } from "../entities/payment.entity";
 import { DKGatewayAuthToken } from "../entities/dk-gateway-auth-token.entity";
 import { TelegramSimpleService } from "./telegram.service.simple";
 import { TelegramVerificationService } from "./telegram-verification.service";
@@ -14,7 +17,15 @@ import { DKGatewayService } from "../payment/services/dk-gateway/dk-gateway.serv
 @Module({
   imports: [
     ConfigModule,
-    TypeOrmModule.forFeature([User, Market, Bet, DKGatewayAuthToken]),
+    TypeOrmModule.forFeature([
+      User,
+      Market,
+      Bet,
+      AuthMethod,
+      Transaction,
+      Payment,
+      DKGatewayAuthToken,
+    ]),
   ],
   controllers: [BotController],
   providers: [

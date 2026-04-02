@@ -12,7 +12,7 @@ import { Payment } from "../entities/payment.entity";
 import { Transaction } from "../entities/transaction.entity";
 import { DKGatewayAuthToken } from "../entities/dk-gateway-auth-token.entity";
 import { DKGatewayService } from "../payment/services/dk-gateway/dk-gateway.service";
-import { TelegramVerificationService } from "../telegram/telegram-verification.service";
+import { TelegramModule } from "../telegram/telegram.module";
 
 @Module({
   imports: [
@@ -32,13 +32,9 @@ import { TelegramVerificationService } from "../telegram/telegram-verification.s
         signOptions: { expiresIn: config.get("JWT_EXPIRES_IN", "7d") },
       }),
     }),
+    TelegramModule,
   ],
-  providers: [
-    AuthService,
-    JwtStrategy,
-    DKGatewayService,
-    TelegramVerificationService,
-  ],
+  providers: [AuthService, JwtStrategy, DKGatewayService],
   controllers: [AuthController],
   exports: [AuthService, JwtModule],
 })

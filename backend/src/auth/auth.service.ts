@@ -267,6 +267,29 @@ export class AuthService {
         });
       }
 
+      // Telegram user with a matching DK phone may already exist ──
+      // This can happen if the Telegram login ran first (creating a row with telegramId
+      // but no DK fields) and now the same person enters their CID without a JWT.
+      // Hash the DK phone and look for a match so we merge into that row instead of
+      // creating a duplicate.
+      if (!user && account.phoneNumber) {
+        const dkPhoneHash = this.telegramVerification.hashPhone(
+          account.phoneNumber,
+        );
+        user = await this.userRepo.findOneBy({
+          telegramPhoneHash: dkPhoneHash,
+        });
+        if (!user) {
+          // Also check if there is a Telegram row whose dkPhoneHash was pre-seeded
+          user = await this.userRepo.findOneBy({ dkPhoneHash });
+        }
+        if (user) {
+          this.logger.log(
+            `[Auth] Phone-hash match found user ${user.id} — merging DK data instead of creating duplicate`,
+          );
+        }
+      }
+
       if (user) {
         // User row exists — just ensure fields are up to date and create the missing auth_method
         await this.userRepo.update(user.id, {

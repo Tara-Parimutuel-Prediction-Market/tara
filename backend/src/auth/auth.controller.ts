@@ -62,8 +62,11 @@ export class AuthController {
     summary: "Login or register with DK Bank CID (no JWT required)",
   })
   @ApiBody({ type: DKBankAuthDto })
-  async dkBankLogin(@Body() dto: DKBankAuthDto) {
-    return this.authService.loginWithDKBank(dto.cid);
+  async dkBankLogin(@Body() dto: DKBankAuthDto, @Request() req: any) {
+    // If the caller already carries a valid JWT, treat this as an authenticated
+    // link request so we merge into the existing row rather than create a duplicate.
+    const callerUserId: string | undefined = req.user?.userId;
+    return this.authService.loginWithDKBank(dto.cid, callerUserId);
   }
 
   /**
@@ -81,7 +84,7 @@ export class AuthController {
   })
   @ApiBody({ type: DKBankAuthDto })
   async linkDKBank(@Body() dto: DKBankAuthDto, @Request() req: any) {
-    return this.authService.loginWithDKBank(dto.cid, req.user.sub);
+    return this.authService.loginWithDKBank(dto.cid, req.user.userId);
   }
 
   /**

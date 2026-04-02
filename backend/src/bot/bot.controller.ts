@@ -23,7 +23,7 @@ export class BotController {
     if (!botToken) return { error: "Bot token not configured" };
 
     try {
-      // Use built-in fetch — no axios dependency
+      // Use built-in fetch
       const response = await fetch(
         `https://api.telegram.org/bot${botToken}/getMe`,
       );
@@ -51,7 +51,7 @@ export class BotController {
   private async handleMessage(message: any) {
     const chatId: number = message.chat.id;
 
-    // ── Handle shared contact (phone verification) ─────────────────────────
+    // Handle shared contact (phone verification)
     if (message.contact) {
       const contact = message.contact;
       try {
@@ -71,20 +71,34 @@ export class BotController {
       return;
     }
 
-    // ── Handle text commands ────────────────────────────────────────────────
+    // Handle text commands
     if (message.text) {
       switch (message.text) {
-        case "/start":
-          await this.telegramSimpleService.sendMessage(
-            chatId,
-            "🎯 <b>Welcome to Tara!</b>\n\n" +
-              "To enable secure payments, please verify your phone:\n" +
-              "👉 Type /verify and share your phone number.\n\n" +
-              "Other commands:\n" +
-              "/predict - View active markets\n" +
-              "/help    - Show all commands",
-          );
+        case "/start": {
+          const miniAppUrl = process.env.TELEGRAM_MINI_APP_URL || "";
+          const botToken = process.env.TELEGRAM_BOT_TOKEN;
+          await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              chat_id: chatId,
+              text:
+                "🎯 <b>Welcome to Tara!</b>\n\n" +
+                "To enable secure payments, please verify your phone:\n" +
+                "👉 Type /verify and share your phone number.\n\n" +
+                "Other commands:\n" +
+                "/predict - View active markets\n" +
+                "/help    - Show all commands",
+              parse_mode: "HTML",
+              reply_markup: {
+                inline_keyboard: [
+                  [{ text: "🚀 Open Tara", web_app: { url: miniAppUrl } }],
+                ],
+              },
+            }),
+          });
           break;
+        }
 
         case "/verify":
           await this.handleVerifyCommand(chatId, message.from.id);

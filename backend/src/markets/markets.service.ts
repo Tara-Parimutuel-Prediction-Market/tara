@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from "@nestjs/common";
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, DataSource } from "typeorm";
 import { RedisService } from "../redis/redis.service";
@@ -14,10 +18,18 @@ import {
 } from "class-validator";
 
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { Market, MarketStatus, MarketMechanism } from "../entities/market.entity";
+import {
+  Market,
+  MarketStatus,
+  MarketMechanism,
+} from "../entities/market.entity";
 import { Outcome } from "../entities/outcome.entity";
 import { Dispute } from "../entities/dispute.entity";
-import { Payment, PaymentMethod, PaymentStatus } from "../entities/payment.entity";
+import {
+  Payment,
+  PaymentMethod,
+  PaymentStatus,
+} from "../entities/payment.entity";
 import { Transaction, TransactionType } from "../entities/transaction.entity";
 import { User } from "../entities/user.entity";
 import { ParimutuelEngine } from "./parimutuel.engine";
@@ -55,7 +67,12 @@ export class UpdateMarketDto {
   @ApiPropertyOptional() @IsOptional() @IsString() imageUrl?: string;
   @ApiPropertyOptional() @IsOptional() @IsDateString() opensAt?: string;
   @ApiPropertyOptional() @IsOptional() @IsDateString() closesAt?: string;
-  @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) @Max(50) houseEdgePct?: number;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(50)
+  houseEdgePct?: number;
   @ApiPropertyOptional() @IsOptional() @IsNumber() liquidityParam?: number;
 }
 
@@ -65,16 +82,23 @@ export class PlaceBetDto {
 }
 
 export class SubmitDisputeDto {
-  @ApiPropertyOptional({ description: "Bond amount in credits (used when paying from credit balance)" })
+  @ApiPropertyOptional({
+    description:
+      "Bond amount in credits (used when paying from credit balance)",
+  })
   @IsOptional()
   bondAmount?: number;
 
-  @ApiPropertyOptional({ description: "Completed DK Bank payment ID to use as bond" })
+  @ApiPropertyOptional({
+    description: "Completed DK Bank payment ID to use as bond",
+  })
   @IsOptional()
   @IsUUID()
   paymentId?: string;
 
-  @ApiPropertyOptional({ description: "Reason for disputing the proposed outcome" })
+  @ApiPropertyOptional({
+    description: "Reason for disputing the proposed outcome",
+  })
   @IsOptional()
   @IsString()
   reason?: string;
@@ -87,7 +111,8 @@ export class MarketsService {
     @InjectRepository(Outcome) private outcomeRepo: Repository<Outcome>,
     @InjectRepository(Dispute) private disputeRepo: Repository<Dispute>,
     @InjectRepository(Payment) private paymentRepo: Repository<Payment>,
-    @InjectRepository(Transaction) private transactionRepo: Repository<Transaction>,
+    @InjectRepository(Transaction)
+    private transactionRepo: Repository<Transaction>,
     @InjectRepository(User) private userRepo: Repository<User>,
     private engine: ParimutuelEngine,
     private lmsrService: LMSRService,
@@ -153,11 +178,28 @@ export class MarketsService {
     }
   }
 
-  async findAll(): Promise<Market[]> {
-    const cached = await this.redis.getJson<Market[]>("tara:cache:markets:all");
+  async findAll(q?: string): Promise<Market[]> {
+    const cacheKey = q
+      ? `tara:cache:markets:search:${q.toLowerCase().trim()}`
+      : "tara:cache:markets:all";
+    const cached = await this.redis.getJson<Market[]>(cacheKey);
     if (cached) return cached;
-    const markets = await this.marketRepo.find({ order: { createdAt: "DESC" } });
-    await this.redis.setJsonEx("tara:cache:markets:all", 30, markets);
+
+    const qb = this.marketRepo
+      .createQueryBuilder("market")
+      .leftJoinAndSelect("market.outcomes", "outcome")
+      .orderBy("market.createdAt", "DESC");
+
+    if (q && q.trim()) {
+      const term = `%${q.trim().toLowerCase()}%`;
+      qb.where(
+        "LOWER(market.title) LIKE :term OR LOWER(market.description) LIKE :term",
+        { term },
+      );
+    }
+
+    const markets = await qb.getMany();
+    await this.redis.setJsonEx(cacheKey, 30, markets);
     return markets;
   }
 
@@ -176,14 +218,15 @@ export class MarketsService {
 
   async update(id: string, dto: UpdateMarketDto): Promise<Market> {
     const market = await this.findOne(id);
-    
+
     if (dto.title) market.title = dto.title;
     if (dto.description) market.description = dto.description;
     if (dto.imageUrl) market.imageUrl = dto.imageUrl;
     if (dto.opensAt) market.opensAt = new Date(dto.opensAt);
     if (dto.closesAt) market.closesAt = new Date(dto.closesAt);
     if (dto.houseEdgePct !== undefined) market.houseEdgePct = dto.houseEdgePct;
-    if (dto.liquidityParam !== undefined) market.liquidityParam = dto.liquidityParam;
+    if (dto.liquidityParam !== undefined)
+      market.liquidityParam = dto.liquidityParam;
 
     const saved = await this.marketRepo.save(market);
     await this.invalidateMarketCache(id);
@@ -202,7 +245,10 @@ export class MarketsService {
   }
 
   async proposeResolution(marketId: string, proposedOutcomeId: string) {
-    const result = await this.engine.proposeResolution(marketId, proposedOutcomeId);
+    const result = await this.engine.proposeResolution(
+      marketId,
+      proposedOutcomeId,
+    );
     await this.invalidateMarketCache(marketId);
     return result;
   }
@@ -219,13 +265,21 @@ export class MarketsService {
     return result;
   }
 
-  async submitDispute(userId: string, marketId: string, dto: SubmitDisputeDto): Promise<Dispute> {
+  async submitDispute(
+    userId: string,
+    marketId: string,
+    dto: SubmitDisputeDto,
+  ): Promise<Dispute> {
     if (!dto.paymentId && !dto.bondAmount)
-      throw new BadRequestException("Either paymentId (DK Bank) or bondAmount (credits) is required");
+      throw new BadRequestException(
+        "Either paymentId (DK Bank) or bondAmount (credits) is required",
+      );
 
     const market = await this.findOne(marketId);
     if (market.status !== MarketStatus.RESOLVING)
-      throw new BadRequestException("Disputes can only be submitted during the resolution window");
+      throw new BadRequestException(
+        "Disputes can only be submitted during the resolution window",
+      );
 
     if (market.disputeDeadlineAt && new Date() > market.disputeDeadlineAt)
       throw new BadRequestException("Dispute window has closed");
@@ -236,54 +290,77 @@ export class MarketsService {
       if (dto.paymentId) {
         // ── DK Bank path: verify a completed payment ──────────────────────────
         const payment = await em.getRepository(Payment).findOne({
-          where: { id: dto.paymentId, userId, status: PaymentStatus.SUCCESS, method: PaymentMethod.DK_BANK },
+          where: {
+            id: dto.paymentId,
+            userId,
+            status: PaymentStatus.SUCCESS,
+            method: PaymentMethod.DK_BANK,
+          },
         });
         if (!payment)
-          throw new BadRequestException("DK Bank payment not found, not completed, or does not belong to you");
+          throw new BadRequestException(
+            "DK Bank payment not found, not completed, or does not belong to you",
+          );
 
         // Ensure this payment hasn't already been used for a dispute
-        const existing = await em.getRepository(Dispute).findOne({ where: { bondPaymentId: dto.paymentId } });
+        const existing = await em
+          .getRepository(Dispute)
+          .findOne({ where: { bondPaymentId: dto.paymentId } });
         if (existing)
-          throw new BadRequestException("This payment has already been used for a dispute");
+          throw new BadRequestException(
+            "This payment has already been used for a dispute",
+          );
 
         bondAmount = Number(payment.amount);
 
-        return em.save(Dispute, em.create(Dispute, {
-          userId,
-          marketId,
-          bondAmount,
-          bondPaymentId: dto.paymentId,
-          reason: dto.reason ?? null,
-          bondRefunded: false,
-        }));
+        return em.save(
+          Dispute,
+          em.create(Dispute, {
+            userId,
+            marketId,
+            bondAmount,
+            bondPaymentId: dto.paymentId,
+            reason: dto.reason ?? null,
+            bondRefunded: false,
+          }),
+        );
       } else {
         // ── Credits path: deduct from balance ─────────────────────────────────
         bondAmount = dto.bondAmount!;
-        const { balance } = await em.getRepository(Transaction)
+        const { balance } = await em
+          .getRepository(Transaction)
           .createQueryBuilder("t")
           .select("COALESCE(SUM(t.amount), 0)", "balance")
           .where("t.userId = :userId", { userId })
           .getRawOne();
         const balanceBefore = Number(balance);
         if (balanceBefore < bondAmount)
-          throw new BadRequestException("Insufficient balance for dispute bond");
+          throw new BadRequestException(
+            "Insufficient balance for dispute bond",
+          );
 
-        await em.save(Transaction, em.create(Transaction, {
-          type: TransactionType.DISPUTE_BOND,
-          amount: -bondAmount,
-          balanceBefore,
-          balanceAfter: balanceBefore - bondAmount,
-          userId,
-          note: `Dispute bond for market resolution`,
-        }));
+        await em.save(
+          Transaction,
+          em.create(Transaction, {
+            type: TransactionType.DISPUTE_BOND,
+            amount: -bondAmount,
+            balanceBefore,
+            balanceAfter: balanceBefore - bondAmount,
+            userId,
+            note: `Dispute bond for market resolution`,
+          }),
+        );
 
-        return em.save(Dispute, em.create(Dispute, {
-          userId,
-          marketId,
-          bondAmount,
-          reason: dto.reason ?? null,
-          bondRefunded: false,
-        }));
+        return em.save(
+          Dispute,
+          em.create(Dispute, {
+            userId,
+            marketId,
+            bondAmount,
+            reason: dto.reason ?? null,
+            bondRefunded: false,
+          }),
+        );
       }
     });
   }

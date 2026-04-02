@@ -5,13 +5,25 @@ import {
   Patch,
   Param,
   Body,
+  Query,
   UseGuards,
   Request,
 } from "@nestjs/common";
-import { ApiBearerAuth, ApiTags, ApiOperation, ApiResponse } from "@nestjs/swagger";
+import {
+  ApiBearerAuth,
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiQuery,
+} from "@nestjs/swagger";
 import { Dispute } from "../entities/dispute.entity";
 import { JwtAuthGuard, Public, AdminGuard } from "../auth/guards";
-import { MarketsService, PlaceBetDto, UpdateMarketDto, SubmitDisputeDto } from "./markets.service";
+import {
+  MarketsService,
+  PlaceBetDto,
+  UpdateMarketDto,
+  SubmitDisputeDto,
+} from "./markets.service";
 
 @ApiTags("markets")
 @ApiBearerAuth()
@@ -22,9 +34,16 @@ export class MarketsController {
 
   @Get()
   @Public()
-  @ApiOperation({ summary: "List all markets" })
-  findAll() {
-    return this.marketsService.findAll();
+  @ApiOperation({
+    summary: "List all markets, optionally filtered by search query",
+  })
+  @ApiQuery({
+    name: "q",
+    required: false,
+    description: "Search term to filter markets by title or description",
+  })
+  findAll(@Query("q") q?: string) {
+    return this.marketsService.findAll(q);
   }
 
   @Get(":id")
@@ -56,9 +75,15 @@ export class MarketsController {
   }
 
   @Post(":id/disputes")
-  @ApiOperation({ summary: "Submit a dispute bond during the 24h resolution window" })
+  @ApiOperation({
+    summary: "Submit a dispute bond during the 24h resolution window",
+  })
   @ApiResponse({ status: 201, type: Dispute })
-  submitDispute(@Param("id") id: string, @Body() dto: SubmitDisputeDto, @Request() req) {
+  submitDispute(
+    @Param("id") id: string,
+    @Body() dto: SubmitDisputeDto,
+    @Request() req,
+  ) {
     return this.marketsService.submitDispute(req.user.userId, id, dto);
   }
 

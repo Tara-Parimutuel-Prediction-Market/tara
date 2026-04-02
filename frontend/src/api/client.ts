@@ -201,8 +201,9 @@ export function submitDispute(
   });
 }
 
-export function getMarkets(): Promise<Market[]> {
-  return request<Market[]>("/markets");
+export function getMarkets(q?: string): Promise<Market[]> {
+  const qs = q && q.trim() ? `?q=${encodeURIComponent(q.trim())}` : "";
+  return request<Market[]>(`/markets${qs}`);
 }
 
 export function getMarket(id: string): Promise<Market> {

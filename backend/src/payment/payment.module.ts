@@ -10,7 +10,6 @@ import { PaymentOtp } from "../entities/payment-otp.entity";
 import { DKGatewayService } from "./services/dk-gateway/dk-gateway.service";
 import { DKBankPaymentService } from "./dkbank-payment.service";
 import { TelegramModule } from "../telegram/telegram.module";
-import { TelegramVerificationService } from "../telegram/telegram-verification.service";
 
 @Module({
   imports: [
@@ -25,10 +24,6 @@ import { TelegramVerificationService } from "../telegram/telegram-verification.s
     TelegramModule,
   ],
   controllers: [PaymentController],
-  providers: [
-    DKGatewayService,
-    DKBankPaymentService,
-    TelegramVerificationService,
-  ],
+  providers: [DKGatewayService, DKBankPaymentService],
 })
 export class PaymentModule {}

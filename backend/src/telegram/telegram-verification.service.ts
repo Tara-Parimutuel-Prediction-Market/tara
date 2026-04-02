@@ -9,6 +9,10 @@ import { Repository } from "typeorm";
 import { createHmac } from "crypto";
 import { ConfigService } from "@nestjs/config";
 import { User } from "../entities/user.entity";
+import { AuthMethod } from "../entities/auth-method.entity";
+import { Bet } from "../entities/bet.entity";
+import { Transaction } from "../entities/transaction.entity";
+import { Payment } from "../entities/payment.entity";
 import { DKGatewayService } from "../payment/services/dk-gateway/dk-gateway.service";
 
 /**
@@ -29,6 +33,14 @@ export class TelegramVerificationService {
 
   constructor(
     @InjectRepository(User) private readonly userRepo: Repository<User>,
+    @InjectRepository(AuthMethod)
+    private readonly authMethodRepo: Repository<AuthMethod>,
+    @InjectRepository(Bet)
+    private readonly betRepo: Repository<Bet>,
+    @InjectRepository(Transaction)
+    private readonly transactionRepo: Repository<Transaction>,
+    @InjectRepository(Payment)
+    private readonly paymentRepo: Repository<Payment>,
     private readonly configService: ConfigService,
     private readonly dkGateway: DKGatewayService,
   ) {}
@@ -109,9 +121,22 @@ export class TelegramVerificationService {
         `[PhoneVerify] Matched user ${user.id} via dkPhoneHash — will bind telegramId=${telegramUserId}`,
       );
 
-      // Write the missing telegramId onto the user row now so future lookups work
-      await this.userRepo.update(user.id, { telegramId: telegramUserId });
-      user.telegramId = telegramUserId;
+      // ── Check if a SEPARATE Telegram-only row already exists for this telegramUserId ──
+      // This happens when: user opened TMA (created row A with telegramId) then entered
+      // CID without being logged in (created row B with dkCid only). Merge B → A.
+      const telegramRow = await this.userRepo.findOneBy({
+        telegramId: telegramUserId,
+      });
+      if (telegramRow && telegramRow.id !== user.id) {
+        this.logger.log(
+          `[PhoneVerify] Found separate Telegram-only row ${telegramRow.id} for telegramId=${telegramUserId} — merging DK-only row ${user.id} into it`,
+        );
+        user = await this.mergeUsers(telegramRow, user);
+      } else {
+        // Write the missing telegramId onto the DK-only user row
+        await this.userRepo.update(user.id, { telegramId: telegramUserId });
+        user.telegramId = telegramUserId;
+      }
     }
 
     this.logger.log(
@@ -270,6 +295,74 @@ export class TelegramVerificationService {
   }
 
   // ── Internal helpers ─────────────────────────────────────────────────────
+
+  /**
+   * Merges `deleteUser` (DK-only row) into `keepUser` (Telegram row).
+   *
+   * Steps:
+   *  1. Copy DK fields from deleteUser → keepUser.
+   *  2. Re-point all auth_methods, bets, payments, transactions to keepUser.
+   *  3. Delete deleteUser.
+   *
+   * Returns the refreshed keepUser row.
+   */
+  private async mergeUsers(keepUser: User, deleteUser: User): Promise<User> {
+    this.logger.log(
+      `[Merge] Merging user ${deleteUser.id} (DK-only) into ${keepUser.id} (Telegram) — transferring DK fields + related records`,
+    );
+
+    // 1. Transfer DK identity fields onto the keeper row
+    await this.userRepo.update(keepUser.id, {
+      dkCid: deleteUser.dkCid ?? keepUser.dkCid,
+      dkAccountNumber: deleteUser.dkAccountNumber ?? keepUser.dkAccountNumber,
+      dkAccountName: deleteUser.dkAccountName ?? keepUser.dkAccountName,
+      dkPhoneHash: deleteUser.dkPhoneHash ?? keepUser.dkPhoneHash,
+      phoneNumber: deleteUser.phoneNumber ?? keepUser.phoneNumber,
+      telegramChatId: deleteUser.telegramChatId ?? keepUser.telegramChatId,
+    });
+
+    // 2. Re-point auth_methods
+    await this.authMethodRepo
+      .createQueryBuilder()
+      .update()
+      .set({ userId: keepUser.id })
+      .where("userId = :id", { id: deleteUser.id })
+      .execute();
+
+    // 3. Re-point bets
+    await this.betRepo
+      .createQueryBuilder()
+      .update()
+      .set({ userId: keepUser.id })
+      .where("userId = :id", { id: deleteUser.id })
+      .execute();
+
+    // 4. Re-point transactions
+    await this.transactionRepo
+      .createQueryBuilder()
+      .update()
+      .set({ userId: keepUser.id })
+      .where("userId = :id", { id: deleteUser.id })
+      .execute();
+
+    // 5. Re-point payments
+    await this.paymentRepo
+      .createQueryBuilder()
+      .update()
+      .set({ userId: keepUser.id })
+      .where("userId = :id", { id: deleteUser.id })
+      .execute();
+
+    // 6. Delete the now-empty duplicate row
+    await this.userRepo.delete(deleteUser.id);
+
+    this.logger.log(
+      `[Merge] Successfully merged — duplicate row ${deleteUser.id} deleted`,
+    );
+
+    const merged = await this.userRepo.findOneBy({ id: keepUser.id });
+    return merged!;
+  }
 
   private async flagSuspiciousActivity(
     userId: string,

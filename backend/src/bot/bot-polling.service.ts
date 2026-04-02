@@ -197,17 +197,36 @@ export class BotPollingService
     // ── Text commands ────────────────────────────────────────────────────
     if (message.text) {
       switch (message.text) {
-        case "/start":
-          await this.telegramSimple.sendMessage(
-            chatId,
-            "🎯 <b>Welcome to Tara!</b>\n\n" +
-              "To enable secure payments, please verify your phone:\n" +
-              "👉 Type /verify and share your phone number.\n\n" +
-              "Other commands:\n" +
-              "/predict - View active markets\n" +
-              "/help    - Show all commands",
+        case "/start": {
+          const miniAppUrl =
+            this.config.get<string>("TELEGRAM_MINI_APP_URL") ||
+            process.env.TELEGRAM_MINI_APP_URL ||
+            "";
+          await fetch(
+            `https://api.telegram.org/bot${this.botToken}/sendMessage`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                chat_id: chatId,
+                text:
+                  "🎯 <b>Welcome to Tara!</b>\n\n" +
+                  "To enable secure payments, please verify your phone:\n" +
+                  "👉 Type /verify and share your phone number.\n\n" +
+                  "Other commands:\n" +
+                  "/predict - View active markets\n" +
+                  "/help    - Show all commands",
+                parse_mode: "HTML",
+                reply_markup: {
+                  inline_keyboard: [
+                    [{ text: "🚀 Open Tara", web_app: { url: miniAppUrl } }],
+                  ],
+                },
+              }),
+            },
           );
           break;
+        }
 
         case "/verify":
           await this.handleVerifyCommand(chatId, message.from.id);
