@@ -153,6 +153,17 @@ export class BotController {
       return;
     }
 
+    // CID is linked but DK Bank may not have a phone on record
+    if (!user.dkPhoneHash) {
+      await this.telegramSimpleService.sendMessage(
+        chatId,
+        "⚠️ <b>No phone number found on your DK Bank account</b>\n\n" +
+          "Your CID is linked, but DK Bank has no registered phone number for it.\n\n" +
+          "Please visit a <b>DK Bank branch</b> to register your phone number, then type /verify again.",
+      );
+      return;
+    }
+
     if (user.telegramPhoneHash && user.telegramLinkedAt) {
       await this.telegramSimpleService.sendMessage(
         chatId,

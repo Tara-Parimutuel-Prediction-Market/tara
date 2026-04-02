@@ -219,7 +219,7 @@ export class BotPollingService
                 parse_mode: "HTML",
                 reply_markup: {
                   inline_keyboard: [
-                    [{ text: "🚀 Open Tara", web_app: { url: miniAppUrl } }],
+                    [{ text: "🚀 Open Tara", url: miniAppUrl }],
                   ],
                 },
               }),
@@ -274,6 +274,17 @@ export class BotPollingService
           "2️⃣ Go to <b>Profile → Link DK Bank Account</b>\n" +
           "3️⃣ Enter your <b>11-digit CID number</b>\n" +
           "4️⃣ Come back here and type /verify again.",
+      );
+      return;
+    }
+
+    // CID is linked but DK Bank may not have a phone on record
+    if (!user.dkPhoneHash) {
+      await this.telegramSimple.sendMessage(
+        chatId,
+        "⚠️ <b>No phone number found on your DK Bank account</b>\n\n" +
+          "Your CID is linked, but DK Bank has no registered phone number for it.\n\n" +
+          "Please visit a <b>DK Bank branch</b> to register your phone number, then type /verify again.",
       );
       return;
     }
