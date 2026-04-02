@@ -109,6 +109,8 @@ export class AuthService {
         });
         await this.userRepo.save(user);
 
+        // TODO: REMOVE before production — dev/staging only
+        // In production users will deposit real BTN via DK Bank; no free credits.
         // Seed 1000 starter credits
         await this.transactionRepo.save(
           this.transactionRepo.create({
@@ -339,6 +341,8 @@ export class AuthService {
         account.phoneNumber,
       );
 
+      // TODO: REMOVE before production — dev/staging only
+      // In production users will deposit real BTN via DK Bank; no free credits.
       // Seed 1000 starter credits as a transaction entry
       await this.transactionRepo.save(
         this.transactionRepo.create({

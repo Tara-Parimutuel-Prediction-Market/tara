@@ -171,8 +171,12 @@ export class TelegramVerificationService {
           }
         } catch (err: any) {
           if (err instanceof BadRequestException) throw err;
+          this.logger.error(
+            `[PhoneVerify] Live DK lookup failed for user ${user.id} CID ${user.dkCid}: ${err.message}`,
+          );
           throw new BadRequestException(
-            "Could not verify your DK Bank account. Please try again or contact support.",
+            "Could not reach DK Bank to verify your account right now.\n\n" +
+              "Please try again in a few minutes. If the problem persists, contact support.",
           );
         }
       } else {
@@ -201,7 +205,7 @@ export class TelegramVerificationService {
       );
     }
 
-    // ── Persist the binding ──────────────────────────────────────────────────
+    //  Persist the binding
     await this.userRepo.update(user.id, {
       telegramChatId,
       telegramPhoneHash,
@@ -236,7 +240,7 @@ export class TelegramVerificationService {
     this.logger.log(`[PhoneVerify] DK phone hash stored for user ${userId}`);
   }
 
-  // ── Payment-time identity verification ───────────────────────────────────
+  //  Payment-time identity verification
 
   /**
    * Verifies the Telegram identity before sending an OTP.
@@ -253,7 +257,7 @@ export class TelegramVerificationService {
     const user = await this.userRepo.findOneBy({ id: userId });
     if (!user) throw new UnauthorizedException("User not found");
 
-    // ── Check 1: Telegram phone has been verified ────────────────────────────
+    //  Check 1: Telegram phone has been verified
     if (!user.telegramChatId || !user.telegramPhoneHash) {
       throw new UnauthorizedException(
         "Your Telegram account is not yet phone-verified. " +
@@ -261,7 +265,7 @@ export class TelegramVerificationService {
       );
     }
 
-    // ── Check 2: Same Telegram account that was bound ────────────────────────
+    //  Check 2: Same Telegram account that was bound
     if (incomingChatId && user.telegramChatId !== incomingChatId) {
       await this.flagSuspiciousActivity(userId, "chat_id_mismatch");
       throw new UnauthorizedException(
@@ -269,7 +273,7 @@ export class TelegramVerificationService {
       );
     }
 
-    // ── Check 3: Telegram phone hash still equals DK Bank phone hash ─────────
+    //  Check 3: Telegram phone hash still equals DK Bank phone hash
     if (user.telegramPhoneHash !== user.dkPhoneHash) {
       await this.flagSuspiciousActivity(userId, "phone_hash_mismatch");
       throw new UnauthorizedException(

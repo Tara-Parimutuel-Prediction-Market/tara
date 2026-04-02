@@ -250,10 +250,11 @@ export function TmaPaymentModal({
           padding: "24px 20px 28px",
           width: "100%",
           maxWidth: 460,
+          boxSizing: "border-box",
           margin: "0 16px",
           boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
           animation: "tmaModalUp 0.3s cubic-bezier(0.34,1.56,0.64,1) forwards",
-          maxHeight: `${viewportHeight * 0.9}px`,
+          maxHeight: `${viewportHeight * 0.5}px`,
           overflowY: "auto",
           display: "flex",
           flexDirection: "column",
@@ -539,7 +540,7 @@ export function TmaPaymentModal({
 
         {/* ── Main form (idle / processing) ── */}
         {(status === "idle" || status === "processing") && (
-          <>
+          <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
             {/* Header */}
             <div
               style={{
@@ -547,6 +548,7 @@ export function TmaPaymentModal({
                 justifyContent: "space-between",
                 alignItems: "flex-start",
                 marginBottom: 12,
+                flexShrink: 0,
               }}
             >
               <div style={{ flex: 1, minWidth: 0, paddingRight: 12 }}>
@@ -625,12 +627,14 @@ export function TmaPaymentModal({
             </div>
 
             <div
-              style={{ height: 1, background: "#f3f4f6", marginBottom: 16 }}
+              style={{ height: 1, background: "#f3f4f6", marginBottom: 16, flexShrink: 0 }}
             />
 
-            {/* Payment method */}
-            <div
-              style={{
+            {/* SCROLLABLE INNER CONTENT */}
+            <div style={{ flex: 1, overflowY: "auto", minHeight: 0, paddingRight: 4, marginRight: -4 }}>
+              {/* Payment method */}
+              <div
+                style={{
                 fontSize: 11,
                 fontWeight: 700,
                 color: "#9ca3af",
@@ -998,47 +1002,52 @@ export function TmaPaymentModal({
               </>
             )}
 
-            {error && (
-              <div
+            </div>
+
+            {/* FIXED FOOTER */}
+            <div style={{ flexShrink: 0, marginTop: 12 }}>
+              {error && (
+                <div
+                  style={{
+                    background: "#fef2f2",
+                    border: "1px solid #fca5a5",
+                    color: "#ef4444",
+                    padding: "10px 14px",
+                    borderRadius: 8,
+                    marginBottom: 16,
+                    fontSize: 13,
+                    fontWeight: 500,
+                  }}
+                >
+                  {error}
+                </div>
+              )}
+
+              <button
+                onClick={handlePay}
+                disabled={!canPay}
                 style={{
-                  background: "#fef2f2",
-                  border: "1px solid #fca5a5",
-                  color: "#ef4444",
-                  padding: "10px 14px",
-                  borderRadius: 8,
-                  marginBottom: 16,
-                  fontSize: 13,
-                  fontWeight: 500,
+                  width: "100%",
+                  padding: "14px",
+                  background: canPay ? "#3b82f6" : "#e5e7eb",
+                  color: canPay ? "#fff" : "#9ca3af",
+                  border: "none",
+                  borderRadius: 10,
+                  fontSize: 15,
+                  fontWeight: 700,
+                  cursor: canPay ? "pointer" : "not-allowed",
                 }}
               >
-                {error}
-              </div>
-            )}
-
-            <button
-              onClick={handlePay}
-              disabled={!canPay}
-              style={{
-                width: "100%",
-                padding: "14px",
-                background: canPay ? "#3b82f6" : "#e5e7eb",
-                color: canPay ? "#fff" : "#9ca3af",
-                border: "none",
-                borderRadius: 10,
-                fontSize: 15,
-                fontWeight: 700,
-                cursor: canPay ? "pointer" : "not-allowed",
-              }}
-            >
-              {status === "processing"
-                ? "Processing…"
-                : canPay
-                  ? `Pay ${formatBTN(betAmount)} with DK Bank`
-                  : !isValidAmount
-                    ? `Min Nu ${MIN_BET}`
-                    : "Enter CID to continue"}
-            </button>
-          </>
+                {status === "processing"
+                  ? "Processing…"
+                  : canPay
+                    ? `Pay ${formatBTN(betAmount)} with DK Bank`
+                    : !isValidAmount
+                      ? `Min Nu ${MIN_BET}`
+                      : "Enter CID to continue"}
+              </button>
+            </div>
+          </div>
         )}
       </div>
     </div>
