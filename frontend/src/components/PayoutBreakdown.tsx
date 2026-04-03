@@ -1,4 +1,4 @@
-import { useState } from 'react';
+// import { useState } from 'react';
 import type { Market } from '@/api/client';
 
 function Row({ label, value, muted, bold, green }: {
@@ -20,7 +20,7 @@ export function PayoutBreakdown({ market, outcomeId, betAmount }: {
   outcomeId: string;
   betAmount: number;
 }) {
-  const [open, setOpen] = useState(false);
+  // const [open, setOpen] = useState(false);
 
   const outcome = market.outcomes.find((o) => o.id === outcomeId);
   if (!outcome || betAmount <= 0) return null;
@@ -64,7 +64,7 @@ export function PayoutBreakdown({ market, outcomeId, betAmount }: {
         </svg>
       </button> */}
 
-      {open && (
+      {false && (
         <div style={{
           marginTop: 8, background: '#f8fafc', borderRadius: 8,
           border: '1px solid #e5e7eb', padding: '12px 14px',
@@ -73,7 +73,7 @@ export function PayoutBreakdown({ market, outcomeId, betAmount }: {
           <div style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
             Pool state
           </div>
-          <Row label={`[${outcome.label}] pool`} value={nuInt(curOutcomePool)} />
+          <Row label={`[${outcome?.label}] pool`} value={nuInt(curOutcomePool)} />
           <Row label="Total pool" value={nuInt(curTotalPool)} />
 
           <div style={{ height: 1, background: '#e5e7eb', margin: '8px 0' }} />
@@ -82,7 +82,7 @@ export function PayoutBreakdown({ market, outcomeId, betAmount }: {
           <div style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
             After your bet of {nu(betAmount)}
           </div>
-          <Row label={`[${outcome.label}] pool`} value={nuInt(newOutcomePool)} />
+          <Row label={`[${outcome?.label}] pool`} value={nuInt(newOutcomePool)} />
           <Row label="Total pool" value={nuInt(newTotalPool)} />
           <Row label="Your share" value={`${(yourShare * 100).toFixed(2)}%`} />
 
@@ -104,7 +104,7 @@ export function PayoutBreakdown({ market, outcomeId, betAmount }: {
           }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: '#3b82f6', marginBottom: 2 }}>Formula</div>
             <div style={{ fontSize: 10, color: '#6b7280', lineHeight: 1.6, fontFamily: 'monospace' }}>
-              (bet ÷ new {outcome.label} pool) × new total pool × (1 − house%)<br />
+              (bet ÷ new {outcome?.label} pool) × new total pool × (1 − house%)<br />
               ({betAmount} ÷ {newOutcomePool.toFixed(0)}) × {newTotalPool.toFixed(0)} × {(1 - houseEdgePct / 100).toFixed(2)} = {nu(netPayout)}
             </div>
           </div> */}
