@@ -165,7 +165,7 @@ export function PwaPaymentModal({
         }
       `}</style>
       <div style={{
-        background: '#ffffff', borderRadius: 20,
+        background: 'var(--bg-card)', borderRadius: 20,
         padding: '24px 20px 28px',
         width: '100%', maxWidth: 460, margin: '0 16px',
         boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
@@ -189,7 +189,7 @@ export function PwaPaymentModal({
             <div style={{ fontSize: 18, fontWeight: 800, color: '#16a34a', marginBottom: 6, animation: 'fadeSlideIn 0.35s ease 0.3s both' }}>
               Bet Placed!
             </div>
-            <div style={{ fontSize: 13, color: '#6b7280', animation: 'fadeSlideIn 0.35s ease 0.45s both' }}>
+            <div style={{ fontSize: 13, color: 'var(--text-muted)', animation: 'fadeSlideIn 0.35s ease 0.45s both' }}>
               Your payment was confirmed
             </div>
           </div>
@@ -212,7 +212,7 @@ export function PwaPaymentModal({
             <div style={{ fontSize: 18, fontWeight: 800, color: '#ef4444', marginBottom: 8, animation: 'fadeSlideIn 0.35s ease 0.3s both' }}>
               Payment Failed
             </div>
-            <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 24, lineHeight: 1.5, animation: 'fadeSlideIn 0.35s ease 0.45s both' }}>
+            <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 24, lineHeight: 1.5, animation: 'fadeSlideIn 0.35s ease 0.45s both' }}>
               {error || 'Could not complete payment'}
             </div>
             <div style={{ animation: 'fadeSlideIn 0.35s ease 0.55s both' }}>
@@ -232,10 +232,10 @@ export function PwaPaymentModal({
           {/* Header */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
             <div style={{ flex: 1, minWidth: 0, paddingRight: 12 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-subtle)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>
                 Placing a bet on
               </div>
-              <div style={{ fontSize: 15, fontWeight: 800, color: '#111827', lineHeight: 1.3, marginBottom: 8, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-main)', lineHeight: 1.3, marginBottom: 8, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {market.title}
               </div>
               <div style={{
@@ -250,18 +250,18 @@ export function PwaPaymentModal({
             <button
               onClick={handleClose}
               style={{
-                background: '#f3f4f6', border: 'none', borderRadius: '50%',
-                width: 30, height: 30, fontSize: 18, color: '#6b7280',
+                background: 'var(--bg-main)', border: 'none', borderRadius: '50%',
+                width: 30, height: 30, fontSize: 18, color: 'var(--text-muted)',
                 cursor: status === 'processing' ? 'not-allowed' : 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
               }}
             >×</button>
           </div>
 
-          <div style={{ height: 1, background: '#f3f4f6', marginBottom: 16 }} />
+          <div style={{ height: 1, background: 'var(--glass-border)', marginBottom: 16 }} />
 
           {/* Payment method */}
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-subtle)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>
             Pay with
           </div>
           <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
@@ -269,36 +269,36 @@ export function PwaPaymentModal({
               onClick={() => setSelectedMethod('dkbank')}
               style={{
                 flex: 1, padding: '10px 12px', borderRadius: 10, cursor: 'pointer',
-                border: selectedMethod === 'dkbank' ? '2px solid #3b82f6' : '2px solid #e5e7eb',
-                background: selectedMethod === 'dkbank' ? '#eff6ff' : '#f9fafb',
+                border: selectedMethod === 'dkbank' ? '2px solid #3b82f6' : '2px solid var(--glass-border)',
+                background: selectedMethod === 'dkbank' ? 'rgba(59, 130, 246, 0.1)' : 'var(--bg-main)',
                 display: 'flex', alignItems: 'center', gap: 8, textAlign: 'left',
               }}
             >
               {/* <span style={{ fontSize: 18 }}>🏦</span> */}
               <div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: selectedMethod === 'dkbank' ? '#1d4ed8' : '#374151' }}>DK Bank</div>
-                <div style={{ fontSize: 11, color: selectedMethod === 'dkbank' ? '#60a5fa' : '#9ca3af' }}>BTN · Nu</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: selectedMethod === 'dkbank' ? '#3b82f6' : 'var(--text-main)' }}>DK Bank</div>
+                <div style={{ fontSize: 11, color: selectedMethod === 'dkbank' ? '#60a5fa' : 'var(--text-subtle)' }}>BTN · Nu</div>
               </div>
             </button>
             <div style={{
               flex: 1, padding: '10px 12px', borderRadius: 10,
-              border: '2px solid #f3f4f6', background: '#fafafa',
+              border: '2px solid var(--glass-border)', background: 'var(--bg-main)',
               display: 'flex', alignItems: 'center', gap: 8, opacity: 0.45,
             }}>
               {/* <span style={{ fontSize: 18 }}>💎</span> */}
               <div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: '#9ca3af' }}>TON Wallet</div>
-                <div style={{ fontSize: 11, color: '#d1d5db' }}>Coming soon</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-subtle)' }}>TON Wallet</div>
+                <div style={{ fontSize: 11, color: 'var(--text-subtle)' }}>Coming soon</div>
               </div>
             </div>
           </div>
 
           {/* Amount + CID — shown only after method is selected */}
           {selectedMethod === 'dkbank' && (<>
-            <div style={{ height: 1, background: '#f3f4f6', marginBottom: 16 }} />
+            <div style={{ height: 1, background: 'var(--glass-border)', marginBottom: 16 }} />
 
             {/* Amount */}
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-subtle)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
               Amount (Nu)
             </div>
             <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
@@ -308,16 +308,16 @@ export function PwaPaymentModal({
                   onClick={() => setAmountStr(q.toString())}
                   style={{
                     flex: 1, padding: '9px 0', borderRadius: 10,
-                    border: amountStr === q.toString() ? '2px solid #3b82f6' : '2px solid #e5e7eb',
-                    background: amountStr === q.toString() ? '#eff6ff' : '#f9fafb',
-                    color: amountStr === q.toString() ? '#3b82f6' : '#374151',
+                    border: amountStr === q.toString() ? '2px solid #3b82f6' : '2px solid var(--glass-border)',
+                    background: amountStr === q.toString() ? 'rgba(59, 130, 246, 0.1)' : 'var(--bg-main)',
+                    color: amountStr === q.toString() ? '#3b82f6' : 'var(--text-main)',
                     fontSize: 13, fontWeight: 700, cursor: 'pointer',
                   }}
                 >{q}</button>
               ))}
             </div>
             <div style={{ position: 'relative', marginBottom: 16 }}>
-              <span style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', fontSize: 13, fontWeight: 600, color: '#9ca3af', pointerEvents: 'none' }}>Nu</span>
+              <span style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', fontSize: 13, fontWeight: 600, color: 'var(--text-subtle)', pointerEvents: 'none' }}>Nu</span>
               <input
                 ref={inputRef}
                 type="number"
@@ -327,9 +327,9 @@ export function PwaPaymentModal({
                 style={{
                   width: '100%', boxSizing: 'border-box',
                   padding: '12px 14px 12px 34px', borderRadius: 10,
-                  border: isValidAmount || !betAmount ? '2px solid #e5e7eb' : '2px solid #fca5a5',
-                  fontSize: 15, fontWeight: 600, color: '#111827',
-                  background: '#f9fafb', outline: 'none',
+                  border: isValidAmount || !betAmount ? '2px solid var(--glass-border)' : '2px solid #fca5a5',
+                  fontSize: 15, fontWeight: 600, color: 'var(--text-main)',
+                  background: 'var(--bg-main)', outline: 'none',
                 }}
               />
             </div>
@@ -338,12 +338,12 @@ export function PwaPaymentModal({
             {isValidAmount && (
               <div style={{
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                background: estProfit >= 0 ? '#f0fdf4' : '#f9fafb',
-                border: `1px solid ${estProfit >= 0 ? '#86efac' : '#e5e7eb'}`,
+                background: estProfit >= 0 ? 'rgba(22, 163, 74, 0.1)' : 'var(--bg-main)',
+                border: `1px solid ${estProfit >= 0 ? '#86efac' : 'var(--glass-border)'}`,
                 borderRadius: 10, padding: '10px 14px', marginBottom: 16,
               }}>
                 <div>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-subtle)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                     Est. payout if win
                   </div>
                   <div style={{ fontSize: 18, fontWeight: 800, color: estProfit >= 0 ? '#16a34a' : '#9ca3af' }}>
@@ -351,7 +351,7 @@ export function PwaPaymentModal({
                   </div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-subtle)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                     Est. profit
                   </div>
                   {estProfit >= 0 ? (
@@ -359,7 +359,7 @@ export function PwaPaymentModal({
                       +Nu {estProfit.toFixed(2)}
                     </div>
                   ) : (
-                    <div style={{ fontSize: 12, color: '#9ca3af', maxWidth: 120, textAlign: 'right' }}>
+                    <div style={{ fontSize: 12, color: 'var(--text-subtle)', maxWidth: 120, textAlign: 'right' }}>
                       Grows as more bets join
                     </div>
                   )}
@@ -374,7 +374,7 @@ export function PwaPaymentModal({
 
             {/* CID */}
             <div style={{ marginBottom: 12 }}>
-              <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
+              <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text-subtle)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
                 CID Number *
               </label>
               <input
@@ -386,14 +386,14 @@ export function PwaPaymentModal({
                 style={{
                   width: '100%', boxSizing: 'border-box',
                   padding: '12px 14px', borderRadius: 10,
-                  border: '2px solid #e5e7eb',
-                  fontSize: 15, fontWeight: 600, color: '#111827',
-                  background: '#f9fafb', outline: 'none',
+                  border: '2px solid var(--glass-border)',
+                  fontSize: 15, fontWeight: 600, color: 'var(--text-main)',
+                  background: 'var(--bg-main)', outline: 'none',
                 }}
               />
             </div>
             <div style={{ marginBottom: 20 }}>
-              <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
+              <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text-subtle)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
                 Name (Optional)
               </label>
               <input
@@ -404,9 +404,9 @@ export function PwaPaymentModal({
                 style={{
                   width: '100%', boxSizing: 'border-box',
                   padding: '12px 14px', borderRadius: 10,
-                  border: '2px solid #e5e7eb',
-                  fontSize: 15, fontWeight: 600, color: '#111827',
-                  background: '#f9fafb', outline: 'none',
+                  border: '2px solid var(--glass-border)',
+                  fontSize: 15, fontWeight: 600, color: 'var(--text-main)',
+                  background: 'var(--bg-main)', outline: 'none',
                 }}
               />
             </div>
@@ -425,8 +425,8 @@ export function PwaPaymentModal({
             disabled={!canPay}
             style={{
               width: '100%', padding: '14px',
-              background: canPay ? '#3b82f6' : '#e5e7eb',
-              color: canPay ? '#fff' : '#9ca3af',
+              background: canPay ? '#3b82f6' : 'var(--glass-border)',
+              color: canPay ? '#fff' : 'var(--text-subtle)',
               border: 'none', borderRadius: 10,
               fontSize: 15, fontWeight: 700,
               cursor: canPay ? 'pointer' : 'not-allowed',

@@ -54,10 +54,10 @@ export const PwaMarketCard: FC<PwaMarketCardProps> = ({ market, onBet }) => {
 
   return (
     <div style={{
-      background: "rgba(255, 255, 255, 0.6)",
-      backdropFilter: "blur(10px)",
-      WebkitBackdropFilter: "blur(10px)",
-      border: "1px solid rgba(255, 255, 255, 0.8)",
+      background: "var(--glass-bg)",
+      backdropFilter: "var(--glass-blur)",
+      WebkitBackdropFilter: "var(--glass-blur)",
+      border: "1px solid var(--glass-border)",
       borderRadius: "var(--radius-lg)",
       padding: "16px",
       display: "flex",
@@ -79,7 +79,7 @@ export const PwaMarketCard: FC<PwaMarketCardProps> = ({ market, onBet }) => {
     onMouseLeave={(e) => {
       e.currentTarget.style.boxShadow = "var(--shadow-sm)";
       e.currentTarget.style.transform = "translateY(0)";
-      e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.8)";
+      e.currentTarget.style.borderColor = "var(--glass-border)";
     }}
     >
       {(isUpcoming || isResolving) && (
@@ -104,11 +104,11 @@ export const PwaMarketCard: FC<PwaMarketCardProps> = ({ market, onBet }) => {
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: "auto" }}>
         {isResolving ? (
-          <div style={{ flex: 1, padding: "10px", borderRadius: 10, background: "#fffbeb", border: "1px dashed #f59e0b", fontSize: "0.75rem", color: "#b45309", fontWeight: 700, textAlign: "center" }}>
+          <div style={{ flex: 1, padding: "10px", borderRadius: 10, background: "rgba(245, 158, 11, 0.1)", border: "1px dashed var(--glass-border)", fontSize: "0.75rem", color: "#f59e0b", fontWeight: 700, textAlign: "center" }}>
             Currently Resolving
           </div>
         ) : isUpcoming ? (
-          <div style={{ flex: 1, padding: "10px", borderRadius: 10, background: "#f1f5f9", fontSize: "0.75rem", color: "#64748b", fontWeight: 700, textAlign: "center" }}>
+          <div style={{ flex: 1, padding: "10px", borderRadius: 10, background: "var(--bg-main)", fontSize: "0.75rem", color: "var(--text-muted)", fontWeight: 700, textAlign: "center" }}>
             Opens {countdown}
           </div>
         ) : (

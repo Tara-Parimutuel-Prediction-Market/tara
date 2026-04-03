@@ -10,6 +10,7 @@ import { ConfigService } from "@nestjs/config";
 import { TelegramSimpleService } from "../telegram/telegram.service.simple";
 import { TelegramVerificationService } from "../telegram/telegram-verification.service";
 import { User } from "../entities/user.entity";
+import { Market, MarketStatus } from "../entities/market.entity";
 
 /**
  * BotPollingService
@@ -43,6 +44,7 @@ export class BotPollingService
     private readonly telegramSimple: TelegramSimpleService,
     private readonly telegramVerification: TelegramVerificationService,
     @InjectRepository(User) private readonly userRepo: Repository<User>,
+    @InjectRepository(Market) private readonly marketRepo: Repository<Market>,
   ) {}
 
   async onApplicationBootstrap() {
@@ -233,10 +235,7 @@ export class BotPollingService
           break;
 
         case "/predict":
-          await this.telegramSimple.sendMessage(
-            chatId,
-            "📊 Active markets will be shown here soon!",
-          );
+          await this.handlePredictCommand(chatId);
           break;
 
         case "/help":
@@ -257,6 +256,29 @@ export class BotPollingService
           );
       }
     }
+  }
+
+  private async handlePredictCommand(chatId: number) {
+    const markets = await this.marketRepo.find({
+      where: [{ status: MarketStatus.OPEN }, { status: MarketStatus.RESOLVING }],
+      order: { closesAt: "ASC" },
+      take: 5,
+    });
+
+    if (!markets.length) {
+      await this.telegramSimple.sendMessage(chatId, "📊 No active markets right now. Check back soon!");
+      return;
+    }
+
+    const miniAppUrl = this.config.get<string>("TELEGRAM_MINI_APP_URL") || process.env.TELEGRAM_MINI_APP_URL || "";
+    const lines = markets.map((m) => {
+      const closes = m.closesAt ? new Date(m.closesAt).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" }) : "TBD";
+      const statusIcon = m.status === MarketStatus.RESOLVING ? "⚖️" : "🟢";
+      return `${statusIcon} <b>${m.title}</b>\n⏰ ${closes}`;
+    });
+
+    const text = `📊 <b>Active Markets</b>\n\n${lines.join("\n\n")}\n\n👉 <a href="${miniAppUrl}">Place your prediction</a>`;
+    await this.telegramSimple.sendMessage(chatId, text);
   }
 
   private async handleVerifyCommand(chatId: number, telegramUserId: number) {

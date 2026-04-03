@@ -14,6 +14,8 @@ import { PwaBottomNav } from "./components/PwaBottomNav";
 
 import { TonConnectUIProvider } from "@tonconnect/ui-react";
 import { publicUrl } from "@/helpers/publicUrl.ts";
+import { ThemeProvider } from "@/contexts/ThemeContext";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 function PwaLayout() {
   // const { isAuthenticated, setIsAuthenticated } = useAuth();
@@ -99,6 +101,7 @@ function PwaLayout() {
             </svg>
             Telegram
           </a>
+          <ThemeToggle />
           
           {/* Desktop-only nav links — disabled: betting is through Telegram only */}
           {/* {!isMobile && [
@@ -152,10 +155,12 @@ function PwaLayout() {
 
 export function PwaApp() {
   return (
-    <TonConnectUIProvider manifestUrl={publicUrl("tonconnect-manifest.json")}>
-      <HashRouter>
-        <PwaLayout />
-      </HashRouter>
-    </TonConnectUIProvider>
+    <ThemeProvider>
+      <TonConnectUIProvider manifestUrl={publicUrl("tonconnect-manifest.json")}>
+        <HashRouter>
+          <PwaLayout />
+        </HashRouter>
+      </TonConnectUIProvider>
+    </ThemeProvider>
   );
 }

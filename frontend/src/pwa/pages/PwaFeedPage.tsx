@@ -95,7 +95,7 @@ export function PwaFeedPage() {
       {openMarkets.length > 0 && (
         <section>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
-            <div style={{ padding: "6px 12px", borderRadius: 20, background: "#ecfdf5", color: "#10b981", fontSize: 11, fontWeight: 800, letterSpacing: "0.05em" }}>LIVE</div>
+            <div style={{ padding: "6px 12px", borderRadius: 20, background: "rgba(16, 185, 129, 0.1)", color: "#10b981", fontSize: 11, fontWeight: 800, letterSpacing: "0.05em" }}>LIVE</div>
           </div>
           {renderGrid(openMarkets)}
         </section>
@@ -104,7 +104,7 @@ export function PwaFeedPage() {
       {resolvingMarkets.length > 0 && (
         <section>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
-            <div style={{ padding: "6px 12px", borderRadius: 20, background: "#fffbeb", color: "#f59e0b", fontSize: 11, fontWeight: 800, letterSpacing: "0.05em" }}>WAITING</div>
+            <div style={{ padding: "6px 12px", borderRadius: 20, background: "rgba(245, 158, 11, 0.1)", color: "#f59e0b", fontSize: 11, fontWeight: 800, letterSpacing: "0.05em" }}>WAITING</div>
             <h2 style={{ fontSize: 20, fontWeight: 800, color: "var(--text-main)", margin: 0, fontFamily: "var(--font-display)" }}>Dispute Window</h2>
           </div>
           {renderGrid(resolvingMarkets)}
@@ -114,7 +114,7 @@ export function PwaFeedPage() {
       {upcomingMarkets.length > 0 && (
         <section>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
-            <div style={{ padding: "6px 12px", borderRadius: 20, background: "#f1f5f9", color: "#64748b", fontSize: 11, fontWeight: 800, letterSpacing: "0.05em" }}>SOON</div>
+            <div style={{ padding: "6px 12px", borderRadius: 20, background: "var(--bg-main)", color: "var(--text-subtle)", fontSize: 11, fontWeight: 800, letterSpacing: "0.05em" }}>SOON</div>
           </div>
           {renderGrid(upcomingMarkets)}
         </section>

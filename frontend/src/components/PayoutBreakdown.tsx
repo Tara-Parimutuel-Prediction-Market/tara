@@ -41,28 +41,28 @@ export function PayoutBreakdown({ market, outcomeId, betAmount }: {
 
   return (
     <div style={{ marginTop: 6 }}>
-      <button
+      {/* <button
         onClick={() => setOpen((v) => !v)}
         style={{
           display: 'flex', alignItems: 'center', gap: 4,
           background: 'none', border: 'none', padding: 0, cursor: 'pointer',
           fontSize: 11, fontWeight: 600, color: '#6b7280',
         }}
-      >
+      > */}
         {/* calculator icon */}
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        {/* <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <rect x="4" y="2" width="16" height="20" rx="2" />
           <line x1="8" y1="6" x2="16" y2="6" /><line x1="8" y1="10" x2="10" y2="10" />
           <line x1="14" y1="10" x2="16" y2="10" /><line x1="8" y1="14" x2="10" y2="14" />
           <line x1="14" y1="14" x2="16" y2="14" /><line x1="8" y1="18" x2="10" y2="18" />
           <line x1="14" y1="18" x2="16" y2="18" />
-        </svg>
-        How is this calculated?
+        </svg> */}
+        {/* How is this calculated?
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
           style={{ transform: open ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.2s' }}>
           <polyline points="6 9 12 15 18 9" />
         </svg>
-      </button>
+      </button> */}
 
       {open && (
         <div style={{

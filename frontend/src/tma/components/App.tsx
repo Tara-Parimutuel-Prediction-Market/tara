@@ -4,13 +4,17 @@ import { AppRoot } from '@telegram-apps/telegram-ui';
 import { PwaBottomNav } from '@/pwa/components/PwaBottomNav';
 
 import { routes } from '@/tma/navigation/routes.tsx';
+import { useTheme } from '@/hooks/useTheme';
 
 export function App() {
   const lp = useLaunchParams();
+  const { theme } = useTheme();
+
+  const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
 
   return (
     <AppRoot
-      appearance='light'
+      appearance={isDark ? 'dark' : 'light'}
       platform={['macos', 'ios'].includes(lp.tgWebAppPlatform) ? 'ios' : 'base'}
     >
       <HashRouter>
