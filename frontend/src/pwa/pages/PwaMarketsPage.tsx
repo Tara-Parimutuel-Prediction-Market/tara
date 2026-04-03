@@ -13,17 +13,29 @@ export function PwaMarketsPage() {
     outcomeId: string;
   } | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
 
+  // Debounce the raw search input → 400 ms before hitting the server
   useEffect(() => {
-    getMarkets()
+    const t = setTimeout(() => setDebouncedSearch(searchQuery), 400);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
+
+  // Fetch from server whenever the committed search term changes
+  useEffect(() => {
+    setLoading(true);
+    getMarkets(debouncedSearch.trim() || undefined)
       .then(setMarkets)
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, []);
+  }, [debouncedSearch]);
 
   const handlePaymentSuccess = async (_payment: PaymentResponse) => {
     if (!activeBet) return;
     const betAmt = _payment?.amount ?? 0;
+
+    // Snapshot before optimistic update so we can roll back on failure
+    const prevMarkets = markets;
 
     setMarkets((prev) =>
       prev.map((m) => {
@@ -44,7 +56,7 @@ export function PwaMarketsPage() {
     );
 
     setActiveBet(null);
-    const market = markets.find((m) => m.id === activeBet.marketId);
+    const market = prevMarkets.find((m) => m.id === activeBet.marketId);
     if (market) {
       try {
         await placeBet(market.id, {
@@ -52,10 +64,13 @@ export function PwaMarketsPage() {
           amount: betAmt,
         });
       } catch (e: any) {
-        console.warn(e.message);
+        // Bet failed — roll back the optimistic update
+        setMarkets(prevMarkets);
+        console.warn("Bet placement failed, rolled back:", e.message);
       }
     }
-    getMarkets().then(setMarkets).catch(console.error);
+    // Sync with server to get authoritative pool numbers
+    getMarkets(debouncedSearch.trim() || undefined).then(setMarkets).catch(console.error);
   };
 
   if (loading)
@@ -94,19 +109,9 @@ export function PwaMarketsPage() {
     ? markets.find((m) => m.id === activeBet.marketId)
     : null;
 
-  const filterByQuery = (list: Market[]) => {
-    if (!searchQuery.trim()) return list;
-    const q = searchQuery.toLowerCase();
-    return list.filter(
-      (m) =>
-        m.title.toLowerCase().includes(q) ||
-        (m.description ?? "").toLowerCase().includes(q),
-    );
-  };
-
-  const filteredOpen = filterByQuery(openMarkets);
-  const filteredUpcoming = filterByQuery(upcomingMarkets);
-  const filteredSettled = filterByQuery(settledMarkets);
+  const filteredOpen = openMarkets;
+  const filteredUpcoming = upcomingMarkets;
+  const filteredSettled = settledMarkets;
   const hasResults =
     filteredOpen.length + filteredUpcoming.length + filteredSettled.length > 0;
 
