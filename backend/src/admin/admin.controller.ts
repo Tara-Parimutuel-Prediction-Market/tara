@@ -25,6 +25,7 @@ import { JwtAuthGuard, AdminGuard } from "../auth/guards";
 import { MarketsService, CreateMarketDto } from "../markets/markets.service";
 import { FixturesService } from "./fixtures.service";
 import { AuditService } from "./audit.service";
+import { TelegramSimpleService } from "../telegram/telegram.service.simple";
 import { AuditAction } from "../entities/audit-log.entity";
 import { Market, MarketStatus } from "../entities/market.entity";
 import { Outcome } from "../entities/outcome.entity";
@@ -61,6 +62,7 @@ export class AdminController {
     private marketsService: MarketsService,
     private fixturesService: FixturesService,
     private auditService: AuditService,
+    private telegramSimple: TelegramSimpleService,
     @InjectRepository(Settlement)
     private settlementRepo: Repository<Settlement>,
     @InjectRepository(Dispute) private disputeRepo: Repository<Dispute>,
@@ -86,6 +88,12 @@ export class AdminController {
       },
       ipAddress: req.ip,
     });
+    const miniAppUrl = process.env.TELEGRAM_MINI_APP_URL || '';
+    const outcomes = (market.outcomes ?? []).map((o) => `• ${o.label}`).join('\n');
+    const closesAt = market.closesAt ? new Date(market.closesAt).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }) : 'TBD';
+    await this.telegramSimple.postToChannel(
+      `🚀 <b>NEW MARKET</b>\n\n📊 <b>${market.title}</b>\n\n🎲 <b>Outcomes:</b>\n${outcomes}\n\n⏰ Closes: ${closesAt}\n\n👉 <a href="${miniAppUrl}">Predict Now</a>`
+    );
     return market;
   }
 
@@ -158,6 +166,10 @@ export class AdminController {
       },
       ipAddress: req.ip,
     });
+    const miniAppUrl = process.env.TELEGRAM_MINI_APP_URL || '';
+    await this.telegramSimple.postToChannel(
+      `⚖️ <b>DISPUTE WINDOW OPEN</b>\n\n📊 <b>${before.title}</b>\n\n🔖 <b>Proposed Winner:</b> ${proposedOutcome?.label ?? 'N/A'}\n⏳ Dispute window: 24 hours\n\n👉 <a href="${miniAppUrl}">Submit Dispute</a>`
+    );
     return result;
   }
 
@@ -194,6 +206,10 @@ export class AdminController {
       },
       ipAddress: req.ip,
     });
+    const miniAppUrl = process.env.TELEGRAM_MINI_APP_URL || '';
+    await this.telegramSimple.postToChannel(
+      `✅ <b>MARKET RESOLVED</b>\n\n📊 <b>${before.title}</b>\n\n🏆 <b>Winner:</b> ${winningOutcome?.label ?? 'N/A'}\n💰 <b>Pool:</b> Nu ${Number(before.totalPool).toLocaleString()}\n\n👉 <a href="${miniAppUrl}">View Results</a>`
+    );
     return result;
   }
 

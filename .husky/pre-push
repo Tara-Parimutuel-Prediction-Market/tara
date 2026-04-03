@@ -1,0 +1,21 @@
+#!/bin/sh
+
+echo "Running pre-push build checks..."
+
+# Build backend (TypeScript compilation)
+echo "\n[1/2] Building backend..."
+npm run build --workspace=backend
+if [ $? -ne 0 ]; then
+  echo "\nBackend build failed. Push aborted."
+  exit 1
+fi
+
+# Build frontend (Vite)
+echo "\n[2/2] Building frontend..."
+npm run build --workspace=frontend
+if [ $? -ne 0 ]; then
+  echo "\nFrontend build failed. Push aborted."
+  exit 1
+fi
+
+echo "\nBoth builds passed. Pushing..."

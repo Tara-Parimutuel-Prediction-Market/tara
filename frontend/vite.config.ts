@@ -1,11 +1,18 @@
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
-import mkcert from "vite-plugin-mkcert";
 import tsconfigPaths from "vite-tsconfig-paths";
 import { VitePWA } from "vite-plugin-pwa";
 
 // https://vitejs.dev/config/
-export default defineConfig({
+export default defineConfig(async () => {
+  const extraPlugins = [];
+  if (process.env.HTTPS) {
+    // Dynamically imported so axios (mkcert peer dep) is never loaded in production builds
+    const { default: mkcert } = await import("vite-plugin-mkcert");
+    extraPlugins.push(mkcert());
+  }
+
+  return {
   base: "/",
   css: {
     preprocessorOptions: {
@@ -15,16 +22,9 @@ export default defineConfig({
     },
   },
   plugins: [
-    // Allows using React dev server along with building a React application with Vite.
-    // https://npmjs.com/package/@vitejs/plugin-react
     react(),
-    // Allows using the compilerOptions.paths property in tsconfig.json.
-    // https://www.npmjs.com/package/vite-tsconfig-paths
     tsconfigPaths(),
-    // Creates a custom SSL certificate valid for the local machine.
-    // Using this plugin requires admin rights on the first dev-mode launch.
-    // https://www.npmjs.com/package/vite-plugin-mkcert
-    process.env.HTTPS && mkcert(),
+    ...extraPlugins,
     VitePWA({
       registerType: "autoUpdate",
       includeAssets: ["favicon.ico", "apple-touch-icon.png", "icons/*.png"],
@@ -95,4 +95,5 @@ export default defineConfig({
       },
     },
   },
+  };
 });

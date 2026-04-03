@@ -108,6 +108,9 @@ export class AuthController {
     @Query("username") username = "testuser",
     @Query("first_name") first_name = "Test",
   ) {
+    if (process.env.NODE_ENV === "production") {
+      throw new UnauthorizedException("Not available in production");
+    }
     const botToken = process.env.TELEGRAM_BOT_TOKEN;
     const user = JSON.stringify({ id: Number(id), first_name, username });
     const auth_date = Math.floor(Date.now() / 1000);
@@ -160,6 +163,9 @@ export class AuthController {
     description: "Value of ADMIN_DEV_SECRET in .env",
   })
   async devAdminToken(@Query("secret") secret: string) {
+    if (process.env.NODE_ENV === "production") {
+      throw new UnauthorizedException("Not available in production");
+    }
     const expected = process.env.ADMIN_DEV_SECRET;
     if (!expected || secret !== expected) {
       throw new UnauthorizedException("Wrong secret");

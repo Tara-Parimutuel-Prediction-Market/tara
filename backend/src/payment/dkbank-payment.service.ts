@@ -4,6 +4,7 @@ import {
   Logger,
   NotFoundException,
 } from "@nestjs/common";
+import { randomBytes, timingSafeEqual } from "crypto";
 import { InjectRepository } from "@nestjs/typeorm";
 import { ConfigService } from "@nestjs/config";
 import { DataSource, Repository } from "typeorm";
@@ -195,7 +196,7 @@ export class DKBankPaymentService {
     // The Telegram OTP is the user-facing confirmation gate.
     // Security is backed by: CID ownership + Telegram phone == DK phone (verified on linking).
     {
-      const generatedOtp = String(Math.floor(100000 + Math.random() * 900000));
+      const generatedOtp = String(100000 + (randomBytes(3).readUIntBE(0, 3) % 900000));
       const now = new Date();
       const expiresAt = new Date(now.getTime() + OTP_TTL_MS);
 
@@ -275,6 +276,20 @@ export class DKBankPaymentService {
     }
 
     // ── Step 1: Validate Telegram OTP (security gate) ────────────────────────
+    const MAX_OTP_ATTEMPTS = 5;
+
+    // Load OTP record first so we can enforce per-payment attempt limit
+    const otpRecord = await this.otpRepo.findOne({
+      where: { paymentId, userId },
+      order: { createdAt: "DESC" },
+    });
+
+    if (otpRecord && otpRecord.failedAttempts >= MAX_OTP_ATTEMPTS) {
+      throw new BadRequestException(
+        "Too many incorrect OTP attempts. Please initiate a new payment.",
+      );
+    }
+
     const tgOtpSession = await this.redis.getJson<{
       otp: string;
       userId: string;
@@ -288,7 +303,13 @@ export class DKBankPaymentService {
     if (tgOtpSession.userId !== userId) {
       throw new BadRequestException("Payment not found.");
     }
-    if (tgOtpSession.otp !== otp) {
+    const otpValid = tgOtpSession.otp.length === otp.length &&
+      timingSafeEqual(Buffer.from(tgOtpSession.otp), Buffer.from(otp));
+    if (!otpValid) {
+      if (otpRecord) {
+        otpRecord.failedAttempts += 1;
+        await this.otpRepo.save(otpRecord);
+      }
       throw new BadRequestException(
         "Invalid OTP. Please check your Telegram and try again.",
       );
@@ -298,12 +319,6 @@ export class DKBankPaymentService {
 
     // Clear Telegram OTP from Redis immediately after validation
     await this.redis.del(`tara:tg-otp:${paymentId}`);
-
-    const meta = payment.metadata || {};
-    const otpRecord = await this.otpRepo.findOne({
-      where: { paymentId, userId },
-      order: { createdAt: "DESC" },
-    });
 
     // Telegram OTP verified — credit Tara balance directly.
     // We never call DK account_auth/debit_request so no DK SMS is ever triggered.

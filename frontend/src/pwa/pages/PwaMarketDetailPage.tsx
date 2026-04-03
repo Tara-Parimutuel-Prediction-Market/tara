@@ -9,7 +9,7 @@ export function PwaMarketDetailPage() {
   const [market, setMarket] = useState<Market | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [disputes, setDisputes] = useState<Dispute[]>([]);
+  const [_disputes, setDisputes] = useState<Dispute[]>([]);
   const [bondAmount, setBondAmount] = useState("10");
   const [disputeReason, setDisputeReason] = useState("");
   const [disputeSubmitting, setDisputeSubmitting] = useState(false);
