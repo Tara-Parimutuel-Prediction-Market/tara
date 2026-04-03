@@ -10,6 +10,7 @@ import { AdminController } from "./admin.controller";
 import { MarketsModule } from "../markets/markets.module";
 import { FixturesService } from "./fixtures.service";
 import { AuditService } from "./audit.service";
+import { TelegramModule } from "../telegram/telegram.module";
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { AuditService } from "./audit.service";
       AuditLog,
     ]),
     MarketsModule,
+    TelegramModule,
   ],
   controllers: [AdminController],
   providers: [FixturesService, AuditService],

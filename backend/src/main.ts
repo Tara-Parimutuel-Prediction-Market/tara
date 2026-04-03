@@ -12,6 +12,7 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   // CORS
+  const isProduction = process.env.NODE_ENV === "production";
   app.enableCors({
     origin: [
       process.env.FRONTEND_URL || "http://localhost:5173",
@@ -19,8 +20,8 @@ async function bootstrap() {
       "http://localhost:5174",
       "http://127.0.0.1:5174",
       "https://tara-parimutuel.vercel.app",
-      /\.ngrok-free\.app$/, // Allow all ngrok URLs
-      /\.ngrok\.io$/, // Allow ngrok.io URLs too
+      // ngrok tunnels only allowed in development — never in production
+      ...(!isProduction ? [/\.ngrok-free\.app$/, /\.ngrok\.io$/] : []),
     ],
     credentials: true,
   });

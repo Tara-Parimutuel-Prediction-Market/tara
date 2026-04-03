@@ -11,7 +11,7 @@ import { InjectRepository } from "@nestjs/typeorm";
 // NOTE: axios removed — using Node.js built-in fetch (v18+) to avoid supply-chain risk.
 import * as jwt from "jsonwebtoken";
 import { Repository } from "typeorm";
-import { createHmac, randomUUID } from "crypto";
+import { createHmac, randomUUID, randomBytes, timingSafeEqual } from "crypto";
 
 import { DKGatewayAuthToken } from "../../../entities/dk-gateway-auth-token.entity";
 
@@ -118,7 +118,7 @@ export class DKGatewayService {
 
   /** 6-digit System Trace Audit Number — must be consistent across account_auth and debit_request. */
   generateStanNumber(): string {
-    return String(Math.floor(100000 + Math.random() * 900000));
+    return String(100000 + (randomBytes(3).readUIntBE(0, 3) % 900000));
   }
 
   private async signHeaders(requestBody: Record<string, unknown>) {
@@ -591,13 +591,15 @@ export class DKGatewayService {
     body: unknown,
     signatureHeader: string | undefined,
   ): boolean {
-    if (!this.webhookSecret) return true;
+    if (!this.webhookSecret)
+      throw new Error("DK_WEBHOOK_SECRET is not configured — refusing to accept unsigned webhook");
     if (!signatureHeader) return false;
     const bodyStr = JSON.stringify(body);
-    const computed = createHmac("sha256", this.webhookSecret)
-      .update(bodyStr)
-      .digest("hex");
-    const received = signatureHeader.replace(/^DK\s*/i, "").trim();
-    return computed === received;
+    const computed = Buffer.from(
+      createHmac("sha256", this.webhookSecret).update(bodyStr).digest("hex"),
+    );
+    const received = Buffer.from(signatureHeader.replace(/^DK\s*/i, "").trim());
+    if (computed.length !== received.length) return false;
+    return timingSafeEqual(computed, received);
   }
 }

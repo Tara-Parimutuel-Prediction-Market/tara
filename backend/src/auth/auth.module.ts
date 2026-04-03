@@ -27,10 +27,16 @@ import { TelegramModule } from "../telegram/telegram.module";
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        secret: config.get("JWT_SECRET", "tara-secret"),
-        signOptions: { expiresIn: config.get("JWT_EXPIRES_IN", "7d") },
-      }),
+      useFactory: (config: ConfigService) => {
+        const secret = config.get<string>("JWT_SECRET");
+        if (!secret && process.env.NODE_ENV === "production") {
+          throw new Error("JWT_SECRET environment variable must be set in production");
+        }
+        return {
+          secret: secret || "tara-secret",
+          signOptions: { expiresIn: config.get("JWT_EXPIRES_IN", "7d") },
+        };
+      },
     }),
     TelegramModule,
   ],

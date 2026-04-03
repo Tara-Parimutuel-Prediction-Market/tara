@@ -55,6 +55,29 @@ export class TelegramSimpleService {
     this.logger.log(`Market announcement sent: ${market.title}`);
   }
 
+  /** Post a message to the configured Telegram channel. */
+  async postToChannel(text: string): Promise<void> {
+    const channelId = process.env.TELEGRAM_CHANNEL_ID;
+    if (!channelId) {
+      this.logger.warn('[Channel] TELEGRAM_CHANNEL_ID not set — skipping channel post');
+      return;
+    }
+    try {
+      const url = `https://api.telegram.org/bot${this.botToken}/sendMessage`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: channelId, text, parse_mode: 'HTML', disable_web_page_preview: true }),
+      });
+      if (!res.ok) {
+        const body = await res.text();
+        this.logger.error(`[Channel] sendMessage HTTP ${res.status}: ${body}`);
+      }
+    } catch (error: any) {
+      this.logger.error(`[Channel] Failed to post to channel: ${error.message}`);
+    }
+  }
+
   async sendBetResult(bet: Bet, market: Market): Promise<void> {
     const user = await this.userRepository.findOne({
       where: { id: bet.userId },

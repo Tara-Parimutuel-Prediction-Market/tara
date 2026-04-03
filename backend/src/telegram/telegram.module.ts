@@ -13,6 +13,7 @@ import { TelegramVerificationService } from "./telegram-verification.service";
 import { BotController } from "../bot/bot.controller";
 import { BotPollingService } from "../bot/bot-polling.service";
 import { DKGatewayService } from "../payment/services/dk-gateway/dk-gateway.service";
+import { TelegramChannelController } from "./telegram-channel.controller";
 
 @Module({
   imports: [
@@ -27,7 +28,7 @@ import { DKGatewayService } from "../payment/services/dk-gateway/dk-gateway.serv
       DKGatewayAuthToken,
     ]),
   ],
-  controllers: [BotController],
+  controllers: [BotController, TelegramChannelController],
   providers: [
     TelegramSimpleService,
     TelegramVerificationService,

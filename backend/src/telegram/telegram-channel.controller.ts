@@ -1,40 +1,64 @@
-import { Controller, Post, Body, Get } from '@nestjs/common'
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger'
-import { TelegramSimpleService } from './telegram.service.simple'
-import { Market } from '../entities/market.entity'
-import { Bet } from '../entities/bet.entity'
+import { Controller, Post, Get } from '@nestjs/common';
+import { ApiTags, ApiOperation } from '@nestjs/swagger';
 
 @ApiTags('Telegram Channel')
 @Controller('telegram/channel')
 export class TelegramChannelController {
-  constructor(private readonly telegramSimpleService: TelegramSimpleService) {}
-
-  @Post('announce')
-  @ApiOperation({ summary: 'Send market announcement to Telegram channel' })
-  @ApiResponse({ status: 200, description: 'Announcement sent successfully' })
-  async sendAnnouncement(@Body() body: { marketId: string }) {
-    // This would be called by your market service when new markets are created
-    // For now, return success
-    return { success: true, message: 'Announcement sent to channel' }
-  }
-
-  @Post('resolve')
-  @ApiOperation({ summary: 'Send market resolution to Telegram channel' })
-  @ApiResponse({ status: 200, description: 'Resolution sent successfully' })
-  async sendResolution(@Body() body: { marketId: string }) {
-    // This would be called when markets are resolved
-    return { success: true, message: 'Resolution sent to channel' }
-  }
+  private readonly botToken = process.env.TELEGRAM_BOT_TOKEN || '';
+  private readonly channelId = process.env.TELEGRAM_CHANNEL_ID || '';
 
   @Get('status')
-  @ApiOperation({ summary: 'Get Telegram channel status' })
-  @ApiResponse({ status: 200, description: 'Channel status retrieved' })
+  @ApiOperation({ summary: 'Check bot token, channel config, and bot admin status' })
   async getChannelStatus() {
-    // Check if channel is properly configured
+    if (!this.botToken) return { ok: false, error: 'TELEGRAM_BOT_TOKEN not set in .env' };
+    if (!this.channelId) return { ok: false, error: 'TELEGRAM_CHANNEL_ID not set in .env' };
+
+    // 1. Check bot token is valid
+    const botRes = await fetch(`https://api.telegram.org/bot${this.botToken}/getMe`);
+    const botData: any = await botRes.json();
+    if (!botData.ok) return { ok: false, error: 'Invalid bot token', detail: botData };
+
+    // 2. Check bot is admin of the channel
+    const memberRes = await fetch(`https://api.telegram.org/bot${this.botToken}/getChatMember`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: this.channelId, user_id: botData.result.id }),
+    });
+    const memberData: any = await memberRes.json();
+    const isAdmin = memberData.ok && ['administrator', 'creator'].includes(memberData.result?.status);
+
     return {
-      configured: true,
-      channelId: process.env.TELEGRAM_CHANNEL_ID,
-      botToken: process.env.TELEGRAM_BOT_TOKEN ? '***' : null
-    }
+      ok: isAdmin,
+      bot: {
+        username: botData.result.username,
+        id: botData.result.id,
+      },
+      channel: {
+        id: this.channelId,
+        botStatus: memberData.result?.status || 'unknown',
+        isAdmin,
+      },
+      error: isAdmin ? null : 'Bot is NOT an admin of the channel. Add it as admin with Post Messages permission.',
+    };
+  }
+
+  @Post('test-message')
+  @ApiOperation({ summary: 'Send a test message to the channel to verify everything works' })
+  async sendTestMessage() {
+    if (!this.botToken) return { ok: false, error: 'TELEGRAM_BOT_TOKEN not set' };
+    if (!this.channelId) return { ok: false, error: 'TELEGRAM_CHANNEL_ID not set' };
+
+    const res = await fetch(`https://api.telegram.org/bot${this.botToken}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: this.channelId,
+        text: '✅ <b>Tara channel connected successfully!</b>\n\nBot is configured and posting works.',
+        parse_mode: 'HTML',
+      }),
+    });
+    const data: any = await res.json();
+    if (!data.ok) return { ok: false, error: data.description };
+    return { ok: true, message: 'Test message sent to channel successfully' };
   }
 }

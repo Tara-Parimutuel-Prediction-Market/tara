@@ -2,7 +2,6 @@ import { FC, useState } from "react";
 import { Market, placeBet, getMarket } from "@/api/client";
 import { PwaPaymentModal } from "./PwaPaymentModal";
 import type { PaymentResponse } from "@/types/payment";
-import { useBreakpoint } from "../hooks/useBreakpoint";
 
 interface PwaBetFormProps {
   market: Market;

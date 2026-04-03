@@ -1,8 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
-import { User } from "../entities/user.entity";
 import { Market } from "../entities/market.entity";
 import { TelegramService } from "./telegram.service";
 
@@ -12,14 +9,17 @@ export class TelegramChannelService {
   private readonly botToken: string;
   private readonly channelId: string;
 
+  private readonly miniAppUrl: string;
+  private readonly botUsername: string;
+
   constructor(
     private readonly configService: ConfigService,
     private readonly telegramService: TelegramService,
-    @InjectRepository(User) private readonly userRepository: Repository<User>,
   ) {
     this.botToken = this.configService.get<string>("TELEGRAM_BOT_TOKEN") || "";
-    this.channelId =
-      this.configService.get<string>("TELEGRAM_CHANNEL_ID") || "";
+    this.channelId = this.configService.get<string>("TELEGRAM_CHANNEL_ID") || "";
+    this.miniAppUrl = this.configService.get<string>("TELEGRAM_MINI_APP_URL") || "";
+    this.botUsername = this.configService.get<string>("TELEGRAM_BOT_USERNAME") || "";
   }
 
   async initializeChannel(): Promise<void> {
@@ -177,7 +177,7 @@ export class TelegramChannelService {
 🎯 <b>Welcome to Tara Prediction Markets!</b>
 
 📈 Get real-time market announcements
-🏆 Follow resolution results  
+🏆 Follow resolution results
 📊 Track platform statistics
 💬 Engage with the community
 
@@ -188,19 +188,13 @@ export class TelegramChannelService {
       [
         {
           text: "🎯 Browse Markets",
-          url: "https://t.me/your_bot_username?start=browse",
+          url: `https://t.me/${this.botUsername}?start=browse`,
         },
       ],
       [
         {
           text: "📊 View Stats",
-          url: "https://t.me/your_bot_username?start=stats",
-        },
-      ],
-      [
-        {
-          text: "💬 Join Discussion",
-          url: "https://t.me/your_discussion_group",
+          url: `https://t.me/${this.botUsername}?start=stats`,
         },
       ],
     ];
@@ -241,13 +235,13 @@ export class TelegramChannelService {
       [
         {
           text: "🎯 View Active Markets",
-          url: "https://t.me/your_bot_username?start=markets",
+          url: `https://t.me/${this.botUsername}?start=markets`,
         },
       ],
       [
         {
-          text: "📈 Check Leaderboard",
-          url: "https://t.me/your_bot_username?start=leaderboard",
+          text: "📈 Open Tara",
+          url: this.miniAppUrl,
         },
       ],
     ];
@@ -288,10 +282,15 @@ Keep predicting and winning! 🎯
       [
         {
           text: "🎯 Start Predicting",
-          url: "https://t.me/your_bot_username?start=predict",
+          url: `https://t.me/${this.botUsername}?start=predict`,
         },
       ],
-      [{ text: "📊 Full Report", url: "https://your-analytics-url/weekly" }],
+      [
+        {
+          text: "📊 Open Tara",
+          url: this.miniAppUrl,
+        },
+      ],
     ];
 
     return { message, keyboard };
@@ -311,13 +310,12 @@ ${outcomes}
 
 ⏰ <b>Closes:</b> ${closesAt}
 
-💰 <b>Estimated Volume:</b> High
+💰 <b>Pool:</b> Nu ${Number(market.totalPool).toLocaleString()}
 
 👇 <b>Predict Now:</b>
-• <a href="https://t.me/your_bot_username?start=market_${market.id}">Quick Predict</a>
-• <a href="https://your-mini-app-url?market=${market.id}">Full Interface</a>
+• <a href="${this.miniAppUrl}">Open Tara</a>
 
-#PredictionMarkets #Betting #Tara
+#PredictionMarkets #Tara
     `.trim();
   }
 
@@ -333,15 +331,12 @@ ${outcomes}
 🏆 <b>Winning Outcome:</b>
 ${winningOutcome?.label || "Pending"}
 
-💰 <b>Final Pool Size:</b> $${market.totalPool || "TBD"}
-
-📈 <b>Total Bets:</b> ${market.bets?.length ?? "TBD"}
+💰 <b>Final Pool:</b> Nu ${Number(market.totalPool).toLocaleString()}
 
 ⏰ <b>Resolved:</b> ${resolvedAt}
 
 👇 <b>View Details:</b>
-• <a href="https://your-mini-app-url/market/${market.id}">Market Details</a>
-• <a href="https://t.me/your_bot_username?start=portfolio">Your Portfolio</a>
+• <a href="${this.miniAppUrl}">Open Tara</a>
 
 #MarketResults #TaraPredictions
     `.trim();
@@ -361,26 +356,16 @@ ${content.message}
     return message;
   }
 
-  private createChannelKeyboard(market: Market): any {
+  private createChannelKeyboard(_market: Market): any {
     return [
       [
         {
-          text: "🎯 Quick Predict",
-          url: `https://t.me/your_bot_username?start=market_${market.id}`,
+          text: "🎯 Predict Now",
+          url: this.miniAppUrl,
         },
-        {
-          text: "📊 Full Interface",
-          url: `https://your-mini-app-url?market=${market.id}`,
-        },
-      ],
-      [
         {
           text: "📈 View All Markets",
-          url: "https://t.me/your_bot_username?start=markets",
-        },
-        {
-          text: "💼 My Portfolio",
-          url: "https://t.me/your_bot_username?start=portfolio",
+          url: `https://t.me/${this.botUsername}?start=markets`,
         },
       ],
     ];
