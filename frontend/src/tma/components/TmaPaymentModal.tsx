@@ -245,7 +245,7 @@ export function TmaPaymentModal({
 
       <div
         style={{
-          background: "#ffffff",
+          background: "var(--bg-card)",
           borderRadius: 20,
           padding: "24px 20px 28px",
           width: "100%",
@@ -304,7 +304,7 @@ export function TmaPaymentModal({
             <div
               style={{
                 fontSize: 13,
-                color: "#6b7280",
+                color: "var(--text-muted)",
                 animation: "tmaFadeIn 0.35s ease 0.45s both",
               }}
             >
@@ -358,7 +358,7 @@ export function TmaPaymentModal({
             <div
               style={{
                 fontSize: 13,
-                color: "#6b7280",
+                color: "var(--text-muted)",
                 marginBottom: 24,
                 lineHeight: 1.5,
                 animation: "tmaFadeIn 0.35s ease 0.45s both",
@@ -405,7 +405,7 @@ export function TmaPaymentModal({
                   style={{
                     fontSize: 11,
                     fontWeight: 700,
-                    color: "#9ca3af",
+                    color: "var(--text-subtle)",
                     textTransform: "uppercase",
                     letterSpacing: "0.06em",
                     marginBottom: 3,
@@ -414,7 +414,7 @@ export function TmaPaymentModal({
                   Verify OTP
                 </div>
                 <div
-                  style={{ fontSize: 15, fontWeight: 800, color: "#111827" }}
+                  style={{ fontSize: 15, fontWeight: 800, color: "var(--text-main)" }}
                 >
                   DK Bank
                 </div>
@@ -422,13 +422,13 @@ export function TmaPaymentModal({
               <button
                 onClick={handleClose}
                 style={{
-                  background: "#f3f4f6",
+                  background: "var(--bg-main)",
                   border: "none",
                   borderRadius: "50%",
                   width: 30,
                   height: 30,
                   fontSize: 18,
-                  color: "#6b7280",
+                  color: "var(--text-muted)",
                   cursor: "pointer",
                   display: "flex",
                   alignItems: "center",
@@ -439,7 +439,7 @@ export function TmaPaymentModal({
               </button>
             </div>
             <div
-              style={{ height: 1, background: "#f3f4f6", marginBottom: 20 }}
+              style={{ height: 1, background: "var(--glass-border)", marginBottom: 20 }}
             />
 
             <div style={{ textAlign: "center", marginBottom: 20 }}>
@@ -448,13 +448,13 @@ export function TmaPaymentModal({
                 style={{
                   fontSize: 14,
                   fontWeight: 700,
-                  color: "#111827",
+                  color: "var(--text-main)",
                   marginBottom: 4,
                 }}
               >
                 OTP Sent
               </div>
-              <div style={{ fontSize: 13, color: "#9ca3af" }}>
+              <div style={{ fontSize: 13, color: "var(--text-subtle)" }}>
                 Enter the code sent to you via Telegram bot
               </div>
             </div>
@@ -474,9 +474,9 @@ export function TmaPaymentModal({
                 boxSizing: "border-box",
                 padding: "16px",
                 borderRadius: 10,
-                border: error ? "2px solid #ef4444" : "2px solid #e5e7eb",
-                background: "#f9fafb",
-                color: "#111827",
+                border: error ? "2px solid #ef4444" : "2px solid var(--glass-border)",
+                background: "var(--bg-main)",
+                color: "var(--text-main)",
                 fontSize: 24,
                 fontWeight: 700,
                 letterSpacing: "0.3em",
@@ -504,8 +504,8 @@ export function TmaPaymentModal({
                 width: "100%",
                 padding: "14px",
                 marginTop: 16,
-                background: otpValue.length < 4 ? "#e5e7eb" : "#3b82f6",
-                color: otpValue.length < 4 ? "#9ca3af" : "#fff",
+                background: otpValue.length < 4 ? "var(--glass-border)" : "#3b82f6",
+                color: otpValue.length < 4 ? "var(--text-subtle)" : "#fff",
                 border: "none",
                 borderRadius: 10,
                 fontSize: 15,
@@ -526,7 +526,7 @@ export function TmaPaymentModal({
                 padding: "12px",
                 marginTop: 8,
                 background: "transparent",
-                color: "#9ca3af",
+                color: "var(--text-muted)",
                 border: "none",
                 borderRadius: 10,
                 fontSize: 14,
@@ -556,7 +556,7 @@ export function TmaPaymentModal({
                   style={{
                     fontSize: 11,
                     fontWeight: 700,
-                    color: "#9ca3af",
+                    color: "var(--text-subtle)",
                     textTransform: "uppercase",
                     letterSpacing: "0.06em",
                     marginBottom: 3,
@@ -568,7 +568,7 @@ export function TmaPaymentModal({
                   style={{
                     fontSize: 15,
                     fontWeight: 800,
-                    color: "#111827",
+                    color: "var(--text-main)",
                     lineHeight: 1.3,
                     marginBottom: 8,
                     whiteSpace: "nowrap",
@@ -583,8 +583,8 @@ export function TmaPaymentModal({
                     display: "inline-flex",
                     alignItems: "center",
                     gap: 6,
-                    background: "#eff6ff",
-                    border: "1px solid #bfdbfe",
+                    background: "rgba(59, 130, 246, 0.1)",
+                    border: "1px solid rgba(59, 130, 246, 0.3)",
                     borderRadius: 20,
                     padding: "4px 12px",
                   }}
@@ -608,13 +608,13 @@ export function TmaPaymentModal({
               <button
                 onClick={handleClose}
                 style={{
-                  background: "#f3f4f6",
+                  background: "var(--bg-main)",
                   border: "none",
                   borderRadius: "50%",
                   width: 30,
                   height: 30,
                   fontSize: 18,
-                  color: "#6b7280",
+                  color: "var(--text-muted)",
                   cursor: status === "processing" ? "not-allowed" : "pointer",
                   display: "flex",
                   alignItems: "center",
@@ -627,7 +627,7 @@ export function TmaPaymentModal({
             </div>
 
             <div
-              style={{ height: 1, background: "#f3f4f6", marginBottom: 16, flexShrink: 0 }}
+              style={{ height: 1, background: "var(--glass-border)", marginBottom: 16, flexShrink: 0 }}
             />
 
             {/* SCROLLABLE INNER CONTENT */}
@@ -637,7 +637,7 @@ export function TmaPaymentModal({
                 style={{
                 fontSize: 11,
                 fontWeight: 700,
-                color: "#9ca3af",
+                color: "var(--text-subtle)",
                 textTransform: "uppercase",
                 letterSpacing: "0.06em",
                 marginBottom: 10,
@@ -656,9 +656,9 @@ export function TmaPaymentModal({
                   border:
                     selectedMethod === "dkbank"
                       ? "2px solid #3b82f6"
-                      : "2px solid #e5e7eb",
+                      : "2px solid var(--glass-border)",
                   background:
-                    selectedMethod === "dkbank" ? "#eff6ff" : "#f9fafb",
+                    selectedMethod === "dkbank" ? "rgba(59, 130, 246, 0.1)" : "var(--bg-main)",
                   display: "flex",
                   alignItems: "center",
                   gap: 8,
@@ -671,7 +671,7 @@ export function TmaPaymentModal({
                       fontSize: 13,
                       fontWeight: 700,
                       color:
-                        selectedMethod === "dkbank" ? "#1d4ed8" : "#374151",
+                        selectedMethod === "dkbank" ? "#3b82f6" : "var(--text-main)",
                     }}
                   >
                     DK Bank
@@ -680,7 +680,7 @@ export function TmaPaymentModal({
                     style={{
                       fontSize: 11,
                       color:
-                        selectedMethod === "dkbank" ? "#60a5fa" : "#9ca3af",
+                        selectedMethod === "dkbank" ? "#60a5fa" : "var(--text-subtle)",
                     }}
                   >
                     BTN · Nu
@@ -692,8 +692,8 @@ export function TmaPaymentModal({
                   flex: 1,
                   padding: "10px 12px",
                   borderRadius: 10,
-                  border: "2px solid #f3f4f6",
-                  background: "#fafafa",
+                  border: "2px solid var(--glass-border)",
+                  background: "var(--bg-main)",
                   display: "flex",
                   alignItems: "center",
                   gap: 8,
@@ -702,11 +702,11 @@ export function TmaPaymentModal({
               >
                 <div>
                   <div
-                    style={{ fontSize: 13, fontWeight: 700, color: "#9ca3af" }}
+                    style={{ fontSize: 13, fontWeight: 700, color: "var(--text-subtle)" }}
                   >
                     TON Wallet
                   </div>
-                  <div style={{ fontSize: 11, color: "#d1d5db" }}>
+                  <div style={{ fontSize: 11, color: "var(--text-subtle)" }}>
                     Coming soon
                   </div>
                 </div>
@@ -717,7 +717,7 @@ export function TmaPaymentModal({
             {selectedMethod === "dkbank" && (
               <>
                 <div
-                  style={{ height: 1, background: "#f3f4f6", marginBottom: 16 }}
+                  style={{ height: 1, background: "var(--glass-border)", marginBottom: 16 }}
                 />
 
                 {/* Amount */}
@@ -725,7 +725,7 @@ export function TmaPaymentModal({
                   style={{
                     fontSize: 11,
                     fontWeight: 700,
-                    color: "#9ca3af",
+                    color: "var(--text-subtle)",
                     textTransform: "uppercase",
                     letterSpacing: "0.06em",
                     marginBottom: 8,
@@ -745,11 +745,11 @@ export function TmaPaymentModal({
                         border:
                           amountStr === q.toString()
                             ? "2px solid #3b82f6"
-                            : "2px solid #e5e7eb",
+                            : "2px solid var(--glass-border)",
                         background:
-                          amountStr === q.toString() ? "#eff6ff" : "#f9fafb",
+                          amountStr === q.toString() ? "rgba(59, 130, 246, 0.1)" : "var(--bg-main)",
                         color:
-                          amountStr === q.toString() ? "#3b82f6" : "#374151",
+                          amountStr === q.toString() ? "#3b82f6" : "var(--text-main)",
                         fontSize: 13,
                         fontWeight: 700,
                         cursor: "pointer",
@@ -768,7 +768,7 @@ export function TmaPaymentModal({
                       transform: "translateY(-50%)",
                       fontSize: 13,
                       fontWeight: 600,
-                      color: "#9ca3af",
+                      color: "var(--text-subtle)",
                       pointerEvents: "none",
                     }}
                   >
@@ -787,12 +787,12 @@ export function TmaPaymentModal({
                       borderRadius: 10,
                       border:
                         isValidAmount || !betAmount
-                          ? "2px solid #e5e7eb"
+                          ? "2px solid var(--glass-border)"
                           : "2px solid #fca5a5",
                       fontSize: 15,
                       fontWeight: 600,
-                      color: "#111827",
-                      background: "#f9fafb",
+                      color: "var(--text-main)",
+                      background: "var(--bg-main)",
                       outline: "none",
                     }}
                   />
@@ -805,8 +805,8 @@ export function TmaPaymentModal({
                       display: "flex",
                       justifyContent: "space-between",
                       alignItems: "center",
-                      background: estProfit >= 0 ? "#f0fdf4" : "#f9fafb",
-                      border: `1px solid ${estProfit >= 0 ? "#86efac" : "#e5e7eb"}`,
+                      background: estProfit >= 0 ? "rgba(22, 163, 74, 0.1)" : "var(--bg-main)",
+                      border: `1px solid ${estProfit >= 0 ? "#86efac" : "var(--glass-border)"}`,
                       borderRadius: 10,
                       padding: "10px 14px",
                       marginBottom: 16,
@@ -817,7 +817,7 @@ export function TmaPaymentModal({
                         style={{
                           fontSize: 11,
                           fontWeight: 700,
-                          color: "#9ca3af",
+                          color: "var(--text-subtle)",
                           textTransform: "uppercase",
                           letterSpacing: "0.06em",
                         }}
@@ -828,7 +828,7 @@ export function TmaPaymentModal({
                         style={{
                           fontSize: 18,
                           fontWeight: 800,
-                          color: estProfit >= 0 ? "#16a34a" : "#9ca3af",
+                          color: estProfit >= 0 ? "#16a34a" : "var(--text-muted)",
                         }}
                       >
                         {estProfit >= 0 ? `Nu ${estPayout.toFixed(2)}` : "—"}
@@ -839,7 +839,7 @@ export function TmaPaymentModal({
                         style={{
                           fontSize: 11,
                           fontWeight: 700,
-                          color: "#9ca3af",
+                          color: "var(--text-subtle)",
                           textTransform: "uppercase",
                           letterSpacing: "0.06em",
                         }}
@@ -860,7 +860,7 @@ export function TmaPaymentModal({
                         <div
                           style={{
                             fontSize: 12,
-                            color: "#9ca3af",
+                            color: "var(--text-subtle)",
                             maxWidth: 120,
                             textAlign: "right",
                           }}
@@ -888,7 +888,7 @@ export function TmaPaymentModal({
                       display: "block",
                       fontSize: 11,
                       fontWeight: 700,
-                      color: "#9ca3af",
+                      color: "var(--text-subtle)",
                       textTransform: "uppercase",
                       letterSpacing: "0.06em",
                       marginBottom: 6,
@@ -903,11 +903,11 @@ export function TmaPaymentModal({
                         boxSizing: "border-box",
                         padding: "12px 14px",
                         borderRadius: 10,
-                        border: "2px solid #d1fae5",
+                        border: "2px solid rgba(22, 163, 74, 0.3)",
                         fontSize: 15,
                         fontWeight: 600,
-                        color: "#065f46",
-                        background: "#f0fdf4",
+                        color: "#10b981",
+                        background: "rgba(22, 163, 74, 0.1)",
                         display: "flex",
                         justifyContent: "space-between",
                         alignItems: "center",
@@ -944,11 +944,11 @@ export function TmaPaymentModal({
                         boxSizing: "border-box",
                         padding: "12px 14px",
                         borderRadius: 10,
-                        border: "2px solid #fca5a5",
+                        border: "2px solid rgba(239, 68, 68, 0.5)",
                         fontSize: 15,
                         fontWeight: 600,
-                        color: "#111827",
-                        background: "#fff7f7",
+                        color: "var(--text-main)",
+                        background: "rgba(239, 68, 68, 0.05)",
                         outline: "none",
                       }}
                     />
@@ -972,7 +972,7 @@ export function TmaPaymentModal({
                       display: "block",
                       fontSize: 11,
                       fontWeight: 700,
-                      color: "#9ca3af",
+                      color: "var(--text-subtle)",
                       textTransform: "uppercase",
                       letterSpacing: "0.06em",
                       marginBottom: 6,
@@ -990,11 +990,11 @@ export function TmaPaymentModal({
                       boxSizing: "border-box",
                       padding: "12px 14px",
                       borderRadius: 10,
-                      border: "2px solid #e5e7eb",
+                      border: "2px solid var(--glass-border)",
                       fontSize: 15,
                       fontWeight: 600,
-                      color: "#111827",
-                      background: "#f9fafb",
+                      color: "var(--text-main)",
+                      background: "var(--bg-main)",
                       outline: "none",
                     }}
                   />
@@ -1009,8 +1009,8 @@ export function TmaPaymentModal({
               {error && (
                 <div
                   style={{
-                    background: "#fef2f2",
-                    border: "1px solid #fca5a5",
+                    background: "rgba(239, 68, 68, 0.1)",
+                    border: "1px solid rgba(239, 68, 68, 0.3)",
                     color: "#ef4444",
                     padding: "10px 14px",
                     borderRadius: 8,
@@ -1029,8 +1029,8 @@ export function TmaPaymentModal({
                 style={{
                   width: "100%",
                   padding: "14px",
-                  background: canPay ? "#3b82f6" : "#e5e7eb",
-                  color: canPay ? "#fff" : "#9ca3af",
+                  background: canPay ? "#3b82f6" : "var(--glass-border)",
+                  color: canPay ? "#fff" : "var(--text-subtle)",
                   border: "none",
                   borderRadius: 10,
                   fontSize: 15,

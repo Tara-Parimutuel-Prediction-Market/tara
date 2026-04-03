@@ -203,7 +203,7 @@ export function PwaMarketDetailPage() {
                       <span style={{ fontWeight: 700, color: "var(--text-main)" }}>{outcome.label}</span>
                       <span style={{ fontWeight: 800, color: color }}>{pct.toFixed(0)}%</span>
                     </div>
-                    <div style={{ background: "#f1f5f9", borderRadius: "10px", height: "8px", overflow: "hidden" }}>
+                    <div style={{ background: "var(--bg-main)", borderRadius: "10px", height: "8px", overflow: "hidden" }}>
                       <div style={{ 
                         background: color, 
                         height: "100%", 
@@ -230,9 +230,9 @@ export function PwaMarketDetailPage() {
               <PwaBetForm market={market} onBetPlaced={refreshMarket} />
             </div>
           ) : isResolving ? (
-            <div style={{ background: "#fff9eb", border: "1.5px solid #fcd34d", borderRadius: "var(--radius-lg)", overflow: "hidden", boxShadow: "var(--shadow-premium)" }}>
+            <div style={{ background: "rgba(252, 211, 77, 0.1)", border: "1.5px solid rgba(252, 211, 77, 0.3)", borderRadius: "var(--radius-lg)", overflow: "hidden", boxShadow: "var(--shadow-premium)" }}>
               {/* Header */}
-              <div style={{ background: "#fef3c7", padding: "20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ background: "rgba(252, 211, 77, 0.2)", padding: "20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div>
                   <div style={{ fontWeight: 900, color: "#92400e", fontSize: "1rem", letterSpacing: "0.02em" }}>DISPUTE WINDOW</div>
                   <div style={{ fontSize: "0.8rem", color: "#b45309", marginTop: "2px", fontWeight: 700 }}>{disputeTimeLeft}</div>
@@ -244,7 +244,7 @@ export function PwaMarketDetailPage() {
                 {proposedOutcome && (
                   <div>
                     <div style={{ fontSize: "0.65rem", fontWeight: 800, color: "#b45309", letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: "8px" }}>PROPOSED OUTCOME</div>
-                    <div style={{ display: "inline-flex", alignItems: "center", gap: "8px", background: "#fff", border: "1px solid #fde68a", borderRadius: "10px", padding: "12px 16px", width: "100%", boxSizing: "border-box" }}>
+                    <div style={{ display: "inline-flex", alignItems: "center", gap: "8px", background: "var(--bg-card)", border: "1px solid var(--glass-border)", borderRadius: "10px", padding: "12px 16px", width: "100%", boxSizing: "border-box" }}>
                       <span style={{ color: "#b45309", fontWeight: 800, fontSize: "1.1rem" }}>{proposedOutcome.label}</span>
                       <span style={{ background: "#f59e0b", color: "#fff", fontSize: "0.65rem", fontWeight: 900, padding: "2px 8px", borderRadius: "4px", marginLeft: "auto" }}>ADMIN</span>
                     </div>
@@ -252,7 +252,7 @@ export function PwaMarketDetailPage() {
                 )}
 
                 {disputeSuccess ? (
-                  <div style={{ textAlign: "center", padding: "20px", background: "#ecfdf5", borderRadius: "12px", border: "1.5px solid #6ee7b7", color: "#065f46" }}>
+                  <div style={{ textAlign: "center", padding: "20px", background: "rgba(16, 185, 129, 0.1)", borderRadius: "12px", border: "1.5px solid rgba(16, 185, 129, 0.3)", color: "#10b981" }}>
                     <div style={{ fontSize: "1.5rem", marginBottom: "8px" }}>✅</div>
                     <div style={{ fontWeight: 800 }}>Dispute Submitted</div>
                     <div style={{ fontSize: "0.85rem", marginTop: "4px" }}>Admin will review the evidence and make a final call.</div>
@@ -266,7 +266,7 @@ export function PwaMarketDetailPage() {
                         min="1"
                         value={bondAmount}
                         onChange={(e) => setBondAmount(e.target.value)}
-                        style={{ width: "100%", boxSizing: "border-box", padding: "14px", borderRadius: "12px", border: "1.5px solid #fde68a", fontSize: "1rem", fontWeight: 700, outline: "none" }}
+                        style={{ width: "100%", boxSizing: "border-box", padding: "14px", borderRadius: "12px", border: "1.5px solid var(--glass-border)", background: "var(--bg-main)", color: "var(--text-main)", fontSize: "1rem", fontWeight: 700, outline: "none" }}
                       />
                     </div>
                     <div>
@@ -276,7 +276,7 @@ export function PwaMarketDetailPage() {
                         onChange={(e) => setDisputeReason(e.target.value)}
                         rows={3}
                         placeholder="Provide details or links to evidence..."
-                        style={{ width: "100%", boxSizing: "border-box", padding: "14px", borderRadius: "12px", border: "1.5px solid #fde68a", fontSize: "0.9rem", outline: "none", resize: "none", fontFamily: "var(--font-primary)" }}
+                        style={{ width: "100%", boxSizing: "border-box", padding: "14px", borderRadius: "12px", border: "1.5px solid var(--glass-border)", background: "var(--bg-main)", color: "var(--text-main)", fontSize: "0.9rem", outline: "none", resize: "none", fontFamily: "var(--font-primary)" }}
                       />
                     </div>
                     {disputeError && <div style={{ color: "#dc2626", fontSize: "0.85rem", fontWeight: 600 }}>{disputeError}</div>}

@@ -89,8 +89,8 @@ export const PwaBetForm: FC<PwaBetFormProps> = ({ market, onBetPlaced }) => {
                 onClick={() => setSelectedOutcomeId(isSelected ? null : outcome.id)}
                 style={{
                   padding: "20px 12px", borderRadius: "14px",
-                  border: isSelected ? `2.5px solid ${baseColor}` : "2.5px solid #f1f5f9",
-                  background: isSelected ? `${baseColor}10` : "#f8fafc",
+                  border: isSelected ? `2.5px solid ${baseColor}` : "2.5px solid var(--glass-border)",
+                  background: isSelected ? `${baseColor}10` : "var(--bg-main)",
                   color: isSelected ? baseColor : "var(--text-main)",
                   fontWeight: 800, fontSize: "1rem",
                   cursor: "pointer",
@@ -144,8 +144,8 @@ export const PwaBetForm: FC<PwaBetFormProps> = ({ market, onBetPlaced }) => {
                 onClick={() => setAmount(q.toString())}
                 style={{
                   flex: 1,
-                  padding: "8px", borderRadius: "10px", border: "1.5px solid #f1f5f9",
-                  background: amount === q.toString() ? "#3b82f6" : "#fff",
+                  padding: "8px", borderRadius: "10px", border: "1.5px solid var(--glass-border)",
+                  background: amount === q.toString() ? "#3b82f6" : "var(--bg-main)",
                   color: amount === q.toString() ? "#fff" : "var(--text-muted)",
                   fontSize: "0.8rem", fontWeight: 800, cursor: "pointer",
                   transition: "all 0.15s",
@@ -164,8 +164,8 @@ export const PwaBetForm: FC<PwaBetFormProps> = ({ market, onBetPlaced }) => {
         onClick={() => setShowPaymentModal(true)}
         style={{
           width: "100%", padding: "18px", borderRadius: "14px", border: "none",
-          background: isReady ? "linear-gradient(135deg, #3b82f6, #1d4ed8)" : "#f1f5f9",
-          color: isReady ? "#fff" : "#94a3b8",
+          background: isReady ? "linear-gradient(135deg, #3b82f6, #1d4ed8)" : "var(--bg-card)",
+          color: isReady ? "#fff" : "var(--text-subtle)",
           fontSize: "1rem", fontWeight: 900,
           cursor: isReady ? "pointer" : "not-allowed",
           transition: "all 0.2s",

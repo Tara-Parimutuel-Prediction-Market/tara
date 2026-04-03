@@ -238,7 +238,7 @@ export function PwaMarketsPage() {
               style={{
                 padding: "6px 12px",
                 borderRadius: 20,
-                background: "#ecfdf5",
+                background: "rgba(16, 185, 129, 0.1)",
                 color: "#10b981",
                 fontSize: 11,
                 fontWeight: 800,
@@ -277,8 +277,8 @@ export function PwaMarketsPage() {
               style={{
                 padding: "6px 12px",
                 borderRadius: 20,
-                background: "#f1f5f9",
-                color: "#64748b",
+                background: "var(--bg-main)",
+                color: "var(--text-subtle)",
                 fontSize: 11,
                 fontWeight: 800,
                 letterSpacing: "0.05em",
@@ -316,8 +316,8 @@ export function PwaMarketsPage() {
               style={{
                 padding: "6px 12px",
                 borderRadius: 20,
-                background: "#f1f5f9",
-                color: "#64748b",
+                background: "var(--bg-main)",
+                color: "var(--text-subtle)",
                 fontSize: 11,
                 fontWeight: 800,
                 letterSpacing: "0.05em",

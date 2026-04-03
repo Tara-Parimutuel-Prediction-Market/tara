@@ -8,6 +8,7 @@ import {
   Transaction,
 } from "@/api/client";
 import { Page } from "@/tma/components/Page";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import {
   CheckCircle2,
   XCircle,
@@ -177,6 +178,11 @@ export const TmaProfilePage: FC = () => {
   return (
     <Page>
       <div style={styles.container}>
+        {/* Top Header Layer: Toggles */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: 8 }}>
+          <ThemeToggle />
+        </div>
+
         {/* ── Avatar / Name ──────────────────────────────────── */}
         <div style={styles.avatarSection}>
           {user?.photoUrl ? (
@@ -652,16 +658,16 @@ const styles: Record<string, React.CSSProperties> = {
     margin: 0,
     fontSize: 20,
     fontWeight: 700,
-    color: "#111",
+    color: "var(--text-main)",
   },
   username: {
     margin: 0,
     fontSize: 14,
-    color: "#6b7280",
+    color: "var(--text-muted)",
   },
   tabBar: {
     display: "flex",
-    background: "#f3f4f6",
+    background: "var(--bg-card)",
     borderRadius: 12,
     padding: 4,
     gap: 4,
@@ -674,7 +680,7 @@ const styles: Record<string, React.CSSProperties> = {
     border: "none",
     borderRadius: 10,
     background: "transparent",
-    color: "#6b7280",
+    color: "var(--text-muted)",
     cursor: "pointer",
     display: "flex",
     alignItems: "center",
@@ -682,9 +688,9 @@ const styles: Record<string, React.CSSProperties> = {
     transition: "all 0.2s",
   },
   tabActive: {
-    background: "#fff",
+    background: "var(--bg-main)",
     color: "#2775d0",
-    boxShadow: "0 1px 4px rgba(0,0,0,0.1)",
+    boxShadow: "var(--shadow-sm)",
   },
   badgeRow: {
     display: "flex",
@@ -714,10 +720,10 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 600,
   },
   card: {
-    background: "#fff",
+    background: "var(--bg-card)",
     borderRadius: 16,
     padding: "18px 16px",
-    boxShadow: "0 1px 6px rgba(0,0,0,0.07)",
+    boxShadow: "var(--shadow-sm)",
     display: "flex",
     flexDirection: "column",
     gap: 12,
@@ -726,7 +732,7 @@ const styles: Record<string, React.CSSProperties> = {
     margin: 0,
     fontSize: 16,
     fontWeight: 700,
-    color: "#111",
+    color: "var(--text-main)",
   },
   titleRow: {
     display: "flex",
@@ -741,7 +747,7 @@ const styles: Record<string, React.CSSProperties> = {
   hint: {
     margin: 0,
     fontSize: 14,
-    color: "#6b7280",
+    color: "var(--text-muted)",
     lineHeight: 1.6,
   },
   input: {
@@ -749,7 +755,9 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "12px 14px",
     fontSize: 16,
     borderRadius: 10,
-    border: "1.5px solid #d1d5db",
+    border: "1.5px solid var(--glass-border)",
+    background: "var(--bg-main)",
+    color: "var(--text-main)",
     outline: "none",
     boxSizing: "border-box",
     letterSpacing: 2,
@@ -794,11 +802,11 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 14,
   },
   label: {
-    color: "#6b7280",
+    color: "var(--text-muted)",
     fontWeight: 500,
   },
   value: {
-    color: "#111",
+    color: "var(--text-main)",
     fontWeight: 600,
     fontFamily: "monospace",
     fontSize: 13,
@@ -892,9 +900,9 @@ const walletStyles: Record<string, React.CSSProperties> = {
     gap: 8,
     padding: "13px",
     borderRadius: 12,
-    border: "1.5px solid #e5e7eb",
-    background: "#fff",
-    color: "#111",
+    border: "1.5px solid var(--glass-border)",
+    background: "var(--bg-card)",
+    color: "var(--text-main)",
     fontWeight: 600,
     fontSize: "0.9rem",
     cursor: "pointer",
@@ -917,27 +925,27 @@ const walletStyles: Record<string, React.CSSProperties> = {
     margin: 0,
     fontSize: "1.1rem",
     fontWeight: 700,
-    color: "#111",
+    color: "var(--text-main)",
   },
   sectionSubtitle: {
     fontSize: "0.8rem",
-    color: "#9ca3af",
+    color: "var(--text-muted)",
     marginTop: 3,
     marginBottom: 0,
   },
   txList: {
-    background: "#fff",
+    background: "var(--bg-card)",
     borderRadius: 16,
     overflow: "hidden",
-    boxShadow: "0 1px 6px rgba(0,0,0,0.07)",
-    border: "1px solid #f1f5f9",
+    boxShadow: "var(--shadow-sm)",
+    border: "1px solid var(--glass-border)",
   },
   txRow: {
     display: "flex",
     alignItems: "center",
     gap: 14,
     padding: "14px 16px",
-    borderBottom: "1px solid #f1f5f9",
+    borderBottom: "1px solid var(--glass-border)",
   },
   txIcon: {
     width: 40,
@@ -947,8 +955,8 @@ const walletStyles: Record<string, React.CSSProperties> = {
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
-    background: "#f1f5f9",
-    color: "#6b7280",
+    background: "var(--bg-main)",
+    color: "var(--text-muted)",
   },
   txInfo: {
     flex: 1,
@@ -957,19 +965,19 @@ const walletStyles: Record<string, React.CSSProperties> = {
   txLabel: {
     fontWeight: 600,
     fontSize: "0.9rem",
-    color: "#111",
+    color: "var(--text-main)",
     marginBottom: 2,
   },
   txNote: {
     fontSize: "0.75rem",
-    color: "#9ca3af",
+    color: "var(--text-muted)",
     whiteSpace: "nowrap",
     overflow: "hidden",
     textOverflow: "ellipsis",
   },
   txDate: {
     fontSize: "0.72rem",
-    color: "#9ca3af",
+    color: "var(--text-muted)",
     marginTop: 2,
   },
   txAmountCol: {
@@ -982,7 +990,7 @@ const walletStyles: Record<string, React.CSSProperties> = {
   },
   txBalance: {
     fontSize: "0.72rem",
-    color: "#9ca3af",
+    color: "var(--text-muted)",
     marginTop: 2,
   },
   emptyState: {
@@ -991,6 +999,6 @@ const walletStyles: Record<string, React.CSSProperties> = {
     alignItems: "center",
     gap: 12,
     padding: "40px 20px",
-    color: "#9ca3af",
+    color: "var(--text-muted)",
   },
 };

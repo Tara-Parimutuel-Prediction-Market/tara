@@ -5,6 +5,7 @@ import { ApiTags, ApiOperation, ApiResponse } from "@nestjs/swagger";
 import { TelegramSimpleService } from "../telegram/telegram.service.simple";
 import { TelegramVerificationService } from "../telegram/telegram-verification.service";
 import { User } from "../entities/user.entity";
+import { Market, MarketStatus } from "../entities/market.entity";
 
 @ApiTags("Bot")
 @Controller("bot")
@@ -13,6 +14,7 @@ export class BotController {
     private readonly telegramSimpleService: TelegramSimpleService,
     private readonly telegramVerificationService: TelegramVerificationService,
     @InjectRepository(User) private readonly userRepo: Repository<User>,
+    @InjectRepository(Market) private readonly marketRepo: Repository<Market>,
   ) {}
 
   @Get("info")
@@ -105,10 +107,7 @@ export class BotController {
           break;
 
         case "/predict":
-          await this.telegramSimpleService.sendMessage(
-            chatId,
-            "📊 Active markets will be shown here soon!",
-          );
+          await this.handlePredictCommand(chatId);
           break;
 
         case "/help":
@@ -129,6 +128,29 @@ export class BotController {
           );
       }
     }
+  }
+
+  private async handlePredictCommand(chatId: number) {
+    const markets = await this.marketRepo.find({
+      where: [{ status: MarketStatus.OPEN }, { status: MarketStatus.RESOLVING }],
+      order: { closesAt: "ASC" },
+      take: 5,
+    });
+
+    if (!markets.length) {
+      await this.telegramSimpleService.sendMessage(chatId, "📊 No active markets right now. Check back soon!");
+      return;
+    }
+
+    const miniAppUrl = process.env.TELEGRAM_MINI_APP_URL || "";
+    const lines = markets.map((m) => {
+      const closes = m.closesAt ? new Date(m.closesAt).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" }) : "TBD";
+      const statusIcon = m.status === MarketStatus.RESOLVING ? "⚖️" : "🟢";
+      return `${statusIcon} <b>${m.title}</b>\n⏰ ${closes}`;
+    });
+
+    const text = `📊 <b>Active Markets</b>\n\n${lines.join("\n\n")}\n\n👉 <a href="${miniAppUrl}">Place your prediction</a>`;
+    await this.telegramSimpleService.sendMessage(chatId, text);
   }
 
   /**

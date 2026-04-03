@@ -3,6 +3,7 @@ import { TonConnectUIProvider } from '@tonconnect/ui-react';
 import { App } from '@/tma/components/App.tsx';
 import { ErrorBoundary } from '@/tma/components/ErrorBoundary.tsx';
 import { publicUrl } from '@/helpers/publicUrl.ts';
+import { ThemeProvider } from '@/contexts/ThemeContext';
 
 function ErrorBoundaryError({ error }: { error: unknown }) {
   return (
@@ -24,11 +25,13 @@ function ErrorBoundaryError({ error }: { error: unknown }) {
 export function Root() {
   return (
     <ErrorBoundary fallback={ErrorBoundaryError}>
-      <TonConnectUIProvider
-        manifestUrl={publicUrl('tonconnect-manifest.json')}
-      >
-        <App/>
-      </TonConnectUIProvider>
+      <ThemeProvider>
+        <TonConnectUIProvider
+          manifestUrl={publicUrl('tonconnect-manifest.json')}
+        >
+          <App/>
+        </TonConnectUIProvider>
+      </ThemeProvider>
     </ErrorBoundary>
   );
 }
