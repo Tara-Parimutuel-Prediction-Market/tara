@@ -16,11 +16,22 @@ import {
   ApiTags,
   ApiOperation,
   ApiProperty,
+  ApiPropertyOptional,
   ApiResponse,
+  ApiQuery,
 } from "@nestjs/swagger";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
-import { IsUUID, IsEnum } from "class-validator";
+import {
+  IsUUID,
+  IsEnum,
+  IsOptional,
+  IsIn,
+  IsInt,
+  Min,
+  Max,
+} from "class-validator";
+import { Type } from "class-transformer";
 import { JwtAuthGuard, AdminGuard } from "../auth/guards";
 import { MarketsService, CreateMarketDto } from "../markets/markets.service";
 import { FixturesService } from "./fixtures.service";
@@ -51,6 +62,54 @@ class ProposeResolutionDto {
   @ApiProperty({ description: "UUID of the proposed winning outcome" })
   @IsUUID()
   proposedOutcomeId: string;
+}
+
+class GetUsersQueryDto {
+  /** Full-text search across name, username, telegramId, dkCid, dkAccountName, phoneNumber */
+  @ApiPropertyOptional({ description: "Search query" })
+  @IsOptional()
+  search?: string;
+
+  @ApiPropertyOptional({ enum: ["all", "admin", "user"], default: "all" })
+  @IsOptional()
+  @IsIn(["all", "admin", "user"])
+  role?: "all" | "admin" | "user";
+
+  @ApiPropertyOptional({ enum: ["all", "linked", "unlinked"], default: "all" })
+  @IsOptional()
+  @IsIn(["all", "linked", "unlinked"])
+  dkStatus?: "all" | "linked" | "unlinked";
+
+  @ApiPropertyOptional({
+    enum: ["name", "balance", "streak", "joined"],
+    default: "joined",
+  })
+  @IsOptional()
+  @IsIn(["name", "balance", "streak", "joined"])
+  sortField?: "name" | "balance" | "streak" | "joined";
+
+  @ApiPropertyOptional({ enum: ["asc", "desc"], default: "desc" })
+  @IsOptional()
+  @IsIn(["asc", "desc"])
+  sortDir?: "asc" | "desc";
+
+  @ApiPropertyOptional({ default: 1, description: "Page number (1-based)" })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+
+  @ApiPropertyOptional({
+    default: 20,
+    description: "Results per page (max 100)",
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit?: number;
 }
 
 @ApiTags("admin")
@@ -88,11 +147,18 @@ export class AdminController {
       },
       ipAddress: req.ip,
     });
-    const miniAppUrl = process.env.TELEGRAM_MINI_APP_URL || '';
-    const outcomes = (market.outcomes ?? []).map((o) => `• ${o.label}`).join('\n');
-    const closesAt = market.closesAt ? new Date(market.closesAt).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }) : 'TBD';
+    const miniAppUrl = process.env.TELEGRAM_MINI_APP_URL || "";
+    const outcomes = (market.outcomes ?? [])
+      .map((o) => `• ${o.label}`)
+      .join("\n");
+    const closesAt = market.closesAt
+      ? new Date(market.closesAt).toLocaleString("en-US", {
+          dateStyle: "medium",
+          timeStyle: "short",
+        })
+      : "TBD";
     await this.telegramSimple.postToChannel(
-      `🚀 <b>NEW MARKET</b>\n\n📊 <b>${market.title}</b>\n\n🎲 <b>Outcomes:</b>\n${outcomes}\n\n⏰ Closes: ${closesAt}\n\n👉 <a href="${miniAppUrl}">Predict Now</a>`
+      `🚀 <b>NEW MARKET</b>\n\n📊 <b>${market.title}</b>\n\n🎲 <b>Outcomes:</b>\n${outcomes}\n\n⏰ Closes: ${closesAt}\n\n👉 <a href="${miniAppUrl}">Predict Now</a>`,
     );
     return market;
   }
@@ -166,9 +232,9 @@ export class AdminController {
       },
       ipAddress: req.ip,
     });
-    const miniAppUrl = process.env.TELEGRAM_MINI_APP_URL || '';
+    const miniAppUrl = process.env.TELEGRAM_MINI_APP_URL || "";
     await this.telegramSimple.postToChannel(
-      `⚖️ <b>DISPUTE WINDOW OPEN</b>\n\n📊 <b>${before.title}</b>\n\n🔖 <b>Proposed Winner:</b> ${proposedOutcome?.label ?? 'N/A'}\n⏳ Dispute window: 24 hours\n\n👉 <a href="${miniAppUrl}">Submit Dispute</a>`
+      `⚖️ <b>DISPUTE WINDOW OPEN</b>\n\n📊 <b>${before.title}</b>\n\n🔖 <b>Proposed Winner:</b> ${proposedOutcome?.label ?? "N/A"}\n⏳ Dispute window: 24 hours\n\n👉 <a href="${miniAppUrl}">Submit Dispute</a>`,
     );
     return result;
   }
@@ -206,9 +272,9 @@ export class AdminController {
       },
       ipAddress: req.ip,
     });
-    const miniAppUrl = process.env.TELEGRAM_MINI_APP_URL || '';
+    const miniAppUrl = process.env.TELEGRAM_MINI_APP_URL || "";
     await this.telegramSimple.postToChannel(
-      `✅ <b>MARKET RESOLVED</b>\n\n📊 <b>${before.title}</b>\n\n🏆 <b>Winner:</b> ${winningOutcome?.label ?? 'N/A'}\n💰 <b>Pool:</b> Nu ${Number(before.totalPool).toLocaleString()}\n\n👉 <a href="${miniAppUrl}">View Results</a>`
+      `✅ <b>MARKET RESOLVED</b>\n\n📊 <b>${before.title}</b>\n\n🏆 <b>Winner:</b> ${winningOutcome?.label ?? "N/A"}\n💰 <b>Pool:</b> Nu ${Number(before.totalPool).toLocaleString()}\n\n👉 <a href="${miniAppUrl}">View Results</a>`,
     );
     return result;
   }
@@ -324,26 +390,112 @@ export class AdminController {
 
   // ── Users ─────────────────────────────────────────────────────────────────
   @Get("users")
-  @ApiOperation({ summary: "List all users" })
-  listUsers() {
-    return this.userRepo.find({
-      select: [
-        "id",
-        "firstName",
-        "lastName",
-        "username",
-        "photoUrl",
-        "isAdmin",
-        "telegramId",
-        "dkCid",
-        "dkAccountName",
-        "dkAccountNumber",
-        "telegramLinkedAt",
-        "createdAt",
-        "updatedAt",
-      ],
-      order: { createdAt: "DESC" },
-    });
+  @ApiOperation({
+    summary: "List users with search, filters, sort and pagination",
+  })
+  @ApiQuery({ name: "search", required: false, type: String })
+  @ApiQuery({ name: "role", required: false, enum: ["all", "admin", "user"] })
+  @ApiQuery({
+    name: "dkStatus",
+    required: false,
+    enum: ["all", "linked", "unlinked"],
+  })
+  @ApiQuery({
+    name: "sortField",
+    required: false,
+    enum: ["name", "balance", "streak", "joined"],
+  })
+  @ApiQuery({ name: "sortDir", required: false, enum: ["asc", "desc"] })
+  @ApiQuery({ name: "page", required: false, type: Number })
+  @ApiQuery({ name: "limit", required: false, type: Number })
+  async listUsers(@Query() query: GetUsersQueryDto) {
+    const {
+      search,
+      role = "all",
+      dkStatus = "all",
+      sortField = "joined",
+      sortDir = "desc",
+      page = 1,
+      limit = 20,
+    } = query;
+
+    const qb = this.userRepo
+      .createQueryBuilder("u")
+      .select([
+        "u.id",
+        "u.firstName",
+        "u.lastName",
+        "u.username",
+        "u.photoUrl",
+        "u.isAdmin",
+        "u.telegramId",
+        "u.telegramChatId",
+        "u.telegramStreak",
+        "u.telegramLinkedAt",
+        "u.dkCid",
+        "u.dkAccountNumber",
+        "u.dkAccountName",
+        "u.phoneNumber",
+        "u.createdAt",
+        "u.updatedAt",
+      ]);
+
+    // ── Full-text search ────────────────────────────────────────────────────
+    if (search && search.trim()) {
+      const term = `%${search.trim().toLowerCase()}%`;
+      qb.andWhere(
+        `(
+          LOWER(COALESCE(u.firstName,'')  || ' ' || COALESCE(u.lastName,'')) LIKE :term
+          OR LOWER(COALESCE(u.username,''))      LIKE :term
+          OR LOWER(COALESCE(u.telegramId,''))    LIKE :term
+          OR LOWER(COALESCE(u.dkCid,''))         LIKE :term
+          OR LOWER(COALESCE(u.dkAccountName,'')) LIKE :term
+          OR LOWER(COALESCE(u.phoneNumber,''))   LIKE :term
+          OR LOWER(u.id::text)                   LIKE :term
+        )`,
+        { term },
+      );
+    }
+
+    // ── Role filter ─────────────────────────────────────────────────────────
+    if (role === "admin")
+      qb.andWhere("u.isAdmin = :isAdmin", { isAdmin: true });
+    if (role === "user")
+      qb.andWhere("u.isAdmin = :isAdmin", { isAdmin: false });
+
+    // ── DK-link filter ──────────────────────────────────────────────────────
+    if (dkStatus === "linked") qb.andWhere("u.dkCid IS NOT NULL");
+    if (dkStatus === "unlinked") qb.andWhere("u.dkCid IS NULL");
+
+    // ── Sort ────────────────────────────────────────────────────────────────
+    const dir = sortDir.toUpperCase() as "ASC" | "DESC";
+    if (sortField === "name") {
+      qb.orderBy(
+        "LOWER(COALESCE(u.firstName,'') || ' ' || COALESCE(u.lastName,''))",
+        dir,
+      );
+    } else if (sortField === "streak") {
+      qb.orderBy("COALESCE(u.telegramStreak, 0)", dir);
+    } else {
+      // joined (default)
+      qb.orderBy("u.createdAt", dir);
+    }
+
+    // ── Pagination ──────────────────────────────────────────────────────────
+    const take = Math.min(Number(limit), 100);
+    const skip = (Math.max(Number(page), 1) - 1) * take;
+
+    qb.skip(skip).take(take);
+
+    const [data, total] = await qb.getManyAndCount();
+
+    return {
+      data,
+      total,
+      page: Math.max(Number(page), 1),
+      limit: take,
+      pages: Math.ceil(total / take),
+    };
   }
 
   // ── Payments ───────────────────────────────────────────────────────────────
@@ -359,9 +511,42 @@ export class AdminController {
 
   // ── Audit Logs ─────────────────────────────────────────────────────────────
   @Get("audit-logs")
-  @ApiOperation({ summary: "Full audit trail of all admin actions" })
-  getAuditLogs(@Query("limit") limit?: string) {
-    return this.auditService.findAll(Number(limit) || 200);
+  @ApiOperation({ summary: "Paginated, server-side filterable audit trail" })
+  @ApiQuery({ name: "page", required: false })
+  @ApiQuery({ name: "limit", required: false })
+  @ApiQuery({ name: "action", required: false })
+  @ApiQuery({ name: "adminId", required: false })
+  @ApiQuery({ name: "entityType", required: false })
+  @ApiQuery({ name: "search", required: false })
+  @ApiQuery({ name: "from", required: false, description: "YYYY-MM-DD" })
+  @ApiQuery({ name: "to", required: false, description: "YYYY-MM-DD inclusive" })
+  getAuditLogs(
+    @Query("page") page?: string,
+    @Query("limit") limit?: string,
+    @Query("action") action?: string,
+    @Query("adminId") adminId?: string,
+    @Query("entityType") entityType?: string,
+    @Query("search") search?: string,
+    @Query("from") from?: string,
+    @Query("to") to?: string,
+  ) {
+    return this.auditService.findPaginated({
+      page: Number(page) || 1,
+      limit: Number(limit) || 50,
+      action,
+      adminId: adminId || undefined,
+      entityType,
+      search: search || undefined,
+      from: from || undefined,
+      to: to || undefined,
+    });
+  }
+
+  /** Must come BEFORE /audit-logs/admin/:adminId to avoid route shadowing */
+  @Get("audit-logs/admins")
+  @ApiOperation({ summary: "Distinct admins for filter dropdowns" })
+  getAuditAdmins() {
+    return this.auditService.findDistinctAdmins();
   }
 
   @Get("audit-logs/admin/:adminId")
