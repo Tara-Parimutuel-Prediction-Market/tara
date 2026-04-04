@@ -235,7 +235,7 @@ export class BotPollingService
           break;
 
         case "/predict":
-          await this.handlePredictCommand(chatId);
+          await this.handlePredictCommand(chatId, message.from.id);
           break;
 
         case "/help":
@@ -258,7 +258,7 @@ export class BotPollingService
     }
   }
 
-  private async handlePredictCommand(chatId: number) {
+  private async handlePredictCommand(chatId: number, telegramUserId?: number) {
     const markets = await this.marketRepo.find({
       where: [{ status: MarketStatus.OPEN }, { status: MarketStatus.RESOLVING }],
       order: { closesAt: "ASC" },
@@ -277,7 +277,29 @@ export class BotPollingService
       return `${statusIcon} <b>${m.title}</b>\n⏰ ${closes}`;
     });
 
-    const text = `📊 <b>Active Markets</b>\n\n${lines.join("\n\n")}\n\n👉 <a href="${miniAppUrl}">Place your prediction</a>`;
+    // ── Reputation teaser / status ────────────────────────────────────────────
+    let reputationLine = "";
+    if (telegramUserId) {
+      const user = await this.userRepo.findOne({
+        where: { telegramId: String(telegramUserId) },
+        select: ["reputationTier", "totalPredictions", "reputationScore"],
+      });
+      if (!user || (user.totalPredictions ?? 0) === 0) {
+        reputationLine =
+          "\n\n⭐ <i>Make your first prediction to start building your reputation score. Top predictors carry more weight in market probabilities.</i>";
+      } else {
+        const tierLabel =
+          user.reputationTier === "expert" ? "Expert" :
+          user.reputationTier === "reliable" ? "Reliable" :
+          user.reputationTier === "regular" ? "Regular" : "Newcomer";
+        const pct = user.reputationScore != null
+          ? ` · ${Math.round(user.reputationScore * 100)}% accuracy`
+          : "";
+        reputationLine = `\n\n⭐ Your tier: <b>${tierLabel}</b>${pct} (${user.totalPredictions} predictions)`;
+      }
+    }
+
+    const text = `📊 <b>Active Markets</b>\n\n${lines.join("\n\n")}\n\n👉 <a href="${miniAppUrl}">Place your prediction</a>${reputationLine}`;
     await this.telegramSimple.sendMessage(chatId, text);
   }
 

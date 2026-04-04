@@ -240,6 +240,68 @@ export const TmaProfilePage: FC = () => {
               />
             </div>
 
+            {/* ── Reputation Card ────────────────────────────────── */}
+            <div style={styles.card}>
+              <h3 style={styles.cardTitle}>
+                <span style={styles.titleRow}>
+                  <Trophy size={16} color="#f59e0b" />
+                  Prediction Reputation
+                </span>
+              </h3>
+              {(user?.totalPredictions ?? 0) === 0 ? (
+                <div style={{ fontSize: 13, color: "var(--text-subtle)", lineHeight: 1.5 }}>
+                  <p style={{ margin: "0 0 8px" }}>
+                    Make your first prediction to start building your reputation score.
+                  </p>
+                  <p style={{ margin: 0, fontSize: 12, color: "var(--text-subtle)" }}>
+                    Top predictors earn an Expert badge and their predictions carry
+                    more weight in market probabilities.
+                  </p>
+                </div>
+              ) : (
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                    <span style={{
+                      fontSize: 12,
+                      fontWeight: 600,
+                      padding: "2px 10px",
+                      borderRadius: 99,
+                      background:
+                        user?.reputationTier === "expert" ? "#fef3c7" :
+                        user?.reputationTier === "reliable" ? "#d1fae5" :
+                        user?.reputationTier === "regular" ? "#dbeafe" : "#f3f4f6",
+                      color:
+                        user?.reputationTier === "expert" ? "#92400e" :
+                        user?.reputationTier === "reliable" ? "#065f46" :
+                        user?.reputationTier === "regular" ? "#1e40af" : "#374151",
+                      textTransform: "capitalize",
+                    }}>
+                      {user?.reputationTier === "expert" ? "Expert" :
+                       user?.reputationTier === "reliable" ? "Reliable" :
+                       user?.reputationTier === "regular" ? "Regular" : "Newcomer"}
+                    </span>
+                    {user?.reputationScore != null && (
+                      <span style={{ fontSize: 13, color: "var(--text-subtle)" }}>
+                        {Math.round(user.reputationScore * 100)}% accuracy score
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ display: "flex", gap: 20, fontSize: 12, color: "var(--text-subtle)" }}>
+                    <span>
+                      <strong style={{ color: "var(--text-primary)", fontSize: 14 }}>
+                        {user?.totalPredictions ?? 0}
+                      </strong>{" "}predictions
+                    </span>
+                    <span>
+                      <strong style={{ color: "var(--text-primary)", fontSize: 14 }}>
+                        {user?.correctPredictions ?? 0}
+                      </strong>{" "}correct
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* ── DK Bank link form ──────────────────────────────── */}
             <div style={styles.card}>
               <h3 style={styles.cardTitle}>
@@ -838,7 +900,7 @@ const styles: Record<string, React.CSSProperties> = {
 
 const walletStyles: Record<string, React.CSSProperties> = {
   balanceCard: {
-    background: "rgb(100, 184, 226)",
+    background: " #1a5bb5",
     borderRadius: 20,
     padding: "28px 20px",
     color: "#fff",

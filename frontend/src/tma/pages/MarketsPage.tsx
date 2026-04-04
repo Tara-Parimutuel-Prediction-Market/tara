@@ -73,7 +73,7 @@ export const MarketsPage: FC = () => {
               </div>
               <div style={{ textAlign: "right" }}>
                 <div style={{ fontSize: "0.65rem", fontWeight: 800, color: "var(--text-subtle)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 2 }}>Balance</div>
-                <div style={{ fontWeight: 900, color: "var(--text-main)", fontSize: "1.1rem" }}>Nu {Number(user.balance).toLocaleString()}</div>
+                <div style={{ fontWeight: 900, color: "var(--text-main)", fontSize: "1.1rem" }}>Nu {(user.creditsBalance ?? 0).toLocaleString()}</div>
               </div>
             </div>
           )}

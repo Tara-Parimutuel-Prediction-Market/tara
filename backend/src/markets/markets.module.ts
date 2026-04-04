@@ -13,6 +13,7 @@ import { MarketsController } from "./markets.controller";
 import { ParimutuelEngine } from "./parimutuel.engine";
 import { LMSRService } from "./lmsr.service";
 import { KeeperService } from "./keeper.service";
+import { ReputationService } from "./reputation.service";
 
 @Module({
   imports: [
@@ -27,7 +28,7 @@ import { KeeperService } from "./keeper.service";
       Dispute,
     ]),
   ],
-  providers: [MarketsService, ParimutuelEngine, LMSRService, KeeperService],
+  providers: [MarketsService, ParimutuelEngine, LMSRService, KeeperService, ReputationService],
   controllers: [MarketsController],
   exports: [MarketsService, ParimutuelEngine],
 })

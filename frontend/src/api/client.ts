@@ -93,6 +93,12 @@ export interface AuthUser {
   // Boolean flags — hashes are never sent to the client
   isDkPhoneLinked?: boolean;
   isPhoneVerified?: boolean;
+  // Reputation
+  reputationScore?: number | null;
+  reputationTier?: string;
+  totalPredictions?: number;
+  correctPredictions?: number;
+  categoryScores?: Record<string, { correct: number; total: number }> | null;
 }
 
 export interface AuthResponse {
@@ -141,7 +147,8 @@ export interface Outcome {
   label: string;
   totalBetAmount: string;
   currentOdds: string;
-  lmsrProbability?: number; // LMSR probability (0-1)
+  lmsrProbability?: number;
+  reputationSignal?: number | null; // reputation-weighted probability (null = not enough data)
   isWinner: boolean;
   marketId: string;
 }

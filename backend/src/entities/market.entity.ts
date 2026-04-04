@@ -24,6 +24,15 @@ export enum MarketMechanism {
   PARIMUTUEL = "parimutuel",
 }
 
+export enum MarketCategory {
+  SPORTS        = "sports",
+  POLITICS      = "politics",
+  WEATHER       = "weather",
+  ENTERTAINMENT = "entertainment",
+  ECONOMY       = "economy",
+  OTHER         = "other",
+}
+
 @Entity("markets")
 export class Market {
   @PrimaryGeneratedColumn("uuid")
@@ -57,6 +66,13 @@ export class Market {
 
   @Column({ type: "decimal", precision: 18, scale: 2, default: 1000 })
   liquidityParam: number; // LMSR 'b' parameter
+
+  @Column({
+    type: "enum",
+    enum: MarketCategory,
+    default: MarketCategory.OTHER,
+  })
+  category: MarketCategory;
 
   @Column({ nullable: true })
   resolvedOutcomeId: string;

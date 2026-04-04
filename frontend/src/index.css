@@ -10,6 +10,8 @@
   --text-main: #0f172a;
   --text-muted: #64748b;
   --text-subtle: #94a3b8;
+  --bg-secondary: #f1f5f9;
+  --border: #e2e8f0;
   
   /* Gradients */
   --grad-primary: linear-gradient(135deg, #3ecf6e 0%, #2b7fdb 100%);
@@ -42,6 +44,8 @@ html.dark {
   --text-main: #f8fafc;
   --text-muted: #94a3b8;
   --text-subtle: #64748b;
+  --bg-secondary: #1e2d45;
+  --border: #334155;
   
   /* Gradients */
   --grad-primary: linear-gradient(135deg, #3ecf6e 0%, #2b7fdb 100%);

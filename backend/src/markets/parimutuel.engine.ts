@@ -11,6 +11,7 @@ import { Settlement } from "../entities/settlement.entity";
 import { Dispute } from "../entities/dispute.entity";
 import { User } from "../entities/user.entity";
 import { LMSRService } from "./lmsr.service";
+import { ReputationService } from "./reputation.service";
 
 
 // ─── Valid state machine transitions ────────────────────────────────────────
@@ -44,6 +45,7 @@ export class ParimutuelEngine implements OnModuleInit {
     private dataSource: DataSource,
     private lmsrService: LMSRService,
     private redis: RedisService,
+    private reputationService: ReputationService,
   ) {}
 
   private async getCreditsBalance(em: { getRepository: Function }, userId: string): Promise<number> {
@@ -246,7 +248,14 @@ export class ParimutuelEngine implements OnModuleInit {
     await this.refundDisputeBonds(marketId);
 
     // Settle
-    return this.settleMarket(market, winner);
+    const settlement = await this.settleMarket(market, winner);
+
+    // Recalculate reputation scores for all bettors — fire and forget
+    this.reputationService.recalculateForMarket(marketId).catch((err) =>
+      this.logger.warn(`[Reputation] Recalculation failed for market ${marketId}: ${err.message}`),
+    );
+
+    return settlement;
   }
 
   // Refund dispute bonds 

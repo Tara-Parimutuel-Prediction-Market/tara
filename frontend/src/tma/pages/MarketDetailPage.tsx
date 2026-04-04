@@ -148,6 +148,7 @@ export const MarketDetailPage: FC = () => {
                 const colors = ["#22c55e", "#ef4444", "#f59e0b", "#3b82f6", "#8b5cf6"];
                 const color = colors[idx % colors.length];
                 
+                const signal = outcome.reputationSignal;
                 return (
                   <div key={outcome.id}>
                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
@@ -157,6 +158,15 @@ export const MarketDetailPage: FC = () => {
                     <div style={{ background: "var(--bg-secondary)", height: 8, borderRadius: 10, overflow: "hidden" }}>
                       <div style={{ background: color, width: `${pct}%`, height: "100%", borderRadius: 10, transition: "width 1s" }} />
                     </div>
+                    {signal != null && (
+                      <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 5, fontSize: "0.72rem", color: "var(--text-subtle)", fontWeight: 600 }}>
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="#f59e0b" stroke="none">
+                          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                        </svg>
+                        Expert signal: <span style={{ color: "#f59e0b", fontWeight: 800 }}>{Math.round(signal * 100)}%</span>
+                        <span style={{ color: "var(--text-subtle)", fontWeight: 400, fontStyle: "italic" }}> — based on top predictors</span>
+                      </div>
+                    )}
                   </div>
                 );
               })}

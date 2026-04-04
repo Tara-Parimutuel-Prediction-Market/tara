@@ -110,6 +110,12 @@ export class UsersController {
         "dkCid",
         "dkAccountName",
         "telegramLinkedAt",
+        // reputation fields
+        "reputationScore",
+        "reputationTier",
+        "totalPredictions",
+        "correctPredictions",
+        "categoryScores",
         // hashes loaded only for boolean derivation — never forwarded to client
         "dkPhoneHash",
         "telegramPhoneHash",

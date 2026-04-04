@@ -78,6 +78,31 @@ export class User {
   @Column({ type: "timestamptz", nullable: true })
   telegramLinkedAt: Date | null;
 
+  // Reputation 
+
+  /** Overall accuracy score 0.0–1.0 (confidence-adjusted). Null until first market settles. */
+  @Column({ type: "decimal", precision: 5, scale: 4, nullable: true })
+  reputationScore: number | null;
+
+  /** 'newcomer' | 'regular' | 'reliable' | 'expert' */
+  @Column({ default: "newcomer" })
+  reputationTier: string;
+
+  /** Total resolved predictions (won + lost, excludes refunded). */
+  @Column({ default: 0 })
+  totalPredictions: number;
+
+  /** Total correct predictions. */
+  @Column({ default: 0 })
+  correctPredictions: number;
+
+  /**
+   * Per-category accuracy scores stored as JSON.
+   * Shape: { sports: { correct: 3, total: 5 }, politics: { correct: 1, total: 2 }, ... }
+   */
+  @Column({ type: "jsonb", nullable: true })
+  categoryScores: Record<string, { correct: number; total: number }> | null;
+
   @CreateDateColumn()
   createdAt: Date;
 

@@ -34,6 +34,7 @@ import { Transaction, TransactionType } from "../entities/transaction.entity";
 import { User } from "../entities/user.entity";
 import { ParimutuelEngine } from "./parimutuel.engine";
 import { LMSRService } from "./lmsr.service";
+import { ReputationService } from "./reputation.service";
 export class CreateMarketDto {
   @ApiProperty() @IsString() title: string;
   @ApiPropertyOptional() @IsOptional() @IsString() description?: string;
@@ -118,6 +119,7 @@ export class MarketsService {
     private lmsrService: LMSRService,
     private dataSource: DataSource,
     private redis: RedisService,
+    private reputationService: ReputationService,
   ) {}
 
   private async invalidateMarketCache(marketId?: string): Promise<void> {
@@ -199,6 +201,8 @@ export class MarketsService {
     }
 
     const markets = await qb.getMany();
+    // Attach reputation signal to each market's outcomes (fire in parallel)
+    await Promise.all(markets.map((m) => this.attachSignal(m)));
     await this.redis.setJsonEx(cacheKey, 30, markets);
     return markets;
   }
@@ -212,8 +216,23 @@ export class MarketsService {
       relations: ["outcomes"],
     });
     if (!market) throw new NotFoundException("Market not found");
+    await this.attachSignal(market);
     await this.redis.setJsonEx(cacheKey, 30, market);
     return market;
+  }
+
+  /**
+   * Attaches reputationSignal (0–1) to each outcome in-place.
+   * Signal is null when there are fewer than 3 unique bettors.
+   */
+  private async attachSignal(market: Market): Promise<void> {
+    if (!market.outcomes?.length || Number(market.totalPool) === 0) return;
+    const ids = market.outcomes.map((o) => o.id);
+    const signal = await this.reputationService.computeMarketSignal(market.id, ids);
+    for (const outcome of market.outcomes) {
+      (outcome as any).reputationSignal =
+        signal[outcome.id] != null ? signal[outcome.id] : null;
+    }
   }
 
   async update(id: string, dto: UpdateMarketDto): Promise<Market> {

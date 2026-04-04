@@ -25,9 +25,12 @@ function makeMarket(overrides: any = {}) {
     title: "Test Market",
     status: MarketStatus.OPEN,
     totalPool: 0,
-    houseEdgePct: 10,
+    houseEdgePct: 5,
     liquidityParam: 1000,
-    outcomes: [makeOutcome({ id: "o1", label: "A" }), makeOutcome({ id: "o2", label: "B" })],
+    outcomes: [
+      makeOutcome({ id: "o1", label: "A" }),
+      makeOutcome({ id: "o2", label: "B" }),
+    ],
     resolvedOutcomeId: null,
     resolvedAt: null,
     ...overrides,
@@ -42,9 +45,17 @@ describe("ParimutuelEngine.calcOdds", () => {
   beforeEach(() => {
     // calcOdds is a pure method — no dependencies needed
     engine = new ParimutuelEngine(
-      null as any, null as any, null as any, null as any,
-      null as any, null as any, null as any, null as any,
-      null as any, null as any,
+      null as any,
+      null as any,
+      null as any,
+      null as any,
+      null as any,
+      null as any,
+      null as any,
+      null as any,
+      null as any,
+      null as any,
+      null as any,
     );
   });
 
@@ -52,14 +63,14 @@ describe("ParimutuelEngine.calcOdds", () => {
     expect(engine.calcOdds(1000, 5, 0)).toBe(0);
   });
 
-  it("calculates correct odds with 10% house edge", () => {
-    // payoutPool = 1000 * 0.9 = 900; outcomePool = 500 → odds = 1.8
-    expect(engine.calcOdds(1000, 10, 500)).toBeCloseTo(1.8);
+  it("calculates correct odds with 5% house edge", () => {
+    // payoutPool = 1000 * 0.95 = 950; outcomePool = 500 → odds = 1.9
+    expect(engine.calcOdds(1000, 5, 500)).toBeCloseTo(1.9);
   });
 
-  it("calculates odds = 1.9 when one outcome takes entire pool (10% edge)", () => {
-    // payoutPool = 1000 * 0.9 = 900; winner holds all 1000 → 0.9
-    expect(engine.calcOdds(1000, 10, 1000)).toBeCloseTo(0.9);
+  it("calculates odds when one outcome takes entire pool (5% edge)", () => {
+    // payoutPool = 1000 * 0.95 = 950; winner holds all 1000 → 0.95
+    expect(engine.calcOdds(1000, 5, 1000)).toBeCloseTo(0.95);
   });
 
   it("handles 0% house edge", () => {
@@ -97,9 +108,14 @@ describe("ParimutuelEngine.placeBet", () => {
         }),
       }),
       findOne: jest.fn().mockResolvedValue({ id: "user-1" }),
-      save: jest.fn().mockImplementation((_entity: any, data: any) => Promise.resolve(data)),
+      save: jest
+        .fn()
+        .mockImplementation((_entity: any, data: any) => Promise.resolve(data)),
       create: jest.fn().mockImplementation((_entity: any, data: any) => data),
-      find: jest.fn().mockResolvedValue([]),
+      find: jest.fn().mockResolvedValue([
+        makeOutcome({ id: "o1", label: "A" }),
+        makeOutcome({ id: "o2", label: "B" }),
+      ]),
     };
 
     mockDataSource = {
@@ -117,19 +133,27 @@ describe("ParimutuelEngine.placeBet", () => {
     };
 
     engine = new ParimutuelEngine(
-      mockMarketRepo, null as any, mockBetRepo, null as any,
-      null as any, null as any, null as any,
-      mockDataSource, mockLmsr, mockRedis,
+      mockMarketRepo,
+      null as any,
+      mockBetRepo,
+      null as any,
+      null as any,
+      null as any,
+      null as any,
+      mockDataSource,
+      mockLmsr,
+      mockRedis,
+      null as any,
     );
   });
 
   it("throws when amount <= 0", async () => {
-    await expect(engine.placeBet("user-1", "market-1", "o1", 0)).rejects.toThrow(
-      BadRequestException,
-    );
-    await expect(engine.placeBet("user-1", "market-1", "o1", -5)).rejects.toThrow(
-      BadRequestException,
-    );
+    await expect(
+      engine.placeBet("user-1", "market-1", "o1", 0),
+    ).rejects.toThrow(BadRequestException);
+    await expect(
+      engine.placeBet("user-1", "market-1", "o1", -5),
+    ).rejects.toThrow(BadRequestException);
   });
 
   it("throws when market is not open", async () => {
@@ -138,15 +162,17 @@ describe("ParimutuelEngine.placeBet", () => {
         setLock: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         leftJoinAndSelect: jest.fn().mockReturnThis(),
-        getOne: jest.fn().mockResolvedValue(makeMarket({ status: MarketStatus.CLOSED })),
+        getOne: jest
+          .fn()
+          .mockResolvedValue(makeMarket({ status: MarketStatus.CLOSED })),
         select: jest.fn().mockReturnThis(),
         getRawOne: jest.fn().mockResolvedValue({ balance: 500 }),
       }),
     });
 
-    await expect(engine.placeBet("user-1", "market-1", "o1", 100)).rejects.toThrow(
-      "Market is not open for betting",
-    );
+    await expect(
+      engine.placeBet("user-1", "market-1", "o1", 100),
+    ).rejects.toThrow("Market is not open for betting");
   });
 
   it("throws when balance is insufficient", async () => {
@@ -163,16 +189,23 @@ describe("ParimutuelEngine.placeBet", () => {
       getOne: jest.fn().mockResolvedValue(makeMarket()),
     };
 
+    mockEm.find = jest.fn().mockResolvedValue([
+      makeOutcome({ id: "o1", label: "A" }),
+      makeOutcome({ id: "o2", label: "B" }),
+    ]);
     mockEm.getRepository.mockImplementation((entity: any) => {
-      if (entity?.name === "Transaction" || (entity && entity.toString().includes("Transaction"))) {
+      if (
+        entity?.name === "Transaction" ||
+        (entity && entity.toString().includes("Transaction"))
+      ) {
         return { createQueryBuilder: jest.fn().mockReturnValue(balanceQb) };
       }
       return { createQueryBuilder: jest.fn().mockReturnValue(marketQb) };
     });
 
-    await expect(engine.placeBet("user-1", "market-1", "o1", 200)).rejects.toThrow(
-      "Insufficient balance",
-    );
+    await expect(
+      engine.placeBet("user-1", "market-1", "o1", 200),
+    ).rejects.toThrow("Insufficient balance");
   });
 
   it("throws when outcome not found in market", async () => {
@@ -190,12 +223,15 @@ describe("ParimutuelEngine.placeBet", () => {
 
     const result = await engine.placeBet("user-1", "market-1", "o1", 100);
     expect(result).toMatchObject({ id: "bet-1", status: BetStatus.PENDING });
-    expect(mockRedis.releaseLock).toHaveBeenCalledWith("market:market-1", "lock-token");
+    expect(mockRedis.releaseLock).toHaveBeenCalledWith(
+      "market:market-1",
+      "lock-token",
+    );
     expect(mockRedis.del).toHaveBeenCalled();
   });
 });
 
-// ─── transitionMarket ─────────────────────────────────────────────────────────
+// transitionMarket
 
 describe("ParimutuelEngine.transitionMarket", () => {
   let engine: ParimutuelEngine;
@@ -213,12 +249,23 @@ describe("ParimutuelEngine.transitionMarket", () => {
     const market = makeMarket({ status: MarketStatus.OPEN });
     mockMarketRepo = makeRepo(market);
     engine = new ParimutuelEngine(
-      mockMarketRepo, null as any, null as any, null as any,
-      null as any, null as any, null as any,
-      null as any, null as any, null as any,
+      mockMarketRepo,
+      null as any,
+      null as any,
+      null as any,
+      null as any,
+      null as any,
+      null as any,
+      null as any,
+      null as any,
+      null as any,
+      null as any,
     );
 
-    const result = await engine.transitionMarket("market-1", MarketStatus.CLOSED);
+    const result = await engine.transitionMarket(
+      "market-1",
+      MarketStatus.CLOSED,
+    );
     expect(result.status).toBe(MarketStatus.CLOSED);
   });
 
@@ -226,9 +273,17 @@ describe("ParimutuelEngine.transitionMarket", () => {
     const market = makeMarket({ status: MarketStatus.OPEN });
     mockMarketRepo = makeRepo(market);
     engine = new ParimutuelEngine(
-      mockMarketRepo, null as any, null as any, null as any,
-      null as any, null as any, null as any,
-      null as any, null as any, null as any,
+      mockMarketRepo,
+      null as any,
+      null as any,
+      null as any,
+      null as any,
+      null as any,
+      null as any,
+      null as any,
+      null as any,
+      null as any,
+      null as any,
     );
 
     await expect(
@@ -239,9 +294,17 @@ describe("ParimutuelEngine.transitionMarket", () => {
   it("throws when market not found", async () => {
     mockMarketRepo = { findOneBy: jest.fn().mockResolvedValue(null) };
     engine = new ParimutuelEngine(
-      mockMarketRepo, null as any, null as any, null as any,
-      null as any, null as any, null as any,
-      null as any, null as any, null as any,
+      mockMarketRepo,
+      null as any,
+      null as any,
+      null as any,
+      null as any,
+      null as any,
+      null as any,
+      null as any,
+      null as any,
+      null as any,
+      null as any,
     );
 
     await expect(
@@ -255,7 +318,12 @@ describe("ParimutuelEngine.transitionMarket", () => {
 describe("ParimutuelEngine.cancelMarket", () => {
   it("refunds all PENDING bets", async () => {
     const market = makeMarket({ status: MarketStatus.OPEN });
-    const pendingBet = { id: "b1", userId: "u1", amount: 100, status: BetStatus.PENDING };
+    const pendingBet = {
+      id: "b1",
+      userId: "u1",
+      amount: 100,
+      status: BetStatus.PENDING,
+    };
 
     const savedItems: any[] = [];
     const mockEm: any = {
@@ -276,10 +344,17 @@ describe("ParimutuelEngine.cancelMarket", () => {
     };
 
     const engine = new ParimutuelEngine(
-      null as any, null as any, null as any, null as any,
-      null as any, null as any, null as any,
+      null as any,
+      null as any,
+      null as any,
+      null as any,
+      null as any,
+      null as any,
+      null as any,
       { transaction: (cb: Function) => cb(mockEm) } as any,
-      null as any, null as any,
+      null as any,
+      null as any,
+      null as any,
     );
 
     await engine.cancelMarket("market-1");
@@ -293,7 +368,7 @@ describe("ParimutuelEngine.cancelMarket", () => {
   });
 });
 
-// ─── LMSRService ─────────────────────────────────────────────────────────────
+// LMSRService
 
 describe("LMSRService.calculateProbabilities", () => {
   const svc = new LMSRService();

@@ -18,6 +18,7 @@ interface TmaPaymentModalProps {
   onClose: () => void;
   market: Market;
   outcomeId: string;
+  initialAmount?: number;
   onSuccess?: (payment: PaymentResponse) => void;
   onFailure?: (error: string) => void;
 }
@@ -29,11 +30,12 @@ export function TmaPaymentModal({
   onClose,
   market,
   outcomeId,
+  initialAmount,
   onSuccess,
   onFailure,
 }: TmaPaymentModalProps) {
   const [selectedMethod, setSelectedMethod] = useState<"dkbank" | null>(null);
-  const [amountStr, setAmountStr] = useState("100");
+  const [amountStr, setAmountStr] = useState(() => initialAmount ? String(initialAmount) : "100");
   const [cidNumber, setCidNumber] = useState("");
   const [linkedCid, setLinkedCid] = useState<string | null>(null); // from user's profile
   const [customerName, setCustomerName] = useState("");
@@ -96,7 +98,7 @@ export function TmaPaymentModal({
 
   const resetForm = () => {
     setSelectedMethod(null);
-    setAmountStr("100");
+    setAmountStr(initialAmount ? String(initialAmount) : "100");
     setCidNumber("");
     setLinkedCid(null);
     setCustomerName("");
