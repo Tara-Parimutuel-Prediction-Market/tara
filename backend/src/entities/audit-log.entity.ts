@@ -35,7 +35,7 @@ export class AuditLog {
   @Column()
   adminId: string;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   adminUsername: string;
 
   /** What action was performed */
@@ -43,11 +43,11 @@ export class AuditLog {
   action: AuditAction | string;
 
   /** The entity type affected (market, user, payment, etc.) */
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   entityType: string;
 
   /** The UUID of the affected entity */
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   entityId: string;
 
   /**
@@ -64,7 +64,7 @@ export class AuditLog {
   };
 
   /** HTTP request IP address */
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   ipAddress: string;
 
   @CreateDateColumn()

@@ -37,14 +37,14 @@ export class Transaction {
   balanceAfter: number;
 
   @Index()
-  @Column({ nullable: true })
+  @Column({ type: "uuid", nullable: true })
   paymentId: string;
 
   @Index()
-  @Column({ nullable: true })
+  @Column({ type: "uuid", nullable: true })
   betId: string;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   note: string;
 
   @CreateDateColumn()

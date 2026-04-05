@@ -50,35 +50,35 @@ export class Payment {
   @Column({ type: "varchar", length: 10, default: "BTN" })
   currency: string;
 
-  @Column({ nullable: true, unique: true })
+  @Column({ type: "varchar", nullable: true, unique: true })
   externalPaymentId: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   referenceId: string | null;
 
   // DK-specific refs to correlate callbacks/webhooks reliably.
-  @Column({ nullable: true, name: "dkinquiryid" })
+  @Column({ type: "varchar", nullable: true, name: "dkinquiryid" })
   dkInquiryId: string | null;
 
-  @Column({ nullable: true, name: "dktxnstatusid" })
+  @Column({ type: "varchar", nullable: true, name: "dktxnstatusid" })
   dkTxnStatusId: string | null;
 
-  @Column({ nullable: true, name: "dkrequestid" })
+  @Column({ type: "varchar", nullable: true, name: "dkrequestid" })
   dkRequestId: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   customerPhone: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   description: string | null;
 
   @Column({ type: "json", nullable: true })
   metadata: Record<string, any> | null;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   failureReason: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: "timestamptz", nullable: true })
   confirmedAt: Date | null;
 
   @CreateDateColumn()

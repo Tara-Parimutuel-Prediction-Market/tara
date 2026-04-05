@@ -18,45 +18,45 @@ export class User {
   id: string;
 
   @Index({ unique: true })
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   telegramId: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: "int", nullable: true })
   telegramStreak: number | null;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   firstName: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   lastName: string | null;
 
   @Index({ unique: true, sparse: true } as any)
-  @Column({ nullable: true, unique: true })
+  @Column({ type: "varchar", nullable: true, unique: true })
   username: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   photoUrl: string | null;
 
   @Column({ default: false })
   isAdmin: boolean;
 
   @Index({ unique: true, sparse: true } as any)
-  @Column({ nullable: true, unique: true })
+  @Column({ type: "varchar", nullable: true, unique: true })
   dkCid: string | null;
 
   @Index({ unique: true, sparse: true } as any)
-  @Column({ nullable: true, unique: true })
+  @Column({ type: "varchar", nullable: true, unique: true })
   dkAccountNumber: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   dkAccountName: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   phoneNumber: string | null;
 
   /** Telegram chat_id bound during phone-verification handshake. */
   @Index({ unique: true, sparse: true } as any)
-  @Column({ nullable: true, unique: true })
+  @Column({ type: "varchar", nullable: true, unique: true })
   telegramChatId: string | null;
 
   /**
@@ -64,21 +64,21 @@ export class User {
    * Compared against dkPhoneHash on every payment to confirm identity.
    * NEVER stores the raw phone number.
    */
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   telegramPhoneHash: string | null;
 
   /**
    * HMAC-SHA-256 hash of the phone number returned by DK Bank for this CID.
    * Set at registration / DK-link time.
    */
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   dkPhoneHash: string | null;
 
   /** Timestamp when the Telegram account was successfully phone-verified. */
   @Column({ type: "timestamptz", nullable: true })
   telegramLinkedAt: Date | null;
 
-  // Reputation 
+  // Reputation
 
   /** Overall accuracy score 0.0–1.0 (confidence-adjusted). Null until first market settles. */
   @Column({ type: "decimal", precision: 5, scale: 4, nullable: true })

@@ -67,14 +67,14 @@ export class PaymentOtp {
    * DK Bank's bfsTxnId returned from account_auth.
    * Required to call debit_request (confirm OTP step).
    */
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   bfsTxnId: string | null;
 
   // ── Relations ─────────────────────────────────────────────────────────────
 
   /** The DK Bank payment this OTP session belongs to. */
   @Index()
-  @Column({ nullable: true })
+  @Column({ type: "uuid", nullable: true })
   paymentId: string | null;
 
   @ManyToOne(() => Payment, { nullable: true, onDelete: "SET NULL" })
@@ -95,7 +95,7 @@ export class PaymentOtp {
    * or topping up credits to bet on a specific market.
    */
   @Index()
-  @Column({ nullable: true })
+  @Column({ type: "uuid", nullable: true })
   marketId: string | null;
 
   @ManyToOne(() => Market, { nullable: true, onDelete: "SET NULL" })
@@ -106,7 +106,7 @@ export class PaymentOtp {
    * Dispute context — set when the payment is for a dispute bond.
    */
   @Index()
-  @Column({ nullable: true })
+  @Column({ type: "uuid", nullable: true })
   disputeId: string | null;
 
   @ManyToOne(() => Dispute, { nullable: true, onDelete: "SET NULL" })

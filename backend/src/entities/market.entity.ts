@@ -44,7 +44,7 @@ export class Market {
   @Column({ type: "text", nullable: true })
   description: string;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   imageUrl: string;
 
   @Index()
@@ -74,10 +74,10 @@ export class Market {
   })
   category: MarketCategory;
 
-  @Column({ nullable: true })
+  @Column({ type: "uuid", nullable: true })
   resolvedOutcomeId: string;
 
-  @Column({ nullable: true })
+  @Column({ type: "uuid", nullable: true })
   proposedOutcomeId: string;
 
   @Column({ type: "timestamptz", nullable: true })
