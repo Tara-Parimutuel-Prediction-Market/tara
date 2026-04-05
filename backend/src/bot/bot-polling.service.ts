@@ -82,15 +82,25 @@ export class BotPollingService
 
   private async registerWebhook(url: string) {
     try {
+      const secretToken =
+        this.config.get<string>("TELEGRAM_WEBHOOK_SECRET") ||
+        process.env.TELEGRAM_WEBHOOK_SECRET ||
+        undefined;
+
+      const payload: Record<string, unknown> = {
+        url,
+        allowed_updates: ["message", "callback_query"],
+      };
+      if (secretToken) {
+        payload.secret_token = secretToken;
+      }
+
       const res = await fetch(
         `https://api.telegram.org/bot${this.botToken}/setWebhook`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            url,
-            allowed_updates: ["message", "callback_query"],
-          }),
+          body: JSON.stringify(payload),
         },
       );
       const data: any = await res.json();
@@ -127,8 +137,13 @@ export class BotPollingService
   private async poll() {
     while (this.pollingActive) {
       try {
+        const params = new URLSearchParams({
+          offset: String(this.offset),
+          timeout: "30",
+          allowed_updates: JSON.stringify(["message", "callback_query"]),
+        });
         const res = await fetch(
-          `https://api.telegram.org/bot${this.botToken}/getUpdates?offset=${this.offset}&timeout=30&allowed_updates=["message","callback_query"]`,
+          `https://api.telegram.org/bot${this.botToken}/getUpdates?${params}`,
         );
         if (!res.ok) {
           this.logger.warn(
@@ -204,29 +219,35 @@ export class BotPollingService
             this.config.get<string>("TELEGRAM_MINI_APP_URL") ||
             process.env.TELEGRAM_MINI_APP_URL ||
             "";
-          await fetch(
+          const payload: Record<string, unknown> = {
+            chat_id: chatId,
+            text:
+              "🎯 <b>Welcome to Tara!</b>\n\n" +
+              "To enable secure payments, please verify your phone:\n" +
+              "👉 Type /verify and share your phone number.\n\n" +
+              "Other commands:\n" +
+              "/predict - View active markets\n" +
+              "/help    - Show all commands",
+            parse_mode: "HTML",
+          };
+          if (miniAppUrl) {
+            payload.reply_markup = {
+              inline_keyboard: [[{ text: "🚀 Open Tara", url: miniAppUrl }]],
+            };
+          }
+          const res = await fetch(
             `https://api.telegram.org/bot${this.botToken}/sendMessage`,
             {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                chat_id: chatId,
-                text:
-                  "🎯 <b>Welcome to Tara!</b>\n\n" +
-                  "To enable secure payments, please verify your phone:\n" +
-                  "👉 Type /verify and share your phone number.\n\n" +
-                  "Other commands:\n" +
-                  "/predict - View active markets\n" +
-                  "/help    - Show all commands",
-                parse_mode: "HTML",
-                reply_markup: {
-                  inline_keyboard: [
-                    [{ text: "🚀 Open Tara", url: miniAppUrl }],
-                  ],
-                },
-              }),
+              body: JSON.stringify(payload),
             },
           );
+          if (!res.ok) {
+            this.logger.error(
+              `[Bot] /start sendMessage failed: ${await res.text()}`,
+            );
+          }
           break;
         }
 
@@ -260,19 +281,33 @@ export class BotPollingService
 
   private async handlePredictCommand(chatId: number, telegramUserId?: number) {
     const markets = await this.marketRepo.find({
-      where: [{ status: MarketStatus.OPEN }, { status: MarketStatus.RESOLVING }],
+      where: [
+        { status: MarketStatus.OPEN },
+        { status: MarketStatus.RESOLVING },
+      ],
       order: { closesAt: "ASC" },
       take: 5,
     });
 
     if (!markets.length) {
-      await this.telegramSimple.sendMessage(chatId, "📊 No active markets right now. Check back soon!");
+      await this.telegramSimple.sendMessage(
+        chatId,
+        "📊 No active markets right now. Check back soon!",
+      );
       return;
     }
 
-    const miniAppUrl = this.config.get<string>("TELEGRAM_MINI_APP_URL") || process.env.TELEGRAM_MINI_APP_URL || "";
+    const miniAppUrl =
+      this.config.get<string>("TELEGRAM_MINI_APP_URL") ||
+      process.env.TELEGRAM_MINI_APP_URL ||
+      "";
     const lines = markets.map((m) => {
-      const closes = m.closesAt ? new Date(m.closesAt).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" }) : "TBD";
+      const closes = m.closesAt
+        ? new Date(m.closesAt).toLocaleString("en-US", {
+            dateStyle: "medium",
+            timeStyle: "short",
+          })
+        : "TBD";
       const statusIcon = m.status === MarketStatus.RESOLVING ? "⚖️" : "🟢";
       return `${statusIcon} <b>${m.title}</b>\n⏰ ${closes}`;
     });
@@ -289,12 +324,17 @@ export class BotPollingService
           "\n\n⭐ <i>Make your first prediction to start building your reputation score. Top predictors carry more weight in market probabilities.</i>";
       } else {
         const tierLabel =
-          user.reputationTier === "expert" ? "Expert" :
-          user.reputationTier === "reliable" ? "Reliable" :
-          user.reputationTier === "regular" ? "Regular" : "Newcomer";
-        const pct = user.reputationScore != null
-          ? ` · ${Math.round(user.reputationScore * 100)}% accuracy`
-          : "";
+          user.reputationTier === "expert"
+            ? "Expert"
+            : user.reputationTier === "reliable"
+              ? "Reliable"
+              : user.reputationTier === "regular"
+                ? "Regular"
+                : "Newcomer";
+        const pct =
+          user.reputationScore != null
+            ? ` · ${Math.round(user.reputationScore * 100)}% accuracy`
+            : "";
         reputationLine = `\n\n⭐ Your tier: <b>${tierLabel}</b>${pct} (${user.totalPredictions} predictions)`;
       }
     }

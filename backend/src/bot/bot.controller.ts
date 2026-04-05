@@ -94,26 +94,30 @@ export class BotController {
         case "/start": {
           const miniAppUrl = process.env.TELEGRAM_MINI_APP_URL || "";
           const botToken = process.env.TELEGRAM_BOT_TOKEN;
-          await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+          const payload: Record<string, unknown> = {
+            chat_id: chatId,
+            text:
+              "🎯 <b>Welcome to Tara!</b>\n\n" +
+              "To enable secure payments, please verify your phone:\n" +
+              "👉 Type /verify and share your phone number.\n\n" +
+              "Other commands:\n" +
+              "/predict - View active markets\n" +
+              "/help    - Show all commands",
+            parse_mode: "HTML",
+          };
+          if (miniAppUrl) {
+            payload.reply_markup = {
+              inline_keyboard: [[{ text: "🚀 Open Tara", url: miniAppUrl }]],
+            };
+          }
+          const startRes = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              chat_id: chatId,
-              text:
-                "🎯 <b>Welcome to Tara!</b>\n\n" +
-                "To enable secure payments, please verify your phone:\n" +
-                "👉 Type /verify and share your phone number.\n\n" +
-                "Other commands:\n" +
-                "/predict - View active markets\n" +
-                "/help    - Show all commands",
-              parse_mode: "HTML",
-              reply_markup: {
-                inline_keyboard: [
-                  [{ text: "🚀 Open Tara", web_app: { url: miniAppUrl } }],
-                ],
-              },
-            }),
+            body: JSON.stringify(payload),
           });
+          if (!startRes.ok) {
+            console.error(`[Bot] /start sendMessage failed: ${await startRes.text()}`);
+          }
           break;
         }
 
