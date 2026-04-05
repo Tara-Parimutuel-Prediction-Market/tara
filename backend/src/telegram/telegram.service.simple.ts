@@ -15,7 +15,7 @@ export class TelegramSimpleService {
     private readonly configService: ConfigService,
     @InjectRepository(User) private readonly userRepository: Repository<User>,
   ) {
-    this.botToken = this.configService.get<string>("TELEGRAM_BOT_TOKEN");
+    this.botToken = this.configService.getOrThrow<string>("TELEGRAM_BOT_TOKEN");
   }
 
   /** Send a message using built-in fetch — no axios/HttpService dependency. */

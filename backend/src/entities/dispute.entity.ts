@@ -22,7 +22,7 @@ export class Dispute {
 
   @ApiPropertyOptional({ example: "The match result was different", description: "Reason for disputing" })
   @Column({ type: "text", nullable: true })
-  reason: string;
+  reason: string | null;
 
   @ApiPropertyOptional({ description: "DK Bank payment ID used as bond (null if paid from credits)" })
   @Column({ type: "uuid", nullable: true })

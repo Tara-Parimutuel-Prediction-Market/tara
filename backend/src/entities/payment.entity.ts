@@ -51,35 +51,35 @@ export class Payment {
   currency: string;
 
   @Column({ nullable: true, unique: true })
-  externalPaymentId: string; // DK Bank transaction ID, TON transaction hash, etc.
+  externalPaymentId: string | null;
 
   @Column({ nullable: true })
-  referenceId: string; // betId, marketId, or other reference
+  referenceId: string | null;
 
   // DK-specific refs to correlate callbacks/webhooks reliably.
   @Column({ nullable: true, name: "dkinquiryid" })
-  dkInquiryId: string;
+  dkInquiryId: string | null;
 
   @Column({ nullable: true, name: "dktxnstatusid" })
-  dkTxnStatusId: string;
+  dkTxnStatusId: string | null;
 
   @Column({ nullable: true, name: "dkrequestid" })
-  dkRequestId: string;
+  dkRequestId: string | null;
 
   @Column({ nullable: true })
-  customerPhone: string; // For DK Bank payments
+  customerPhone: string | null;
 
   @Column({ nullable: true })
-  description: string;
+  description: string | null;
 
   @Column({ type: "json", nullable: true })
-  metadata: Record<string, any>; // Additional payment gateway data
+  metadata: Record<string, any> | null;
 
   @Column({ nullable: true })
-  failureReason: string;
+  failureReason: string | null;
 
   @Column({ nullable: true })
-  confirmedAt: Date;
+  confirmedAt: Date | null;
 
   @CreateDateColumn()
   createdAt: Date;

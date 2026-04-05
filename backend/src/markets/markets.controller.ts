@@ -62,7 +62,7 @@ export class MarketsController {
 
   @Post(":id/bets")
   @ApiOperation({ summary: "Place a bet on a market outcome" })
-  placeBet(@Param("id") id: string, @Body() dto: PlaceBetDto, @Request() req) {
+  placeBet(@Param("id") id: string, @Body() dto: PlaceBetDto, @Request() req: any) {
     return this.marketsService.placeBet(req.user.userId, id, dto);
   }
 
@@ -82,7 +82,7 @@ export class MarketsController {
   submitDispute(
     @Param("id") id: string,
     @Body() dto: SubmitDisputeDto,
-    @Request() req,
+    @Request() req: any,
   ) {
     return this.marketsService.submitDispute(req.user.userId, id, dto);
   }

@@ -14,7 +14,7 @@ export class BetsController {
 
   @Get("my")
   @ApiOperation({ summary: "Get my betting history" })
-  myBets(@Request() req) {
+  myBets(@Request() req: any) {
     return this.betRepo.find({
       where: { userId: req.user.userId },
       relations: ["market", "outcome"],

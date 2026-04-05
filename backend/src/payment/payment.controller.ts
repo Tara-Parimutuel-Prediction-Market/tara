@@ -14,82 +14,13 @@ import {
 } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiResponse, ApiBody } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
-import { IsString, IsNotEmpty, MinLength, MaxLength, IsNumber, IsIn, IsOptional, IsUUID } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards';
 import { DKBankPaymentService } from './dkbank-payment.service';
 import { DKGatewayService } from './services/dk-gateway/dk-gateway.service';
 import { RedisService } from '../redis/redis.service';
-
-// DTO class for DK Bank payment initiation
-class InitiatePaymentDto {
-  @ApiProperty({ description: 'Payment description', example: 'Tara Credits top-up', minLength: 3, maxLength: 500 })
-  @IsString()
-  @IsNotEmpty()
-  @MinLength(3)
-  @MaxLength(500)
-  description: string;
-
-  @ApiProperty({ description: 'Amount in BTN', example: 100 })
-  @IsNumber()
-  @IsNotEmpty()
-  amount: number;
-
-  @ApiProperty({ description: 'Customer phone number registered with DK Bank', example: '17123456' })
-  @IsString()
-  @IsNotEmpty()
-  customerPhone: string;
-
-  @ApiProperty({ description: 'Market ID to link this payment to (optional)', required: false })
-  @IsOptional()
-  @IsUUID()
-  marketId?: string;
-
-  @ApiProperty({ description: 'Dispute ID to link this payment to (optional)', required: false })
-  @IsOptional()
-  @IsUUID()
-  disputeId?: string;
-}
-
-// DTO class for OTP confirmation
-class ConfirmPaymentDto {
-  @ApiProperty({ description: 'Payment ID from initiation', example: 'uuid-here' })
-  @IsString()
-  @IsNotEmpty()
-  paymentId: string;
-
-  @ApiProperty({ description: '6-digit OTP sent by DK Bank', example: '123456' })
-  @IsString()
-  @IsNotEmpty()
-  @MinLength(4)
-  @MaxLength(8)
-  otp: string;
-}
-
-// DTO class for client inquiry
-class ClientInquiryDto {
-  @ApiProperty({ 
-    description: 'ID type - must be "CID"',
-    example: 'CID',
-    enum: ['CID']
-  })
-  @IsString()
-  @IsNotEmpty()
-  @IsIn(['CID'])
-  id_type: 'CID';
-
-  @ApiProperty({ 
-    description: 'CID number - 11 digits',
-    example: '11000000000',
-    minLength: 11,
-    maxLength: 11
-  })
-  @IsString()
-  @IsNotEmpty()
-  @MinLength(11)
-  @MaxLength(11)
-  id_number: string;
-}
+import { InitiatePaymentDto } from './dto/initiate-payment.dto';
+import { ConfirmPaymentDto } from './dto/confirm-payment.dto';
+import { ClientInquiryDto } from './dto/client-inquiry.dto';
 
 @ApiTags('Payments')
 @Controller('payments')
@@ -117,7 +48,7 @@ export class PaymentController {
   @ApiOperation({ summary: 'Step 1: Initiate DK Bank payment (sends OTP to customer phone)' })
   @ApiBody({ type: InitiatePaymentDto })
   @ApiResponse({ status: 200, description: 'Payment initiated — OTP sent to customer' })
-  async initiateDKBankPayment(@Body() paymentData: InitiatePaymentDto, @Request() req) {
+  async initiateDKBankPayment(@Body() paymentData: InitiatePaymentDto, @Request() req: any) {
     // 5 payment initiations per minute per user
     await this.enforceRateLimit(`payment:initiate:${req.user.userId}`, 5, 60);
     return this.dkBankPaymentService.initiatePayment(req.user.userId, {
@@ -135,7 +66,7 @@ export class PaymentController {
   @ApiOperation({ summary: 'Step 2: Confirm DK Bank payment with OTP' })
   @ApiBody({ type: ConfirmPaymentDto })
   @ApiResponse({ status: 200, description: 'Payment submitted to DK Bank' })
-  async confirmDKBankPayment(@Body() dto: ConfirmPaymentDto, @Request() req) {
+  async confirmDKBankPayment(@Body() dto: ConfirmPaymentDto, @Request() req: any) {
     // 5 OTP confirmation attempts per 15 minutes per user
     await this.enforceRateLimit(`payment:confirm:${req.user.userId}`, 5, 900);
     return this.dkBankPaymentService.confirmPayment(req.user.userId, dto.paymentId, dto.otp);
@@ -159,7 +90,7 @@ export class PaymentController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "DK client inquiry by CID" })
   @ApiBody({ type: ClientInquiryDto })
-  async clientInquiry(@Body() dto: ClientInquiryDto, @Request() req) {
+  async clientInquiry(@Body() dto: ClientInquiryDto, @Request() req: any) {
     if (!dto?.id_type || dto.id_type !== "CID") {
       throw new BadRequestException(`id_type must be "CID"`);
     }
@@ -178,7 +109,7 @@ export class PaymentController {
   @ApiOperation({ summary: "Check DK Bank payment status" })
   async checkDKBankPaymentStatusOwned(
     @Param("paymentId") paymentId: string,
-    @Request() req,
+    @Request() req: any,
   ) {
     return this.dkBankPaymentService.getPaymentStatus(req.user.userId, paymentId);
   }

@@ -14,31 +14,13 @@ import {
   ApiOperation,
   ApiQuery,
   ApiBody,
-  ApiProperty,
   ApiBearerAuth,
 } from "@nestjs/swagger";
-import { IsString, IsNotEmpty, Length } from "class-validator";
 import { createHmac, timingSafeEqual } from "crypto";
 import { AuthService } from "./auth.service";
 import { Public, JwtAuthGuard } from "./guards";
-
-class TelegramAuthDto {
-  @IsString()
-  initData: string;
-}
-
-class DKBankAuthDto {
-  @ApiProperty({
-    description: "CID (11-digit national ID)",
-    example: "11000000000",
-    minLength: 11,
-    maxLength: 11,
-  })
-  @IsString()
-  @IsNotEmpty()
-  @Length(11, 11)
-  cid: string;
-}
+import { TelegramAuthDto } from "./dto/telegram-auth.dto";
+import { DKBankAuthDto } from "./dto/dkbank-auth.dto";
 
 @ApiTags("auth")
 @Controller("auth")
