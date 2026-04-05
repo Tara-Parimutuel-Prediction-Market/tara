@@ -56,9 +56,9 @@ export class TelegramService {
     private readonly marketRepository: Repository<Market>,
     @InjectRepository(Bet) private readonly betRepository: Repository<Bet>,
   ) {
-    this.botToken = this.configService.get<string>("TELEGRAM_BOT_TOKEN");
-    this.webhookUrl = this.configService.get<string>("TELEGRAM_WEBHOOK_URL");
-    this.miniAppUrl = this.configService.get<string>("TELEGRAM_MINI_APP_URL");
+    this.botToken = this.configService.getOrThrow<string>("TELEGRAM_BOT_TOKEN");
+    this.webhookUrl = this.configService.getOrThrow<string>("TELEGRAM_WEBHOOK_URL");
+    this.miniAppUrl = this.configService.getOrThrow<string>("TELEGRAM_MINI_APP_URL");
   }
 
   async setWebhook(): Promise<void> {

@@ -19,45 +19,45 @@ export class User {
 
   @Index({ unique: true })
   @Column({ nullable: true })
-  telegramId: string; // Telegram numeric user ID as string
+  telegramId: string | null;
 
   @Column({ nullable: true })
-  telegramStreak: number; // Current winning streak in Telegram
+  telegramStreak: number | null;
 
   @Column({ nullable: true })
-  firstName: string;
+  firstName: string | null;
 
   @Column({ nullable: true })
-  lastName: string;
+  lastName: string | null;
 
   @Index({ unique: true, sparse: true } as any)
   @Column({ nullable: true, unique: true })
-  username: string;
+  username: string | null;
 
   @Column({ nullable: true })
-  photoUrl: string;
+  photoUrl: string | null;
 
   @Column({ default: false })
   isAdmin: boolean;
 
   @Index({ unique: true, sparse: true } as any)
   @Column({ nullable: true, unique: true })
-  dkCid: string; // DK Bank CID (11-digit national ID)
+  dkCid: string | null;
 
   @Index({ unique: true, sparse: true } as any)
   @Column({ nullable: true, unique: true })
-  dkAccountNumber: string; // DK Bank account number resolved from CID
+  dkAccountNumber: string | null;
 
   @Column({ nullable: true })
-  dkAccountName: string; // Full name from DK Bank account inquiry
+  dkAccountName: string | null;
 
   @Column({ nullable: true })
-  phoneNumber: string; // Phone number from DK Bank account
+  phoneNumber: string | null;
 
   /** Telegram chat_id bound during phone-verification handshake. */
   @Index({ unique: true, sparse: true } as any)
   @Column({ nullable: true, unique: true })
-  telegramChatId: string;
+  telegramChatId: string | null;
 
   /**
    * HMAC-SHA-256 hash of the Telegram-shared phone number.
@@ -65,14 +65,14 @@ export class User {
    * NEVER stores the raw phone number.
    */
   @Column({ nullable: true })
-  telegramPhoneHash: string;
+  telegramPhoneHash: string | null;
 
   /**
    * HMAC-SHA-256 hash of the phone number returned by DK Bank for this CID.
    * Set at registration / DK-link time.
    */
   @Column({ nullable: true })
-  dkPhoneHash: string;
+  dkPhoneHash: string | null;
 
   /** Timestamp when the Telegram account was successfully phone-verified. */
   @Column({ type: "timestamptz", nullable: true })

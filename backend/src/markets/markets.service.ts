@@ -6,19 +6,10 @@ import {
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, DataSource } from "typeorm";
 import { RedisService } from "../redis/redis.service";
-import {
-  IsString,
-  IsOptional,
-  IsNumber,
-  IsDateString,
-  IsUUID,
-  Min,
-  Max,
-  IsArray,
-  IsPositive,
-} from "class-validator";
-
-import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { CreateMarketDto } from "./dto/create-market.dto";
+import { UpdateMarketDto } from "./dto/update-market.dto";
+import { PlaceBetDto } from "./dto/place-bet.dto";
+import { SubmitDisputeDto } from "./dto/submit-dispute.dto";
 import {
   Market,
   MarketStatus,
@@ -36,77 +27,10 @@ import { User } from "../entities/user.entity";
 import { ParimutuelEngine } from "./parimutuel.engine";
 import { LMSRService } from "./lmsr.service";
 import { ReputationService } from "./reputation.service";
-export class CreateMarketDto {
-  @ApiProperty() @IsString() title: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() description?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() imageUrl?: string;
-  @ApiPropertyOptional() @IsOptional() @IsDateString() opensAt?: string;
-  @ApiPropertyOptional() @IsOptional() @IsDateString() closesAt?: string;
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  @Max(50)
-  houseEdgePct?: number;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsNumber()
-  liquidityParam?: number;
-
-  @ApiProperty({
-    type: [String],
-    description: 'Outcome labels e.g. ["Team A wins","Draw","Team B wins"]',
-  })
-  @IsArray()
-  @IsString({ each: true })
-  outcomes: string[];
-}
-
-export class UpdateMarketDto {
-  @ApiPropertyOptional() @IsOptional() @IsString() title?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() description?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() imageUrl?: string;
-  @ApiPropertyOptional() @IsOptional() @IsDateString() opensAt?: string;
-  @ApiPropertyOptional() @IsOptional() @IsDateString() closesAt?: string;
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  @Max(50)
-  houseEdgePct?: number;
-  @ApiPropertyOptional() @IsOptional() @IsNumber() liquidityParam?: number;
-}
-
-export class PlaceBetDto {
-  @ApiProperty() @IsUUID() outcomeId: string;
-  @ApiProperty() @IsNumber() @Min(1) amount: number;
-}
-
-export class SubmitDisputeDto {
-  @ApiPropertyOptional({
-    description:
-      "Bond amount in credits (used when paying from credit balance)",
-  })
-  @IsOptional()
-  @IsNumber()
-  @IsPositive()
-  bondAmount?: number;
-
-  @ApiPropertyOptional({
-    description: "Completed DK Bank payment ID to use as bond",
-  })
-  @IsOptional()
-  @IsUUID()
-  paymentId?: string;
-
-  @ApiPropertyOptional({
-    description: "Reason for disputing the proposed outcome",
-  })
-  @IsOptional()
-  @IsString()
-  reason?: string;
-}
+export { CreateMarketDto } from "./dto/create-market.dto";
+export { UpdateMarketDto } from "./dto/update-market.dto";
+export { PlaceBetDto } from "./dto/place-bet.dto";
+export { SubmitDisputeDto } from "./dto/submit-dispute.dto";
 
 @Injectable()
 export class MarketsService {

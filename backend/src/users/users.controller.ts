@@ -93,7 +93,7 @@ export class UsersController {
   @Get("me")
   @ApiOperation({ summary: "Get my profile & balance" })
   @ApiResponse({ status: 200, type: ProfileResponse })
-  async getMe(@Request() req) {
+  async getMe(@Request() req: any) {
     const userId: string = req.user.userId;
 
     const user = await this.userRepo.findOne({
@@ -148,7 +148,7 @@ export class UsersController {
 
   @Get("me/payments")
   @ApiOperation({ summary: "Get my payment history" })
-  getPayments(@Request() req) {
+  getPayments(@Request() req: any) {
     return this.paymentRepo.find({
       where: { userId: req.user.userId },
       order: { createdAt: "DESC" },
@@ -174,7 +174,7 @@ export class UsersController {
   })
   @ApiResponse({ status: 200, type: [TransactionResponse] })
   getTransactions(
-    @Request() req,
+    @Request() req: any,
     @Query("limit") limit?: string,
     @Query("type") type?: TransactionType,
   ) {
@@ -199,7 +199,7 @@ export class UsersController {
     description: "Filter by bet status",
   })
   @ApiResponse({ status: 200, type: [BetResponse] })
-  getMyBets(@Request() req, @Query("status") status?: BetStatus) {
+  getMyBets(@Request() req: any, @Query("status") status?: BetStatus) {
     const where: any = { userId: req.user.userId };
     if (status) where.status = status;
     return this.betRepo.find({
@@ -216,7 +216,7 @@ export class UsersController {
     summary: "Get my results — bets that have been won, lost, or refunded",
   })
   @ApiResponse({ status: 200, type: [BetResponse] })
-  getResults(@Request() req) {
+  getResults(@Request() req: any) {
     return this.betRepo
       .createQueryBuilder("bet")
       .leftJoinAndSelect("bet.market", "market")

@@ -161,12 +161,13 @@ export class AuthService {
     const freshUser = await this.userRepo.findOneBy({
       id: authMethod.user?.id ?? authMethod.userId,
     });
+    // freshUser cannot be null here — user was just saved/updated above
     const token = this.jwtService.sign({
-      sub: freshUser.id,
-      isAdmin: freshUser.isAdmin,
+      sub: freshUser!.id,
+      isAdmin: freshUser!.isAdmin,
     });
 
-    return { token, user: stripSensitiveFields(freshUser) };
+    return { token, user: stripSensitiveFields(freshUser!) };
   }
 
   // ── Dev-only: login and ensure isAdmin=true ───────────────────────────────
@@ -178,11 +179,12 @@ export class AuthService {
     }
     // Re-sign with isAdmin=true
     const freshUser = await this.userRepo.findOneBy({ id: userId });
+    // freshUser cannot be null — user was just returned by loginWithTelegram
     const token = this.jwtService.sign({
-      sub: freshUser.id,
-      isAdmin: freshUser.isAdmin,
+      sub: freshUser!.id,
+      isAdmin: freshUser!.isAdmin,
     });
-    return { token, user: stripSensitiveFields(freshUser) };
+    return { token, user: stripSensitiveFields(freshUser!) };
   }
 
   // ── Login / Register via DK Bank CID ──────────────────────────────────────
@@ -273,7 +275,7 @@ export class AuthService {
         });
         const updatedUser = await this.userRepo.findOneBy({ id: callerUserId });
         const { phoneNumber: _p1, ...safeDkAccount1 } = account;
-        return { token, user: stripSensitiveFields(updatedUser), dkAccount: safeDkAccount1 };
+        return { token, user: stripSensitiveFields(updatedUser!), dkAccount: safeDkAccount1 };
       }
     }
     // ────────────────────────────────────────────────────────────────────────
@@ -344,11 +346,11 @@ export class AuthService {
         await this.authMethodRepo.save(authMethod);
         const freshUser = await this.userRepo.findOneBy({ id: user.id });
         const token = this.jwtService.sign({
-          sub: freshUser.id,
-          isAdmin: freshUser.isAdmin,
+          sub: freshUser!.id,
+          isAdmin: freshUser!.isAdmin,
         });
         const { phoneNumber: _p2, ...safeDkAccount2 } = account;
-        return { token, user: stripSensitiveFields(freshUser), dkAccount: safeDkAccount2 };
+        return { token, user: stripSensitiveFields(freshUser!), dkAccount: safeDkAccount2 };
       }
 
       // Brand new user — create account linked to DK Bank identity
@@ -413,11 +415,11 @@ export class AuthService {
       id: authMethod.user?.id ?? authMethod.userId,
     });
     const token = this.jwtService.sign({
-      sub: freshUser.id,
-      isAdmin: freshUser.isAdmin,
+      sub: freshUser!.id,
+      isAdmin: freshUser!.isAdmin,
     });
 
     const { phoneNumber: _p3, ...safeDkAccount3 } = account;
-    return { token, user: stripSensitiveFields(freshUser), dkAccount: safeDkAccount3 };
+    return { token, user: stripSensitiveFields(freshUser!), dkAccount: safeDkAccount3 };
   }
 }

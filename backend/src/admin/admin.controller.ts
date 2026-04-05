@@ -10,29 +10,17 @@ import {
   HttpCode,
   Delete,
   Request,
+  NotFoundException,
 } from "@nestjs/common";
 import {
   ApiBearerAuth,
   ApiTags,
   ApiOperation,
-  ApiProperty,
-  ApiPropertyOptional,
   ApiResponse,
   ApiQuery,
 } from "@nestjs/swagger";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
-import {
-  IsUUID,
-  IsEnum,
-  IsOptional,
-  IsIn,
-  IsInt,
-  Min,
-  Max,
-  MaxLength,
-} from "class-validator";
-import { Type } from "class-transformer";
 import { JwtAuthGuard, AdminGuard } from "../auth/guards";
 import { MarketsService, CreateMarketDto } from "../markets/markets.service";
 import { FixturesService } from "./fixtures.service";
@@ -46,73 +34,11 @@ import { Dispute } from "../entities/dispute.entity";
 import { Bet } from "../entities/bet.entity";
 import { User } from "../entities/user.entity";
 import { Payment } from "../entities/payment.entity";
-
-class TransitionDto {
-  @ApiProperty({ enum: MarketStatus })
-  @IsEnum(MarketStatus)
-  status: MarketStatus;
-}
-
-class ResolveDto {
-  @ApiProperty({ description: "UUID of the winning outcome" })
-  @IsUUID()
-  winningOutcomeId: string;
-}
-
-class ProposeResolutionDto {
-  @ApiProperty({ description: "UUID of the proposed winning outcome" })
-  @IsUUID()
-  proposedOutcomeId: string;
-}
-
-class GetUsersQueryDto {
-  /** Full-text search across name, username, telegramId, dkCid, dkAccountName */
-  @ApiPropertyOptional({ description: "Search query (max 200 chars)" })
-  @IsOptional()
-  @MaxLength(200)
-  search?: string;
-
-  @ApiPropertyOptional({ enum: ["all", "admin", "user"], default: "all" })
-  @IsOptional()
-  @IsIn(["all", "admin", "user"])
-  role?: "all" | "admin" | "user";
-
-  @ApiPropertyOptional({ enum: ["all", "linked", "unlinked"], default: "all" })
-  @IsOptional()
-  @IsIn(["all", "linked", "unlinked"])
-  dkStatus?: "all" | "linked" | "unlinked";
-
-  @ApiPropertyOptional({
-    enum: ["name", "balance", "streak", "joined"],
-    default: "joined",
-  })
-  @IsOptional()
-  @IsIn(["name", "balance", "streak", "joined"])
-  sortField?: "name" | "balance" | "streak" | "joined";
-
-  @ApiPropertyOptional({ enum: ["asc", "desc"], default: "desc" })
-  @IsOptional()
-  @IsIn(["asc", "desc"])
-  sortDir?: "asc" | "desc";
-
-  @ApiPropertyOptional({ default: 1, description: "Page number (1-based)" })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  page?: number;
-
-  @ApiPropertyOptional({
-    default: 20,
-    description: "Results per page (max 100)",
-  })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(100)
-  limit?: number;
-}
+import { TransitionDto } from "./dto/transition.dto";
+import { ResolveDto } from "./dto/resolve.dto";
+import { ProposeResolutionDto } from "./dto/propose-resolution.dto";
+import { GetUsersQueryDto } from "./dto/get-users-query.dto";
+import { ToggleAdminDto } from "./dto/toggle-admin.dto";
 
 @ApiTags("admin")
 @ApiBearerAuth()
@@ -135,7 +61,7 @@ export class AdminController {
   // ── Markets ────────────────────────────────────────────────────────────────
   @Post("markets")
   @ApiOperation({ summary: "Create a new market with outcomes" })
-  async createMarket(@Body() dto: CreateMarketDto, @Request() req) {
+  async createMarket(@Body() dto: CreateMarketDto, @Request() req: any) {
     const market = await this.marketsService.create(dto);
     await this.auditService.log({
       adminId: req.user.userId,
@@ -167,8 +93,9 @@ export class AdminController {
 
   @Get("markets")
   @ApiOperation({ summary: "List all markets (admin view)" })
-  listMarkets() {
-    return this.marketsService.findAll();
+  async listMarkets() {
+    const data = await this.marketsService.findAll();
+    return { data, total: data.length };
   }
 
   @Get("markets/:id")
@@ -184,7 +111,7 @@ export class AdminController {
   async transitionMarket(
     @Param("id") id: string,
     @Body() dto: TransitionDto,
-    @Request() req,
+    @Request() req: any,
   ) {
     const before = await this.marketsService.findOne(id);
     const result = await this.marketsService.transition(id, dto.status);
@@ -211,7 +138,7 @@ export class AdminController {
   async proposeResolution(
     @Param("id") id: string,
     @Body() dto: ProposeResolutionDto,
-    @Request() req,
+    @Request() req: any,
   ) {
     const before = await this.marketsService.findOne(id);
     const result = await this.marketsService.proposeResolution(
@@ -250,7 +177,7 @@ export class AdminController {
   async resolveMarket(
     @Param("id") id: string,
     @Body() dto: ResolveDto,
-    @Request() req,
+    @Request() req: any,
   ) {
     const before = await this.marketsService.findOne(id);
     const result = await this.marketsService.resolve(id, dto.winningOutcomeId);
@@ -291,14 +218,15 @@ export class AdminController {
   @Get("disputes")
   @ApiOperation({ summary: "List all disputes across all markets" })
   @ApiResponse({ status: 200, type: [Dispute] })
-  getAllDisputes() {
-    return this.disputeRepo.find({ order: { createdAt: "DESC" }, take: 500 });
+  async getAllDisputes() {
+    const data = await this.disputeRepo.find({ order: { createdAt: "DESC" }, take: 500 });
+    return { data, total: data.length };
   }
 
   @Post("markets/:id/cancel")
   @HttpCode(200)
   @ApiOperation({ summary: "Cancel market & refund all bets" })
-  async cancelMarket(@Param("id") id: string, @Request() req) {
+  async cancelMarket(@Param("id") id: string, @Request() req: any) {
     const before = await this.marketsService.findOne(id);
     const result = await this.marketsService.cancel(id);
     await this.auditService.log({
@@ -317,7 +245,7 @@ export class AdminController {
   @HttpCode(204)
   @Delete("markets/:id")
   @ApiOperation({ summary: "Delete a market" })
-  async deleteMarket(@Param("id") id: string, @Request() req) {
+  async deleteMarket(@Param("id") id: string, @Request() req: any) {
     const before = await this.marketsService.findOne(id);
     await this.auditService.log({
       adminId: req.user.userId,
@@ -371,8 +299,8 @@ export class AdminController {
   // ── Settlements ───────────────────────────────────────────────────────────
   @Get("settlements")
   @ApiOperation({ summary: "List all settlements" })
-  listSettlements() {
-    return this.settlementRepo
+  async listSettlements() {
+    const data = await this.settlementRepo
       .createQueryBuilder("settlement")
       .leftJoinAndMapOne(
         "settlement.market",
@@ -388,6 +316,7 @@ export class AdminController {
       )
       .orderBy("settlement.settledAt", "DESC")
       .getMany();
+    return { data, total: data.length };
   }
 
   // ── Users ─────────────────────────────────────────────────────────────────
@@ -500,15 +429,40 @@ export class AdminController {
     };
   }
 
+  @Patch("users/:userId/admin")
+  @ApiOperation({ summary: "Grant or revoke admin role for a user" })
+  async toggleAdmin(
+    @Param("userId") userId: string,
+    @Body() dto: ToggleAdminDto,
+    @Request() req: any,
+  ) {
+    const user = await this.userRepo.findOneBy({ id: userId });
+    if (!user) throw new NotFoundException("User not found");
+
+    await this.userRepo.update(userId, { isAdmin: dto.isAdmin });
+    await this.auditService.log({
+      adminId: req.user.userId,
+      action: AuditAction.USER_ADMIN_TOGGLE,
+      entityType: "user",
+      entityId: userId,
+      before: { isAdmin: user.isAdmin },
+      after: { isAdmin: dto.isAdmin },
+      ipAddress: req.ip,
+    });
+
+    return { userId, isAdmin: dto.isAdmin };
+  }
+
   // ── Payments ───────────────────────────────────────────────────────────────
   @Get("payments")
   @ApiOperation({ summary: "List all payments (admin view)" })
-  listPayments() {
-    return this.paymentRepo.find({
+  async listPayments() {
+    const data = await this.paymentRepo.find({
       relations: ["user"],
       order: { createdAt: "DESC" },
       take: 500,
     });
+    return { data, total: data.length };
   }
 
   // ── Audit Logs ─────────────────────────────────────────────────────────────
