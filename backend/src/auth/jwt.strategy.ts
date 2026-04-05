@@ -12,22 +12,22 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     private readonly userRepo: Repository<User>,
   ) {
     const secret = process.env.JWT_SECRET;
-    if (!secret && process.env.NODE_ENV === "production") {
-      throw new Error("JWT_SECRET environment variable must be set in production");
+    if (!secret) {
+      throw new Error("JWT_SECRET environment variable must be set");
     }
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: secret || "tara-secret",
+      secretOrKey: secret,
     });
   }
 
   async validate(payload: { sub: string; isAdmin: boolean }) {
-    // Verify the user still exists in the database
+    // Always re-check DB so revoked admin rights take effect immediately
     const user = await this.userRepo.findOneBy({ id: payload.sub });
     if (!user) {
       throw new UnauthorizedException("Session invalid - user not found");
     }
-    return { userId: payload.sub, isAdmin: payload.isAdmin };
+    return { userId: user.id, isAdmin: user.isAdmin };
   }
 }

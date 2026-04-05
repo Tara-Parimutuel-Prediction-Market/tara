@@ -80,10 +80,7 @@ export class DKGatewayService {
     return this.configService.getOrThrow<string>("DK_BENEFICIARY_ACCOUNT");
   }
   private get beneficiaryName(): string {
-    return (
-      this.configService.get<string>("DK_BENEFICIARY_ACCOUNT_NAME") ||
-      "Lucky Pem"
-    );
+    return this.configService.getOrThrow<string>("DK_BENEFICIARY_ACCOUNT_NAME");
   }
   private get bankCode(): string {
     return this.configService.getOrThrow<string>("DK_BANK_CODE");
@@ -593,12 +590,15 @@ export class DKGatewayService {
   ): boolean {
     if (!this.webhookSecret)
       throw new Error("DK_WEBHOOK_SECRET is not configured — refusing to accept unsigned webhook");
-    if (!signatureHeader) return false;
-    const bodyStr = JSON.stringify(body);
-    const computed = Buffer.from(
-      createHmac("sha256", this.webhookSecret).update(bodyStr).digest("hex"),
-    );
-    const received = Buffer.from(signatureHeader.replace(/^DK\s*/i, "").trim());
+    if (!signatureHeader?.trim()) return false;
+    // Use canonicalized JSON (sorted keys) so property order differences don't
+    // cause valid payloads to fail verification
+    const canonical = JSON.stringify(this.canonicalize(body));
+    const computedHex = createHmac("sha256", this.webhookSecret)
+      .update(canonical)
+      .digest("hex");
+    const computed = Buffer.from(computedHex);
+    const received = Buffer.from(signatureHeader.trim());
     if (computed.length !== received.length) return false;
     return timingSafeEqual(computed, received);
   }

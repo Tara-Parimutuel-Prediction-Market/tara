@@ -13,16 +13,31 @@ async function bootstrap() {
 
   // CORS
   const isProduction = process.env.NODE_ENV === "production";
-  app.enableCors({
-    origin: [
-      process.env.FRONTEND_URL || "http://localhost:5173",
+  const allowedOrigins: (string | RegExp)[] = [
+    "https://tara-parimutuel.vercel.app",
+  ];
+  if (!isProduction) {
+    allowedOrigins.push(
       "http://localhost:5173",
       "http://localhost:5174",
       "http://127.0.0.1:5174",
-      "https://tara-parimutuel.vercel.app",
-      // ngrok tunnels only allowed in development — never in production
-      ...(!isProduction ? [/\.ngrok-free\.app$/, /\.ngrok\.io$/] : []),
-    ],
+    );
+    // Allow an explicit ngrok URL set in .env (DEV_NGROK_URL=https://xxxx.ngrok-free.app)
+    // — no wildcard regex; each tunnel URL must be explicitly opted in
+    const devNgrok = process.env.DEV_NGROK_URL;
+    if (devNgrok) allowedOrigins.push(devNgrok);
+  }
+  if (process.env.FRONTEND_URL) {
+    // Validate FRONTEND_URL is a proper https origin before trusting it
+    try {
+      const parsed = new URL(process.env.FRONTEND_URL);
+      if (parsed.protocol === "https:") allowedOrigins.push(parsed.origin);
+    } catch {
+      console.warn("FRONTEND_URL is not a valid URL — skipping CORS entry");
+    }
+  }
+  app.enableCors({
+    origin: allowedOrigins,
     credentials: true,
   });
 

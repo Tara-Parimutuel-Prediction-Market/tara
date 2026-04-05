@@ -1,7 +1,9 @@
-import { Controller, Get, Post, Body } from "@nestjs/common";
+import { Controller, Get, Post, Body, Headers, UnauthorizedException, UseGuards } from "@nestjs/common";
+import { timingSafeEqual } from "crypto";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { ApiTags, ApiOperation, ApiResponse } from "@nestjs/swagger";
+import { JwtAuthGuard, AdminGuard } from "../auth/guards";
 import { TelegramSimpleService } from "../telegram/telegram.service.simple";
 import { TelegramVerificationService } from "../telegram/telegram-verification.service";
 import { User } from "../entities/user.entity";
@@ -18,6 +20,7 @@ export class BotController {
   ) {}
 
   @Get("info")
+  @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiOperation({ summary: "Verify bot token is working" })
   @ApiResponse({ status: 200, description: "Bot info retrieved successfully" })
   async getBotInfo() {
@@ -40,7 +43,19 @@ export class BotController {
   @Post("webhook")
   @ApiOperation({ summary: "Handle Telegram webhook updates" })
   @ApiResponse({ status: 200, description: "Webhook processed successfully" })
-  async handleWebhook(@Body() update: any) {
+  async handleWebhook(
+    @Body() update: any,
+    @Headers("x-telegram-bot-api-secret-token") secretToken: string | undefined,
+  ) {
+    const expected = process.env.TELEGRAM_WEBHOOK_SECRET;
+    if (expected) {
+      const expectedBuf = Buffer.from(expected);
+      const receivedBuf = Buffer.from(secretToken || "");
+      const valid =
+        expectedBuf.length === receivedBuf.length &&
+        timingSafeEqual(expectedBuf, receivedBuf);
+      if (!valid) throw new UnauthorizedException("Invalid webhook token");
+    }
     if (update.message) {
       await this.handleMessage(update.message);
     }

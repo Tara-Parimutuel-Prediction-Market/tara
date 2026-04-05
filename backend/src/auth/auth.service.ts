@@ -1,4 +1,4 @@
-import { createHmac } from "crypto";
+import { createHmac, timingSafeEqual } from "crypto";
 import { Injectable, Logger, UnauthorizedException } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { InjectRepository } from "@nestjs/typeorm";
@@ -8,6 +8,11 @@ import { AuthMethod, AuthProvider } from "../entities/auth-method.entity";
 import { Transaction, TransactionType } from "../entities/transaction.entity";
 import { DKGatewayService } from "../payment/services/dk-gateway/dk-gateway.service";
 import { TelegramVerificationService } from "../telegram/telegram-verification.service";
+
+function stripSensitiveFields(user: User): Omit<User, "dkPhoneHash" | "telegramPhoneHash" | "phoneNumber"> {
+  const { dkPhoneHash: _a, telegramPhoneHash: _b, phoneNumber: _c, ...safe } = user as any;
+  return safe;
+}
 
 export interface TelegramInitData {
   id: number;
@@ -62,7 +67,12 @@ export class AuthService {
       .update(dataCheckString)
       .digest("hex");
 
-    if (expectedHash !== hash) {
+    const expectedBuf = Buffer.from(expectedHash);
+    const receivedBuf = Buffer.from(hash);
+    const hashValid =
+      expectedBuf.length === receivedBuf.length &&
+      timingSafeEqual(expectedBuf, receivedBuf);
+    if (!hashValid) {
       this.logger.warn(
         `[Auth] initData hash mismatch.\n  Expected : ${expectedHash}\n  Got      : ${hash}\n  dataCheckString:\n${dataCheckString}\n  rawInitData (full): ${rawInitData}`,
       );
@@ -109,19 +119,19 @@ export class AuthService {
         });
         await this.userRepo.save(user);
 
-        // TODO: REMOVE before production — dev/staging only
-        // In production users will deposit real BTN via DK Bank; no free credits.
-        // Seed 1000 starter credits
-        await this.transactionRepo.save(
-          this.transactionRepo.create({
-            type: TransactionType.DEPOSIT,
-            amount: 1000,
-            balanceBefore: 0,
-            balanceAfter: 1000,
-            userId: user.id,
-            note: "Starter credits",
-          }),
-        );
+        // Dev-only seed credits — not available in staging or production
+        if (process.env.NODE_ENV === "development") {
+          await this.transactionRepo.save(
+            this.transactionRepo.create({
+              type: TransactionType.DEPOSIT,
+              amount: 1000,
+              balanceBefore: 0,
+              balanceAfter: 1000,
+              userId: user.id,
+              note: "Starter credits",
+            }),
+          );
+        }
       } else {
         // Orphaned user — sync telegramChatId
         await this.userRepo.update(user.id, { telegramChatId: providerId });
@@ -156,7 +166,23 @@ export class AuthService {
       isAdmin: freshUser.isAdmin,
     });
 
-    return { token, user: freshUser };
+    return { token, user: stripSensitiveFields(freshUser) };
+  }
+
+  // ── Dev-only: login and ensure isAdmin=true ───────────────────────────────
+  async ensureAdminAndLogin(rawInitData: string) {
+    const result = await this.loginWithTelegram(rawInitData);
+    const userId = result.user.id;
+    if (!result.user.isAdmin) {
+      await this.userRepo.update(userId, { isAdmin: true });
+    }
+    // Re-sign with isAdmin=true
+    const freshUser = await this.userRepo.findOneBy({ id: userId });
+    const token = this.jwtService.sign({
+      sub: freshUser.id,
+      isAdmin: freshUser.isAdmin,
+    });
+    return { token, user: stripSensitiveFields(freshUser) };
   }
 
   // ── Login / Register via DK Bank CID ──────────────────────────────────────
@@ -247,7 +273,7 @@ export class AuthService {
         });
         const updatedUser = await this.userRepo.findOneBy({ id: callerUserId });
         const { phoneNumber: _p1, ...safeDkAccount1 } = account;
-        return { token, user: updatedUser, dkAccount: safeDkAccount1 };
+        return { token, user: stripSensitiveFields(updatedUser), dkAccount: safeDkAccount1 };
       }
     }
     // ────────────────────────────────────────────────────────────────────────
@@ -322,7 +348,7 @@ export class AuthService {
           isAdmin: freshUser.isAdmin,
         });
         const { phoneNumber: _p2, ...safeDkAccount2 } = account;
-        return { token, user: freshUser, dkAccount: safeDkAccount2 };
+        return { token, user: stripSensitiveFields(freshUser), dkAccount: safeDkAccount2 };
       }
 
       // Brand new user — create account linked to DK Bank identity
@@ -342,19 +368,19 @@ export class AuthService {
         account.phoneNumber,
       );
 
-      // TODO: REMOVE before production — dev/staging only
-      // In production users will deposit real BTN via DK Bank; no free credits.
-      // Seed 1000 starter credits as a transaction entry
-      await this.transactionRepo.save(
-        this.transactionRepo.create({
-          type: TransactionType.DEPOSIT,
-          amount: 1000,
-          balanceBefore: 0,
-          balanceAfter: 1000,
-          userId: user.id,
-          note: "Starter credits",
-        }),
-      );
+      // Dev-only seed credits — not available in staging or production
+      if (process.env.NODE_ENV === "development") {
+        await this.transactionRepo.save(
+          this.transactionRepo.create({
+            type: TransactionType.DEPOSIT,
+            amount: 1000,
+            balanceBefore: 0,
+            balanceAfter: 1000,
+            userId: user.id,
+            note: "Starter credits",
+          }),
+        );
+      }
 
       authMethod = this.authMethodRepo.create({
         provider: AuthProvider.DKBANK,
@@ -392,6 +418,6 @@ export class AuthService {
     });
 
     const { phoneNumber: _p3, ...safeDkAccount3 } = account;
-    return { token, user: freshUser, dkAccount: safeDkAccount3 };
+    return { token, user: stripSensitiveFields(freshUser), dkAccount: safeDkAccount3 };
   }
 }

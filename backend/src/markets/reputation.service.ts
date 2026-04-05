@@ -151,13 +151,16 @@ export class ReputationService {
   }
 
   /**
-   * Computes reputation-weighted probability signal per outcome for a market.
+   * Computes accuracy-weighted probability signal per outcome for a market.
    * Returns a map of outcomeId → probability (0–1), or empty map if no data.
    *
    * Formula:
-   *   weight_i = Σ (bet.amount × user.reputationScore) for outcome i
+   *   weight_i = Σ user.reputationScore for each bettor on outcome i
    *   signal_i = weight_i / Σ weight_all
    *
+   * Each bettor contributes one vote weighted by their accuracy — bet size
+   * is intentionally ignored so a high-reputation user with a small bet
+   * counts the same as one with a large bet.
    * Users with no score yet default to 0.5 (neutral).
    * Returns empty object when fewer than 3 unique bettors exist (not enough signal).
    */
@@ -169,12 +172,11 @@ export class ReputationService {
       .createQueryBuilder("b")
       .leftJoin("b.user", "u")
       .select("b.outcomeId", "outcomeId")
-      .addSelect("b.amount", "amount")
       .addSelect("u.reputationScore", "reputationScore")
       .addSelect("b.userId", "userId")
       .where("b.marketId = :marketId", { marketId })
       .andWhere("b.status IN (:...statuses)", {
-        statuses: ["pending", "won", "lost"],
+        statuses: [BetStatus.PENDING, BetStatus.WON, BetStatus.LOST],
       })
       .getRawMany();
 
@@ -186,8 +188,8 @@ export class ReputationService {
     let totalWeight = 0;
 
     for (const row of rows) {
-      const score = row.reputationScore != null ? Number(row.reputationScore) : 0.5;
-      const weight = Number(row.amount) * score;
+      // Pure accuracy signal: what fraction of accurate predictors picked each outcome?
+      const weight = Number(row.reputationScore ?? 0.5); // not multiplied by amount
       weightedSums[row.outcomeId] = (weightedSums[row.outcomeId] || 0) + weight;
       totalWeight += weight;
     }

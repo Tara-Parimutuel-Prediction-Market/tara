@@ -30,6 +30,7 @@ import {
   IsInt,
   Min,
   Max,
+  MaxLength,
 } from "class-validator";
 import { Type } from "class-transformer";
 import { JwtAuthGuard, AdminGuard } from "../auth/guards";
@@ -65,9 +66,10 @@ class ProposeResolutionDto {
 }
 
 class GetUsersQueryDto {
-  /** Full-text search across name, username, telegramId, dkCid, dkAccountName, phoneNumber */
-  @ApiPropertyOptional({ description: "Search query" })
+  /** Full-text search across name, username, telegramId, dkCid, dkAccountName */
+  @ApiPropertyOptional({ description: "Search query (max 200 chars)" })
   @IsOptional()
+  @MaxLength(200)
   search?: string;
 
   @ApiPropertyOptional({ enum: ["all", "admin", "user"], default: "all" })
@@ -435,23 +437,23 @@ export class AdminController {
         "u.dkCid",
         "u.dkAccountNumber",
         "u.dkAccountName",
-        "u.phoneNumber",
         "u.createdAt",
         "u.updatedAt",
       ]);
 
     // ── Full-text search ────────────────────────────────────────────────────
     if (search && search.trim()) {
-      const term = `%${search.trim().toLowerCase()}%`;
+      // Escape LIKE special chars so user input cannot wildcard-scan arbitrary data
+      const safe = search.trim().toLowerCase().replace(/[%_\\]/g, "\\$&");
+      const term = `%${safe}%`;
       qb.andWhere(
         `(
-          LOWER(COALESCE(u.firstName,'')  || ' ' || COALESCE(u.lastName,'')) LIKE :term
-          OR LOWER(COALESCE(u.username,''))      LIKE :term
-          OR LOWER(COALESCE(u.telegramId,''))    LIKE :term
-          OR LOWER(COALESCE(u.dkCid,''))         LIKE :term
-          OR LOWER(COALESCE(u.dkAccountName,'')) LIKE :term
-          OR LOWER(COALESCE(u.phoneNumber,''))   LIKE :term
-          OR LOWER(u.id::text)                   LIKE :term
+          LOWER(COALESCE(u.firstName,'')  || ' ' || COALESCE(u.lastName,'')) LIKE :term ESCAPE '\\'
+          OR LOWER(COALESCE(u.username,''))      LIKE :term ESCAPE '\\'
+          OR LOWER(COALESCE(u.telegramId,''))    LIKE :term ESCAPE '\\'
+          OR LOWER(COALESCE(u.dkCid,''))         LIKE :term ESCAPE '\\'
+          OR LOWER(COALESCE(u.dkAccountName,'')) LIKE :term ESCAPE '\\'
+          OR LOWER(u.id::text)                   LIKE :term ESCAPE '\\'
         )`,
         { term },
       );

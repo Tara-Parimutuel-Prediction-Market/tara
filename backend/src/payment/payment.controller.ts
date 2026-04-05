@@ -136,8 +136,8 @@ export class PaymentController {
   @ApiBody({ type: ConfirmPaymentDto })
   @ApiResponse({ status: 200, description: 'Payment submitted to DK Bank' })
   async confirmDKBankPayment(@Body() dto: ConfirmPaymentDto, @Request() req) {
-    // 10 OTP confirmation attempts per minute per user (allow retries)
-    await this.enforceRateLimit(`payment:confirm:${req.user.userId}`, 10, 60);
+    // 5 OTP confirmation attempts per 15 minutes per user
+    await this.enforceRateLimit(`payment:confirm:${req.user.userId}`, 5, 900);
     return this.dkBankPaymentService.confirmPayment(req.user.userId, dto.paymentId, dto.otp);
   }
 
@@ -166,9 +166,9 @@ export class PaymentController {
     if (!dto?.id_number || dto.id_number.length < 11) {
       throw new BadRequestException(`id_number must be 11 digits`);
     }
-    // 20 CID lookups per minute per IP
+    // 3 CID lookups per minute per IP — public endpoint, keep tight
     const ip = req.ip || req.connection?.remoteAddress || "unknown";
-    await this.enforceRateLimit(`client-inquiry:${ip}`, 20, 60);
+    await this.enforceRateLimit(`client-inquiry:${ip}`, 3, 60);
 
     return this.dkGatewayService.clientInquiry(dto);
   }

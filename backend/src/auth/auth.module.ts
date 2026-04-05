@@ -29,11 +29,11 @@ import { TelegramModule } from "../telegram/telegram.module";
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
         const secret = config.get<string>("JWT_SECRET");
-        if (!secret && process.env.NODE_ENV === "production") {
-          throw new Error("JWT_SECRET environment variable must be set in production");
+        if (!secret) {
+          throw new Error("JWT_SECRET environment variable must be set");
         }
         return {
-          secret: secret || "tara-secret",
+          secret,
           signOptions: { expiresIn: config.get("JWT_EXPIRES_IN", "7d") },
         };
       },

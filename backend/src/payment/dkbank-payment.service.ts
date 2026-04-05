@@ -233,10 +233,19 @@ export class DKBankPaymentService {
         },
       );
 
+      const firstName = user.firstName?.trim() || "there";
+      const tgExpiresAt = new Date(now.getTime() + TG_OTP_TTL_S * 1000);
+      const expiresAtStr = tgExpiresAt.toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+        timeZone: "Asia/Thimphu",
+        hour12: true,
+      });
+
       await this.telegramService
         .sendMessage(
           Number(user.telegramId),
-          `🔐 <b>Tara Payment OTP</b>\n\nYour one-time code:\n\n<code>${generatedOtp}</code>\n\n💰 Amount: <b>Nu. ${amount}</b>\n⏳ Valid for 60 seconds.`,
+          `🔐 <b>Tara Payment OTP</b>\n\nHi ${firstName}, your one-time code for a <b>Nu ${amount.toLocaleString()}</b> deposit:\n\n<code>${generatedOtp}</code>\n\n⏳ Expires at ${expiresAtStr} (1 min)\n\n⚠️ <b>Tara will never ask for this code.</b> Do not share it with anyone.`,
         )
         .catch((err) =>
           this.logger.warn(`Failed to send OTP via Telegram: ${err.message}`),

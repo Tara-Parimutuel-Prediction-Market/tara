@@ -18,7 +18,7 @@ import {
   ApiBearerAuth,
 } from "@nestjs/swagger";
 import { IsString, IsNotEmpty, Length } from "class-validator";
-import { createHmac } from "crypto";
+import { createHmac, timingSafeEqual } from "crypto";
 import { AuthService } from "./auth.service";
 import { Public, JwtAuthGuard } from "./guards";
 
@@ -167,7 +167,15 @@ export class AuthController {
       throw new UnauthorizedException("Not available in production");
     }
     const expected = process.env.ADMIN_DEV_SECRET;
-    if (!expected || secret !== expected) {
+    if (!expected) {
+      throw new UnauthorizedException("Dev endpoint disabled — ADMIN_DEV_SECRET not set");
+    }
+    const expectedBuf = Buffer.from(expected);
+    const receivedBuf = Buffer.from(secret || "");
+    const match =
+      expectedBuf.length === receivedBuf.length &&
+      timingSafeEqual(expectedBuf, receivedBuf);
+    if (!match) {
       throw new UnauthorizedException("Wrong secret");
     }
 
@@ -202,11 +210,11 @@ export class AuthController {
       .digest("hex");
     params.set("hash", hash);
 
-    const result = await this.authService.loginWithTelegram(params.toString());
+    const result = await this.authService.ensureAdminAndLogin(params.toString());
     return {
       token: result.token,
       user: result.user,
-      note: "This token is valid for 7 days. Keep it secret!",
+      note: "This token is valid for 8 hours. Keep it secret!",
     };
   }
 }

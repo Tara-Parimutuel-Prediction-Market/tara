@@ -282,8 +282,8 @@ export const TmaProfilePage: FC = () => {
                        user?.reputationTier === "regular" ? "Regular" : "Newcomer"}
                     </span>
                     {user?.reputationScore != null && (
-                      <span style={{ fontSize: 13, color: "var(--text-subtle)" }}>
-                        {Math.round(user.reputationScore * 100)}% accuracy score
+                      <span style={{ fontSize: 13, color: "var(--text-subtle)" }} title="Confidence-adjusted score — grows more accurate as you make more predictions">
+                        {Math.round(user.reputationScore * 100)}% confidence score
                       </span>
                     )}
                   </div>

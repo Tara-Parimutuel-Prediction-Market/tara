@@ -15,6 +15,7 @@ import {
   Min,
   Max,
   IsArray,
+  IsPositive,
 } from "class-validator";
 
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
@@ -88,6 +89,8 @@ export class SubmitDisputeDto {
       "Bond amount in credits (used when paying from credit balance)",
   })
   @IsOptional()
+  @IsNumber()
+  @IsPositive()
   bondAmount?: number;
 
   @ApiPropertyOptional({
@@ -193,9 +196,10 @@ export class MarketsService {
       .orderBy("market.createdAt", "DESC");
 
     if (q && q.trim()) {
-      const term = `%${q.trim().toLowerCase()}%`;
+      const safe = q.trim().toLowerCase().replace(/[%_\\]/g, "\\$&");
+      const term = `%${safe}%`;
       qb.where(
-        "LOWER(market.title) LIKE :term OR LOWER(market.description) LIKE :term",
+        "LOWER(market.title) LIKE :term ESCAPE '\\' OR LOWER(market.description) LIKE :term ESCAPE '\\'",
         { term },
       );
     }
