@@ -468,18 +468,27 @@ export class ParimutuelEngine implements OnModuleInit {
     const userMap: Record<string, User> = {};
     for (const u of users) userMap[u.id] = u;
 
-    // 4. Send individual DM to each bettor
+    // 4. Send ONE DM per user (not per position — a user may hold multiple
+
     const payoutPool = settlement.payoutPool;
     const winnerPool = Number(winner.totalBetAmount);
 
+    // Group all bets by userId so we can aggregate across multiple positions.
+    const betsByUser: Record<string, typeof bets> = {};
     for (const bet of bets) {
-      const user = userMap[bet.userId];
+      if (!betsByUser[bet.userId]) betsByUser[bet.userId] = [];
+      betsByUser[bet.userId].push(bet);
+    }
+
+    for (const userId of Object.keys(betsByUser)) {
+      const userBets = betsByUser[userId];
+      const user = userMap[userId];
       if (!user?.telegramId) continue;
 
       const chatId = Number(user.telegramId);
       const firstName = user.firstName?.trim() || "there";
       const tierNow = user.reputationTier ?? "newcomer";
-      const tierBefore = tiersBefore[bet.userId] ?? "newcomer";
+      const tierBefore = tiersBefore[userId] ?? "newcomer";
       const totalPredictions = user.totalPredictions ?? 0;
       const accuracy =
         totalPredictions > 0 && user.reputationScore != null
@@ -490,16 +499,28 @@ export class ParimutuelEngine implements OnModuleInit {
       const tierUpgraded =
         tierOrder.indexOf(tierNow) > tierOrder.indexOf(tierBefore);
 
-      if (bet.status === PositionStatus.WON) {
-        const share = winnerPool > 0 ? Number(bet.amount) / winnerPool : 0;
-        const payout = parseFloat((payoutPool * share).toFixed(2));
-        const profit = (payout - Number(bet.amount)).toFixed(2);
+      // A user wins if ANY of their positions won; they lose only if ALL lost.
+      const hasWon = userBets.some((b) => b.status === PositionStatus.WON);
+
+      if (hasWon) {
+        // Aggregate total stake and payout across all winning positions for this user.
+        let totalStake = 0;
+        let totalPayout = 0;
+        for (const bet of userBets) {
+          if (bet.status === PositionStatus.WON) {
+            const share = winnerPool > 0 ? Number(bet.amount) / winnerPool : 0;
+            const payout = parseFloat((payoutPool * share).toFixed(2));
+            totalStake += Number(bet.amount);
+            totalPayout += payout;
+          }
+        }
+        const profit = (totalPayout - totalStake).toFixed(2);
 
         let msg =
           `✅ <b>You predicted correctly!</b>\n\n` +
           `📊 ${market.title}\n` +
           `🎯 Your pick: <b>${winner.label}</b>\n` +
-          `💰 Payout: <b>Nu ${payout.toLocaleString()}</b> (+Nu ${profit})\n`;
+          `💰 Payout: <b>Nu ${totalPayout.toLocaleString()}</b> (+Nu ${profit})\n`;
 
         if (accuracy)
           msg += `⭐ Accuracy: <b>${accuracy}</b> over ${totalPredictions} predictions\n`;
@@ -538,8 +559,11 @@ export class ParimutuelEngine implements OnModuleInit {
             )
             .catch(() => {});
         }
-      } else if (bet.status === PositionStatus.LOST) {
-        const outcome = market.outcomes.find((o) => o.id === bet.outcomeId);
+      } else {
+        // All of this user's positions lost — send a single loss DM.
+        const outcome = market.outcomes.find(
+          (o) => o.id === userBets[0].outcomeId,
+        );
 
         let msg =
           `🙂‍↕️<b>Not this time.</b>\n\n` +
@@ -559,7 +583,7 @@ export class ParimutuelEngine implements OnModuleInit {
     }
 
     this.logger.log(
-      `[Notify] Settlement DMs sent for market ${market.id} to ${bets.length} bettors`,
+      `[Notify] Settlement DMs sent for market ${market.id} to ${Object.keys(betsByUser).length} bettors (${bets.length} positions total)`,
     );
   }
 

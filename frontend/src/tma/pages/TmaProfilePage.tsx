@@ -468,6 +468,177 @@ export const TmaProfilePage: FC = () => {
                       correct
                     </span>
                   </div>
+
+                  {/* ── Tier progress bar ─────────────────────────── */}
+                  {(() => {
+                    const total = user?.totalPredictions ?? 0;
+                    const correct = user?.correctPredictions ?? 0;
+                    const accuracy = total > 0 ? correct / total : 0;
+                    const tier = user?.reputationTier ?? "newcomer";
+
+                    // Already at the top — show a completion state
+                    if (tier === "expert") {
+                      return (
+                        <div style={{ marginTop: 14 }}>
+                          <div
+                            style={{
+                              background: "var(--bg-secondary)",
+                              borderRadius: 99,
+                              height: 6,
+                              overflow: "hidden",
+                            }}
+                          >
+                            <div
+                              style={{
+                                width: "100%",
+                                height: "100%",
+                                borderRadius: 99,
+                                background:
+                                  "linear-gradient(90deg, #f59e0b, #fbbf24)",
+                              }}
+                            />
+                          </div>
+                          <div
+                            style={{
+                              marginTop: 6,
+                              fontSize: 11,
+                              color: "#92400e",
+                              fontWeight: 700,
+                            }}
+                          >
+                            🏆 Maximum tier reached
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    // Compute progress toward next tier
+                    // Tiers: newcomer (<10) → regular (10–49) → reliable (50+, ≥65%) → expert (100+, ≥75%)
+                    type TierInfo = {
+                      label: string;
+                      color: string;
+                      progressPct: number;
+                      hint: string;
+                    };
+
+                    let info: TierInfo;
+
+                    if (tier === "newcomer") {
+                      // Need 10 predictions to reach Regular
+                      const progressPct = Math.min((total / 10) * 100, 100);
+                      const remaining = 10 - total;
+                      info = {
+                        label: "Regular",
+                        color: "#3b82f6",
+                        progressPct,
+                        hint: `${remaining} more prediction${remaining !== 1 ? "s" : ""} to reach Regular`,
+                      };
+                    } else if (tier === "regular") {
+                      // Need 50 predictions AND ≥65% accuracy to reach Reliable
+                      const predProgress = Math.min(total / 50, 1);
+                      const accProgress = Math.min(accuracy / 0.65, 1);
+                      // Weight both equally
+                      const progressPct =
+                        ((predProgress + accProgress) / 2) * 100;
+                      const predRemaining = Math.max(0, 50 - total);
+                      const accNeeded = accuracy < 0.65;
+                      const hint =
+                        predRemaining > 0 && accNeeded
+                          ? `${predRemaining} more predictions & ${Math.round(accuracy * 100)}% → 65% accuracy for Reliable`
+                          : predRemaining > 0
+                            ? `${predRemaining} more predictions to reach Reliable`
+                            : `Reach 65% accuracy to unlock Reliable (currently ${Math.round(accuracy * 100)}%)`;
+                      info = {
+                        label: "Reliable",
+                        color: "#059669",
+                        progressPct,
+                        hint,
+                      };
+                    } else {
+                      // reliable → need 100 predictions AND ≥75% accuracy for Expert
+                      const predProgress = Math.min(total / 100, 1);
+                      const accProgress = Math.min(accuracy / 0.75, 1);
+                      const progressPct =
+                        ((predProgress + accProgress) / 2) * 100;
+                      const predRemaining = Math.max(0, 100 - total);
+                      const accNeeded = accuracy < 0.75;
+                      const hint =
+                        predRemaining > 0 && accNeeded
+                          ? `${predRemaining} more predictions & ${Math.round(accuracy * 100)}% → 75% accuracy for Expert`
+                          : predRemaining > 0
+                            ? `${predRemaining} more predictions to reach Expert`
+                            : `Reach 75% accuracy to unlock Expert (currently ${Math.round(accuracy * 100)}%)`;
+                      info = {
+                        label: "Expert",
+                        color: "#f59e0b",
+                        progressPct,
+                        hint,
+                      };
+                    }
+
+                    return (
+                      <div style={{ marginTop: 14 }}>
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            marginBottom: 5,
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 700,
+                              color: "var(--text-subtle)",
+                            }}
+                          >
+                            Progress to{" "}
+                            <span style={{ color: info.color }}>
+                              {info.label}
+                            </span>
+                          </span>
+                          <span
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 800,
+                              color: info.color,
+                            }}
+                          >
+                            {Math.round(info.progressPct)}%
+                          </span>
+                        </div>
+                        <div
+                          style={{
+                            background: "var(--bg-secondary)",
+                            borderRadius: 99,
+                            height: 6,
+                            overflow: "hidden",
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: `${info.progressPct}%`,
+                              height: "100%",
+                              borderRadius: 99,
+                              background: info.color,
+                              transition: "width 0.8s ease",
+                            }}
+                          />
+                        </div>
+                        <div
+                          style={{
+                            marginTop: 5,
+                            fontSize: 11,
+                            color: "var(--text-subtle)",
+                            fontWeight: 600,
+                          }}
+                        >
+                          {info.hint}
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
             </div>
