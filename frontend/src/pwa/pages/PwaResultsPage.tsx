@@ -3,15 +3,9 @@ import { Link } from "react-router-dom";
 import { 
   Trophy, 
   TrendingUp, 
-  Target, 
-  History, 
-  ArrowUpRight, 
   Award, 
   ChevronDown, 
   ChevronUp,
-  CheckCircle2,
-  AlertCircle,
-  HelpCircle,
   Globe,
   PieChart,
   Calendar

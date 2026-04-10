@@ -5,7 +5,7 @@ import { getMarkets, getMyBets, getRecentActivity, type Market, type ActivityEve
 import { useAuth } from "@/tma/hooks/useAuth";
 import { TmaBetModal } from "@/tma/components/TmaBetModal";
 import { Link } from "@/tma/components/Link/Link";
-import { Flame, Trophy } from "lucide-react";
+import { Flame } from "lucide-react";
 
 // ── Live Activity Ticker ──────────────────────────────────────────────────────
 
