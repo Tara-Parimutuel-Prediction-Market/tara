@@ -844,16 +844,15 @@ export const MarketDetailPage: FC = () => {
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               {market.outcomes.map((outcome, idx) => {
                 const totalBets = Number(market.totalPool);
-                // Mirror feed logic: only show intelligence/LMSR probability AFTER the user
-                // has a position — before betting always show the raw pool ratio so the
-                // detail page matches what the feed card displays.
+                // After betting: prefer intelligence-weighted prob, then LMSR.
+                // Before betting: use LMSR (avoids 0%/100% on single-bettor markets).
+                // Raw parimutuel ratio is only a last resort when no LMSR is stored.
                 const pct =
                   hasBet &&
                   outcome.intelligenceProb != null &&
                   outcome.intelligenceProb > 0
                     ? outcome.intelligenceProb * 100
-                    : hasBet &&
-                        outcome.lmsrProbability != null &&
+                    : outcome.lmsrProbability != null &&
                         outcome.lmsrProbability > 0
                       ? outcome.lmsrProbability * 100
                       : totalBets > 0

@@ -41,7 +41,12 @@ export const PwaMarketCard: FC<PwaMarketCardProps> = ({ market, onBet }) => {
   const sentiment = (() => {
     const raw = market.outcomes.map((o) => ({
       ...o,
-      pct: totalPool > 0 ? (Number(o.totalBetAmount) / totalPool) * 100 : 100 / market.outcomes.length,
+      pct:
+        o.lmsrProbability != null && o.lmsrProbability > 0
+          ? o.lmsrProbability * 100
+          : totalPool > 0
+            ? (Number(o.totalBetAmount) / totalPool) * 100
+            : 100 / market.outcomes.length,
     }));
     const sorted = [...raw].sort((a, b) => b.pct - a.pct);
     return raw.map((o) => {

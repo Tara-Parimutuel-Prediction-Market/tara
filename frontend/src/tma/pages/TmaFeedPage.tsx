@@ -62,12 +62,13 @@ function MarketCard({
   const sentiment = (() => {
     const raw = market.outcomes.map((o) => ({
       ...o,
-      // Only show intelligence-weighted % AFTER the user has a position.
-      // Before they bet, always show the raw parimutuel pool ratio.
+      // After betting: prefer intelligence-weighted prob, then LMSR.
+      // Before betting: use LMSR (avoids 0%/100% on single-bettor markets).
+      // Raw parimutuel ratio is only a last resort when no LMSR is stored.
       pct:
         hasBet && o.intelligenceProb != null && o.intelligenceProb > 0
           ? o.intelligenceProb * 100
-          : hasBet && o.lmsrProbability != null && o.lmsrProbability > 0
+          : o.lmsrProbability != null && o.lmsrProbability > 0
             ? o.lmsrProbability * 100
             : totalPool > 0
               ? (Number(o.totalBetAmount) / totalPool) * 100
