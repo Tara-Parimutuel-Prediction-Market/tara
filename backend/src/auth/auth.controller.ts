@@ -21,6 +21,8 @@ import { AuthService } from "./auth.service";
 import { Public, JwtAuthGuard } from "./guards";
 import { TelegramAuthDto } from "./dto/telegram-auth.dto";
 import { DKBankAuthDto } from "./dto/dkbank-auth.dto";
+import { ManualLoginRequestDto } from "./dto/manual-login-request.dto";
+import { ManualLoginVerifyDto } from "./dto/manual-login-verify.dto";
 
 @ApiTags("auth")
 @Controller("auth")
@@ -198,5 +200,47 @@ export class AuthController {
       user: result.user,
       note: "This token is valid for 8 hours. Keep it secret!",
     };
+  }
+
+  /**
+   * Manual Login Step 1: Request OTP
+   * Fallback when Telegram initData login fails
+   * Sends a 6-digit OTP to the user's Telegram ID
+   */
+  @Post("manual-login/request-otp")
+  @HttpCode(200)
+  @Public()
+  @ApiOperation({
+    summary: "Request OTP for manual login (fallback when Telegram initData fails)",
+    description: "Sends a 6-digit OTP to the user's Telegram ID via bot. The user must provide their Telegram ID and DK Bank CID.",
+  })
+  @ApiBody({ type: ManualLoginRequestDto })
+  async requestManualLoginOtp(@Body() dto: ManualLoginRequestDto) {
+    await this.authService.requestManualLoginOtp(dto.telegramId, dto.cid);
+    return {
+      success: true,
+      message: "OTP sent to your Telegram account. Valid for 5 minutes.",
+    };
+  }
+
+  /**
+   * Manual Login Step 2: Verify OTP and Login
+   * Verifies the OTP and checks that the phone number matches DK Bank
+   */
+  @Post("manual-login/verify")
+  @HttpCode(200)
+  @Public()
+  @ApiOperation({
+    summary: "Verify OTP and complete manual login",
+    description: "Validates the OTP and phone number. The phone number must match the DK Bank registered number. Returns a JWT token on success.",
+  })
+  @ApiBody({ type: ManualLoginVerifyDto })
+  async verifyManualLogin(@Body() dto: ManualLoginVerifyDto) {
+    return this.authService.verifyManualLogin(
+      dto.telegramId,
+      dto.cid,
+      dto.otp,
+      dto.phoneNumber,
+    );
   }
 }

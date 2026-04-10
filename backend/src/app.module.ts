@@ -24,6 +24,7 @@ import { Dispute } from "./entities/dispute.entity";
 import { DKGatewayAuthToken } from "./entities/dk-gateway-auth-token.entity";
 import { PaymentOtp } from "./entities/payment-otp.entity";
 import { AuditLog } from "./entities/audit-log.entity";
+import { ReportingModule } from "./reporting/reporting.module";
 
 @Module({
   imports: [
@@ -87,6 +88,7 @@ import { AuditLog } from "./entities/audit-log.entity";
     AdminModule,
     TelegramModule,
     PaymentModule,
+    ReportingModule,
   ],
 })
 export class AppModule {}

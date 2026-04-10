@@ -29,6 +29,21 @@ export enum AuditAction {
   USER_ADMIN_TOGGLE = "user.admin_toggle",
   USER_VIEW = "user.view",
   USER_LOGIN = "user.login", // User login
+
+  // Malpractice & Dispute resolution (GMC Authority)
+  MALPRACTICE_VOTE_CREATE = "malpractice.vote.create",
+  MALPRACTICE_VOTE_VALIDATE = "malpractice.vote.validate",
+  MALPRACTICE_VOTE_REFUND = "malpractice.vote.refund",
+  DISPUTE_RESOLUTION_CREATE = "dispute.resolution.create",
+  DISPUTE_RESOLUTION_UPDATE = "dispute.resolution.update",
+  DISPUTE_RESOLUTION_RESOLVE = "dispute.resolution.resolve",
+  ADMIN_PENALTY_APPLY = "admin.penalty.apply",
+  ADMIN_PENALTY_REVOKE = "admin.penalty.revoke",
+
+  // Transaction audit actions
+  TRANSACTION_VERIFY = "transaction.verify",
+  TRANSACTION_FLAG = "transaction.flag",
+  TRANSACTION_REVIEW = "transaction.review",
 }
 
 @Entity("audit_logs")

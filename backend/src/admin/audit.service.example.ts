@@ -20,7 +20,7 @@ class ExampleUsage {
   async logAdminAction(admin: User, action: AuditAction) {
     await this.auditService.log({
       adminId: admin.id,
-      adminUsername: admin.username || undefined,
+      username: admin.username || undefined,
       isAdmin: admin.isAdmin, // true -> RoleType.ADMIN
       action: action,
       entityType: "market",
@@ -36,7 +36,7 @@ class ExampleUsage {
   async logUserAction(user: User, action: AuditAction) {
     await this.auditService.log({
       adminId: user.id,
-      adminUsername: user.username || undefined,
+      username: user.username || undefined,
       isAdmin: user.isAdmin, // false -> RoleType.USER
       action: action,
       entityType: "payment",
