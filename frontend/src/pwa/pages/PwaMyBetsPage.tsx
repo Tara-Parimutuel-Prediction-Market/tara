@@ -1,5 +1,16 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Link } from "react-router-dom";
+import { 
+  CheckCircle2, 
+  XCircle, 
+  Clock, 
+  Wallet, 
+  Calendar, 
+  ChevronRight,
+  ArrowUpRight,
+  RefreshCcw,
+  Target
+} from "lucide-react";
 import { getMyBets, type Bet } from "@/api/client";
 
 const STATUS_COLOR: Record<Bet["status"], string> = {
@@ -9,6 +20,13 @@ const STATUS_COLOR: Record<Bet["status"], string> = {
   refunded: "#64748b",
 };
 
+const STATUS_BG_LIGHT: Record<Bet["status"], string> = {
+  pending: "rgba(245, 158, 11, 0.1)",
+  won: "rgba(34, 197, 94, 0.1)",
+  lost: "rgba(239, 68, 68, 0.1)",
+  refunded: "rgba(100, 116, 139, 0.1)",
+};
+
 const STATUS_LABEL: Record<Bet["status"], string> = {
   pending: "Active",
   won: "Won",
@@ -16,103 +34,173 @@ const STATUS_LABEL: Record<Bet["status"], string> = {
   refunded: "Refunded",
 };
 
+const STATUS_ICON = {
+  pending: Clock,
+  won: CheckCircle2,
+  lost: XCircle,
+  refunded: RefreshCcw,
+};
+
+
+
 function BetCard({ bet }: { bet: Bet }) {
   const color = STATUS_COLOR[bet.status];
+  const Icon = STATUS_ICON[bet.status];
   const pool = bet.market ? Number(bet.market.totalPool) : 0;
   const edge = bet.market ? Number(bet.market.houseEdgePct) : 5;
   const outcomePool = bet.outcome ? Number(bet.outcome.totalBetAmount) : 0;
-  const displayOdds =
-    outcomePool > 0
-      ? ((pool * (1 - edge / 100)) / outcomePool).toFixed(2)
-      : bet.oddsAtPlacement
-        ? Number(bet.oddsAtPlacement).toFixed(2)
-        : "—";
+  
+  const displayOdds = useMemo(() => {
+    if (outcomePool > 0 && pool > 0) {
+      return ((pool * (1 - edge / 100)) / outcomePool).toFixed(2);
+    }
+    return bet.oddsAtPlacement ? Number(bet.oddsAtPlacement).toFixed(2) : "—";
+  }, [pool, edge, outcomePool, bet.oddsAtPlacement]);
+
+  const isPending = bet.status === "pending";
 
   return (
     <div
       style={{
-        background: "var(--glass-bg)",
-        border: "1px solid var(--glass-border)",
-        borderRadius: 14,
-        padding: "16px 18px",
+        background: "var(--bg-card)",
+        border: `1px solid ${isPending ? "var(--glass-border)" : color + "33"}`,
+        borderRadius: 20,
+        padding: "18px",
         display: "flex",
         flexDirection: "column",
-        gap: 8,
+        gap: 14,
+        position: "relative",
+        boxShadow: isPending 
+          ? "var(--shadow-sm)" 
+          : `0 8px 20px ${color}11`,
+        overflow: "hidden",
       }}
     >
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "flex-start",
-          gap: 8,
-        }}
-      >
-        <span
-          style={{
-            fontWeight: 600,
-            fontSize: "0.9rem",
-            color: "var(--text-main)",
-            flex: 1,
-          }}
-        >
-          {bet.market?.title ?? bet.marketId}
-        </span>
-        <span
-          style={{
-            fontSize: "0.7rem",
-            fontWeight: 700,
-            padding: "3px 8px",
-            borderRadius: 20,
-            background: `${color}22`,
-            color,
-            whiteSpace: "nowrap",
-          }}
-        >
-          {STATUS_LABEL[bet.status]}
-        </span>
-      </div>
+      {/* Dynamic Status Glow */}
+      {!isPending && (
+        <div style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: 4,
+          bottom: 0,
+          background: color,
+        }} />
+      )}
 
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-        <span style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>
-          Pick:
-        </span>
-        <span
-          style={{
-            fontSize: "0.78rem",
-            fontWeight: 600,
+      {/* Header: Market Title & Status */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4, flex: 1 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <Calendar size={12} style={{ color: "var(--text-subtle)" }} />
+            <span style={{ fontSize: 10, fontWeight: 600, color: "var(--text-subtle)" }}>
+              {new Date(bet.placedAt).toLocaleDateString()}
+            </span>
+          </div>
+          <h3 style={{
+            fontSize: "0.95rem",
+            fontWeight: 800,
             color: "var(--text-main)",
-          }}
-        >
-          {bet.outcome?.label ?? bet.outcomeId}
-        </span>
-      </div>
-
-      <div
-        style={{
+            lineHeight: 1.3,
+            margin: 0,
+          }}>
+            {bet.market?.title ?? "Market " + bet.marketId}
+          </h3>
+        </div>
+        
+        <div style={{
           display: "flex",
-          justifyContent: "space-between",
-          fontSize: "0.82rem",
-          color: "var(--text-subtle)",
-        }}
-      >
-        <span>BTN {Number(bet.amount).toLocaleString()}</span>
-        <span>Odds {displayOdds}x</span>
-        {bet.payout != null && (
-          <span style={{ color: "#22c55e", fontWeight: 700 }}>
-            +BTN {Number(bet.payout).toLocaleString()}
+          alignItems: "center",
+          gap: 6,
+          padding: "5px 10px",
+          borderRadius: 10,
+          background: STATUS_BG_LIGHT[bet.status],
+          color: color,
+        }}>
+          <Icon size={12} />
+          <span style={{ fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.03em" }}>
+            {STATUS_LABEL[bet.status]}
           </span>
-        )}
+        </div>
       </div>
 
-      <div style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>
-        {new Date(bet.placedAt).toLocaleString()} ·{" "}
-        <Link
-          to={`/market/${bet.marketId}`}
-          style={{ color: "var(--accent)", textDecoration: "none" }}
-        >
-          View market →
-        </Link>
+      {/* Prediction Section */}
+      <div style={{
+        background: "var(--bg-secondary)",
+        borderRadius: 12,
+        padding: "12px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{
+            width: 32,
+            height: 32,
+            borderRadius: 8,
+            background: "var(--bg-card)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "var(--accent)",
+          }}>
+            <Target size={18} />
+          </div>
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            <span style={{ fontSize: 10, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase" }}>Your Pick</span>
+            <span style={{ fontSize: 14, fontWeight: 800, color: "var(--text-main)" }}>
+              {bet.outcome?.label ?? "Outcome " + bet.outcomeId}
+            </span>
+          </div>
+        </div>
+        <div style={{ textAlign: "right" }}>
+          <span style={{ fontSize: 10, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase" }}>Odds</span>
+          <div style={{ fontSize: 14, fontWeight: 800, color: "var(--text-main)" }}>{displayOdds}x</div>
+        </div>
+      </div>
+
+      {/* Financials Row */}
+      <div style={{ 
+        display: "flex", 
+        justifyContent: "space-between", 
+        alignItems: "center",
+        padding: "0 4px"
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <Wallet size={14} style={{ color: "var(--text-subtle)" }} />
+          <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-main)" }}>
+            Nu {Number(bet.amount).toLocaleString()}
+          </span>
+        </div>
+
+        {bet.payout != null ? (
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 4,
+            color: "#22c55e",
+            fontWeight: 800,
+            fontSize: 14,
+          }}>
+            <ArrowUpRight size={16} />
+            <span>Nu {Number(bet.payout).toLocaleString()}</span>
+          </div>
+        ) : (
+          <Link
+            to={`/market/${bet.marketId}`}
+            style={{
+              fontSize: 11,
+              fontWeight: 700,
+              color: "var(--accent)",
+              textDecoration: "none",
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+            }}
+          >
+            Details <ChevronRight size={14} />
+          </Link>
+        )}
       </div>
     </div>
   );
@@ -153,23 +241,27 @@ export function PwaMyBetsPage() {
     <div style={{ maxWidth: 700, margin: "0 auto", padding: "24px 16px" }}>
       <h1
         style={{
-          fontSize: "1.4rem",
-          fontWeight: 800,
-          marginBottom: 4,
+          fontSize: "1.7rem",
+          fontWeight: 900,
+          marginBottom: 6,
           color: "var(--text-main)",
+          letterSpacing: "-0.02em",
         }}
       >
-        My Positions
+        My Picks
       </h1>
       <p
         style={{
-          fontSize: "0.85rem",
+          fontSize: "0.9rem",
           color: "var(--text-muted)",
-          marginBottom: 20,
+          marginBottom: 24,
+          fontWeight: 600,
         }}
       >
-        {bets.length} prediction{bets.length !== 1 ? "s" : ""} placed
+        Tracking your prediction performance
       </p>
+
+
 
       {/* Filter tabs */}
       <div
@@ -184,10 +276,11 @@ export function PwaMyBetsPage() {
               borderRadius: 20,
               border: "1px solid var(--glass-border)",
               background:
-                filter === t.key ? "var(--accent)" : "var(--glass-bg)",
-              color: filter === t.key ? "#fff" : "var(--text-subtle)",
-              fontWeight: 600,
-              fontSize: "0.78rem",
+                filter === t.key ? "var(--accent)" : "var(--bg-card)",
+              color: filter === t.key ? "#fff" : "var(--text-main)",
+              boxShadow: filter === t.key ? "0 4px 12px rgba(59, 130, 246, 0.3)" : "none",
+              fontWeight: 700,
+              fontSize: "0.8rem",
               cursor: "pointer",
             }}
           >

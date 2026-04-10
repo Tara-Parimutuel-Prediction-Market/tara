@@ -5,113 +5,167 @@ import { getMarkets, getMyBets, getRecentActivity, type Market, type ActivityEve
 import { useAuth } from "@/tma/hooks/useAuth";
 import { TmaBetModal } from "@/tma/components/TmaBetModal";
 import { Link } from "@/tma/components/Link/Link";
+import { Flame, Trophy } from "lucide-react";
 
 // ── Live Activity Ticker ──────────────────────────────────────────────────────
 
-function formatActivityEvent(e: ActivityEvent): string {
-  const amt = `Nu ${Number(e.amount).toLocaleString()}`;
-  if (e.type === "win") return `${e.userName} won ${amt} on ${e.outomeLabel} 🎉`;
-  return `${e.userName} just bet ${amt} on ${e.outomeLabel} 🔥`;
+interface FormattedEvent {
+  userName: string;
+  initials: string;
+  action: string;
+  outcome: string;
+  amount: string;
+  marketTitle: string;
+  type: "bet" | "win";
+}
+
+function parseActivityEvent(e: ActivityEvent): FormattedEvent {
+  const amount = `Nu ${Number(e.amount).toLocaleString()}`;
+  const rawUserName = e.userName || "";
+  const userName = rawUserName.startsWith("@") ? rawUserName.substring(1) : rawUserName;
+  const initials = rawUserName ? rawUserName.substring(0, 1).toUpperCase() : "?";
+  return {
+    userName,
+    initials,
+    action: e.type === "win" ? "won" : "just bet",
+    outcome: e.outomeLabel,
+    amount,
+    marketTitle: e.marketTitle,
+    type: e.type,
+  };
 }
 
 function LiveTicker() {
-  const [items, setItems] = useState<string[]>([]);
+  const [events, setEvents] = useState<FormattedEvent[]>([]);
   const [idx, setIdx] = useState(0);
   const [visible, setVisible] = useState(true);
 
   useEffect(() => {
-    // ── PRODUCTION: fetch real activity from the database ──────────────────
     getRecentActivity()
-      .then((events) => {
-        if (events.length > 0) {
-          setItems(events.map(formatActivityEvent));
+      .then((data) => {
+        if (data.length > 0) {
+          setEvents(data.map(parseActivityEvent));
         }
       })
-      .catch(() => {
-        // silently fall through to sample data below
-      });
-
-    // ── SAMPLE DATA: comment out this block before going to production ──────
-    // Remove the block below once getRecentActivity() returns real data.
-    /*
-    const SAMPLE_NAMES = ["Tashi","Karma","Pema","Sonam","Dorji","Rinzin","Deki","Ugyen"];
-    const SAMPLE: ActivityEvent[] = [
-      { type:"bet", userName:"Tashi",  outomeLabel:"Yes",     marketTitle:"...", amount:200, placedAt:"" },
-      { type:"win", userName:"Karma",  outomeLabel:"Brazil",  marketTitle:"...", amount:450, placedAt:"" },
-      { type:"bet", userName:"Pema",   outomeLabel:"No",      marketTitle:"...", amount:100, placedAt:"" },
-      { type:"win", userName:"Sonam",  outomeLabel:"Germany", marketTitle:"...", amount:600, placedAt:"" },
-      { type:"bet", userName:"Dorji",  outomeLabel:"Yes",     marketTitle:"...", amount:150, placedAt:"" },
-      { type:"bet", userName:"Rinzin", outomeLabel:"Draw",    marketTitle:"...", amount:300, placedAt:"" },
-      { type:"win", userName:"Deki",   outomeLabel:"No",      marketTitle:"...", amount:250, placedAt:"" },
-      { type:"bet", userName:"Ugyen",  outomeLabel:"Yes",     marketTitle:"...", amount: 80, placedAt:"" },
-    ];
-    setItems(SAMPLE.map(formatActivityEvent));
-    */
-    // ── END SAMPLE DATA ────────────────────────────────────────────────────
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
-    if (items.length < 2) return;
+    if (events.length < 2) return;
     const cycle = setInterval(() => {
       setVisible(false);
       setTimeout(() => {
-        setIdx((i) => (i + 1) % items.length);
+        setIdx((i) => (i + 1) % events.length);
         setVisible(true);
-      }, 350);
-    }, 3500);
+      }, 400);
+    }, 4500);
     return () => clearInterval(cycle);
-  }, [items.length]);
+  }, [events.length]);
 
-  if (!items.length) return null;
+  if (!events.length) return null;
+
+  const current = events[idx];
 
   return (
     <div style={{
       display: "flex",
       alignItems: "center",
-      gap: 8,
+      gap: 10,
       background: "var(--bg-card)",
       border: "1px solid var(--glass-border)",
-      borderRadius: 10,
-      padding: "7px 12px",
-      marginBottom: 14,
+      borderRadius: 14,
+      padding: "8px 12px",
+      marginBottom: 16,
       overflow: "hidden",
+      boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+      position: "relative",
     }}>
       <style>{`
-        @keyframes ticker-pulse {
-          0%,100% { opacity: 1; transform: scale(1); }
-          50%      { opacity: 0.6; transform: scale(0.85); }
+        @keyframes tickerSlideUp {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
         }
-        @keyframes ticker-ring {
-          0%   { transform: scale(1);   opacity: 0.4; }
-          70%  { transform: scale(2.2); opacity: 0; }
-          100% { transform: scale(2.2); opacity: 0; }
+        @keyframes livePulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.5; }
         }
       `}</style>
-      {/* pulsing red dot */}
-      <span style={{ position: "relative", flexShrink: 0, width: 8, height: 8 }}>
-        <span style={{
-          position: "absolute", inset: 0, borderRadius: "50%",
-          background: "#ef4444", animation: "ticker-pulse 1.4s ease-in-out infinite",
-        }} />
-        <span style={{
-          position: "absolute", inset: 0, borderRadius: "50%",
-          background: "#ef4444", opacity: 0.4,
-          animation: "ticker-ring 1.4s ease-in-out infinite",
-        }} />
-      </span>
-      <span style={{
-        fontSize: 11,
-        fontWeight: 600,
-        color: "var(--text-subtle)",
-        whiteSpace: "nowrap",
-        overflow: "hidden",
-        textOverflow: "ellipsis",
-        opacity: visible ? 1 : 0,
-        transform: visible ? "translateY(0)" : "translateY(-6px)",
-        transition: "opacity 0.3s ease, transform 0.3s ease",
+      
+      {/* Avatar / Initial */}
+      <div style={{
+        width: 32,
+        height: 32,
+        borderRadius: "50%",
+        background: current.type === "win" 
+          ? "linear-gradient(135deg, #22c55e, #16a34a)" 
+          : "linear-gradient(135deg, #3b82f6, #2563eb)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: 14,
+        fontWeight: 800,
+        color: "#fff",
+        flexShrink: 0,
+        boxShadow: "0 2px 6px rgba(0,0,0,0.15)",
       }}>
-        {items[idx]}
-      </span>
+        {current.initials === "@" ? (
+          <Flame size={16} color="#fff" fill="#fff" />
+        ) : (
+          current.initials
+        )}
+      </div>
+
+      <div style={{
+        flex: 1,
+        minWidth: 0,
+        display: "flex",
+        flexDirection: "column",
+        gap: 1,
+        animation: visible ? "tickerSlideUp 0.4s ease-out forwards" : "none",
+        opacity: visible ? 1 : 0,
+      }}>
+        <div style={{
+          fontSize: 12,
+          fontWeight: 700,
+          color: "var(--text-main)",
+          whiteSpace: "nowrap",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+        }}>
+          {current.userName} <span style={{ fontWeight: 500, color: "var(--text-muted)" }}>{current.action}</span>{" "}
+          <span style={{ color: current.type === "win" ? "#22c55e" : "#3b82f6" }}>{current.amount}</span>
+        </div>
+        <div style={{
+          fontSize: 10,
+          fontWeight: 600,
+          color: "var(--text-subtle)",
+          whiteSpace: "nowrap",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+        }}>
+          on <span style={{ color: "var(--text-muted)" }}>{current.outcome}</span> · {current.marketTitle}
+        </div>
+      </div>
+
+      {/* Live Indicator */}
+      <div style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 4,
+        background: "rgba(239, 68, 68, 0.1)",
+        padding: "4px 8px",
+        borderRadius: 8,
+        flexShrink: 0,
+      }}>
+        <div style={{
+          width: 5,
+          height: 5,
+          borderRadius: "50%",
+          background: "#ef4444",
+          animation: "livePulse 1.5s ease-in-out infinite",
+        }} />
+        <span style={{ fontSize: 9, fontWeight: 900, color: "#ef4444", textTransform: "uppercase" }}>Live</span>
+      </div>
     </div>
   );
 }
@@ -692,8 +746,7 @@ export const TmaFeedPage: FC = () => {
       >
         <div className="mesh-bg" />
 
-        {/* ── Live activity ticker ── */}
-        <LiveTicker />
+
 
         {/* ── Search bar ── */}
         <div style={{ position: "relative", marginBottom: 20 }}>
@@ -981,6 +1034,10 @@ export const TmaFeedPage: FC = () => {
                 LIVE
               </div>
             </div>
+            
+            {/* ── Live activity ticker (Redesigned & Relocated) ── */}
+            <LiveTicker />
+
             {filteredOpen.map((market) => (
               <MarketCard
                 key={market.id}

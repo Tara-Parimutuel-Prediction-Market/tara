@@ -16,7 +16,7 @@ import {
   formatBTN,
 } from "@/api/dkbank";
 import { Page } from "@/tma/components/Page";
-import { StreakBanner } from "@/tma/components/StreakBanner";
+import { StreakBenefitsModal } from "@/tma/components/StreakBenefitsModal";
 import {
   CheckCircle2,
   XCircle,
@@ -200,6 +200,7 @@ export const TmaProfilePage: FC = () => {
   const [badgesOpen, setBadgesOpen] = useState(false);
   const [showAllTxs, setShowAllTxs] = useState(false);
   const [balanceHidden, setBalanceHidden] = useState(true);
+  const [streakModalOpen, setStreakModalOpen] = useState(false);
 
   const [cid, setCid] = useState("");
   const [step, setStep] = useState<LinkStep>("idle");
@@ -354,6 +355,9 @@ export const TmaProfilePage: FC = () => {
         @keyframes fadeSlideUp {
           from { opacity: 0; transform: translateY(12px); }
           to   { opacity: 1; transform: translateY(0); }
+        @keyframes streakFire {
+          0%, 100% { filter: drop-shadow(0 0 2px rgba(239,68,68,0.5)); transform: scale(1); }
+          50%       { filter: drop-shadow(0 0 8px rgba(249,115,22,0.8)); transform: scale(1.05); }
         }
       `}</style>
       <div style={styles.container}>
@@ -376,16 +380,31 @@ export const TmaProfilePage: FC = () => {
               </div>
             )}
             <div>
-              <div
-                style={{
-                  fontSize: 17,
-                  fontWeight: 800,
-                  color: "#fff",
-                  lineHeight: 1.2,
-                }}
-              >
-                {user?.firstName} {user?.lastName || ""}
-              </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  {user?.firstName} {user?.lastName || ""}
+                  {(user?.betStreakCount ?? 0) > 0 && (
+                    <button
+                      onClick={() => setStreakModalOpen(true)}
+                      style={{
+                        background: 'linear-gradient(135deg, #ef4444, #f97316)',
+                        border: 'none',
+                        borderRadius: 12,
+                        padding: '0px 8px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        cursor: 'pointer',
+                        animation: 'streakFire 2s ease-in-out infinite',
+                        boxShadow: '0 4px 12px rgba(239,68,68,0.25)',
+                      }}
+                    >
+                      <Flame size={14} color="#fff" fill="#fff" />
+                      <span style={{ fontSize: 13, fontWeight: 900, color: '#fff' }}>
+                        {user?.betStreakCount}
+                      </span>
+                    </button>
+                  )}
+                </div>
               {user?.username && (
                 <div
                   style={{
@@ -883,18 +902,6 @@ export const TmaProfilePage: FC = () => {
 
         {/* ── Collectible Badges ────────────────────────────── */}
         <div style={{ padding: "0 16px" }}>
-          {/* Daily Bet Streak */}
-          {(user?.betStreakCount ?? 0) > 0 && (
-            <div style={{ marginBottom: 16 }}>
-              <StreakBanner
-                streakCount={user?.betStreakCount ?? 0}
-                dayInCycle={user?.dayInCycle ?? 0}
-                nextBoostInDays={user?.nextBoostInDays ?? 7}
-                boostJustActivated={user?.boostReady ?? false}
-              />
-            </div>
-          )}
-
           <BadgeGrid
             totalPredictions={user?.totalPredictions ?? 0}
             correctPredictions={user?.correctPredictions ?? 0}
@@ -1339,6 +1346,13 @@ export const TmaProfilePage: FC = () => {
           </div>
         </div>
       )}
+
+      {/* Streak Benefits Modal */}
+      <StreakBenefitsModal 
+        isOpen={streakModalOpen}
+        onClose={() => setStreakModalOpen(false)}
+        streakCount={user?.betStreakCount ?? 0}
+      />
     </Page>
   );
 };
@@ -1596,7 +1610,7 @@ function BadgeGrid({
             margin: 0,
             fontSize: 14,
             fontWeight: 700,
-            color: "var(--text-primary)",
+            color: "var(--text-main)",
             display: "flex",
             alignItems: "center",
             gap: 6,

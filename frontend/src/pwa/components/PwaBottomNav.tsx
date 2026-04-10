@@ -15,7 +15,7 @@ export const PwaBottomNav: React.FC = () => {
 
   const navItems = [
     { to: "/", label: "Feed", icon: LayoutGrid },
-    { to: "/my-bets", label: "My Positions", icon: Ticket },
+    { to: "/my-bets", label: "My Picks", icon: Ticket },
     { to: "/results", label: "Results", icon: Trophy },
     { to: "/profile", label: "Profile", icon: UserCircle },
   ];

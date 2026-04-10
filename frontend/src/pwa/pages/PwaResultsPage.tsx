@@ -1,5 +1,21 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Link } from "react-router-dom";
+import { 
+  Trophy, 
+  TrendingUp, 
+  Target, 
+  History, 
+  ArrowUpRight, 
+  Award, 
+  ChevronDown, 
+  ChevronUp,
+  CheckCircle2,
+  AlertCircle,
+  HelpCircle,
+  Globe,
+  PieChart,
+  Calendar
+} from "lucide-react";
 import {
   getMyResults,
   getResolvedMarkets,
@@ -16,7 +32,7 @@ export function PwaResultsPage() {
   const [resolved, setResolved] = useState<ResolvedMarket[]>([]);
   const [showAll, setShowAll] = useState(false);
   const [me, setMe] = useState<AuthUser | null>(null);
-  const [repOpen, setRepOpen] = useState(true);
+  const [repOpen, setRepOpen] = useState(false);
 
   useEffect(() => {
     getMyResults()
@@ -31,120 +47,130 @@ export function PwaResultsPage() {
       .catch(() => {});
   }, []);
 
-  const won = bets.filter((b) => b.status === "won");
-  const lost = bets.filter((b) => b.status === "lost");
-  const winRate =
-    bets.filter((b) => b.status !== "refunded").length > 0
-      ? (
-          (won.length / bets.filter((b) => b.status !== "refunded").length) *
-          100
-        ).toFixed(0)
-      : "0";
+  const stats = useMemo(() => {
+    const won = bets.filter((b) => b.status === "won");
+    const validBets = bets.filter((b) => b.status !== "refunded" && b.status !== "pending");
+    const winRate = validBets.length > 0 ? (won.length / validBets.length) * 100 : 0;
+    const totalPayout = bets.reduce((acc, b) => acc + (b.payout || 0), 0);
+    const totalWagered = bets.reduce((acc, b) => acc + Number(b.amount), 0);
+    const netGains = totalPayout - totalWagered;
+    
+    return {
+      total: bets.length,
+      won: won.length,
+      lost: bets.filter(b => b.status === "lost").length,
+      winRate: winRate.toFixed(0),
+      netGains: Math.round(netGains)
+    };
+  }, [bets]);
 
   return (
-    <div style={{ maxWidth: 700, margin: "0 auto", padding: "24px 16px" }}>
-      <h1
-        style={{
-          fontSize: "1.4rem",
-          fontWeight: 800,
-          marginBottom: 4,
-          color: "var(--text-main)",
-        }}
-      >
-        Results
-      </h1>
-      <p
-        style={{
-          fontSize: "0.85rem",
-          color: "var(--text-muted)",
-          marginBottom: 20,
-        }}
-      >
-        Resolution record
-      </p>
-
-      {loading && (
-        <div
+    <div style={{ maxWidth: 700, margin: "0 auto", padding: "24px 16px 100px" }}>
+      <div style={{ marginBottom: 32 }}>
+        <h1
           style={{
-            textAlign: "center",
-            padding: "60px 0",
-            color: "var(--text-subtle)",
+            fontSize: "2rem",
+            fontWeight: 900,
+            marginBottom: 6,
+            color: "var(--text-main)",
+            letterSpacing: "-0.03em",
           }}
         >
-          Loading…
+          Performance
+        </h1>
+        <p
+          style={{
+            fontSize: "0.95rem",
+            color: "var(--text-muted)",
+            fontWeight: 600,
+          }}
+        >
+          Your prediction history and achievements
+        </p>
+      </div>
+
+      {loading && (
+        <div style={{ textAlign: "center", padding: "60px 0", color: "var(--text-subtle)" }}>
+          Loading your record…
         </div>
       )}
+      
       {error && (
-        <div
-          style={{ textAlign: "center", padding: "40px 0", color: "#ef4444" }}
-        >
+        <div style={{ textAlign: "center", padding: "40px 0", color: "#ef4444" }}>
           {error}
         </div>
       )}
 
       {!loading && !error && (
         <>
-          {/* Summary strip */}
-          {bets.length > 0 && (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(4, 1fr)",
-                gap: 10,
-                marginBottom: 24,
-              }}
-            >
-              {[
-                { label: "Contracts", value: bets.length },
-                { label: "Won", value: won.length, color: "#22c55e" },
-                { label: "Lost", value: lost.length, color: "#ef4444" },
-                {
-                  label: "Win rate",
-                  value: `${winRate}%`,
-                  color: Number(winRate) >= 50 ? "#22c55e" : "#f59e0b",
-                },
-              ].map((s) => (
-                <div
-                  key={s.label}
-                  style={{
-                    background: "var(--glass-bg)",
-                    border: "1px solid var(--glass-border)",
-                    borderRadius: 12,
-                    padding: "12px 10px",
-                    textAlign: "center",
-                  }}
-                >
-                  <div
-                    style={{
-                      fontSize: "1.1rem",
-                      fontWeight: 800,
-                      color: (s as any).color ?? "var(--text-main)",
-                    }}
-                  >
-                    {s.value}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: "0.68rem",
-                      color: "var(--text-muted)",
-                      marginTop: 2,
-                    }}
-                  >
-                    {s.label}
-                  </div>
-                </div>
-              ))}
+          {/* Main Dashboard Widget */}
+          <div style={{
+            background: "linear-gradient(135deg, var(--bg-card), var(--bg-card))",
+            border: "1px solid var(--glass-border)",
+            borderRadius: 24,
+            padding: "24px",
+            marginBottom: 24,
+            boxShadow: "0 10px 30px rgba(0,0,0,0.15)",
+            position: "relative",
+            overflow: "hidden"
+          }}>
+            <div style={{
+              position: "absolute",
+              top: -20,
+              right: -20,
+              width: 120,
+              height: 120,
+              background: "var(--accent)",
+              opacity: 0.05,
+              borderRadius: "50%",
+              filter: "blur(40px)"
+            }} />
+            
+            <div style={{ textAlign: "center", marginBottom: 24 }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: "var(--text-subtle)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8 }}>
+                Historical Accuracy
+              </div>
+              <div style={{ display: "flex", alignItems: "baseline", justifyContent: "center", gap: 8 }}>
+                <span style={{ fontSize: 32, fontWeight: 950, color: "var(--text-main)", letterSpacing: "-0.02em" }}>
+                  {stats.winRate}%
+                </span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: Number(stats.winRate) >= 50 ? "#22c55e" : "#f59e0b" }}>
+                  {Number(stats.winRate) >= 50 ? "Excellent" : "Learning"}
+                </span>
+              </div>
             </div>
-          )}
 
-          {/* Prediction Reputation */}
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(3, 1fr)",
+              gap: 12,
+              paddingTop: 20,
+              borderTop: "1px solid var(--glass-border)"
+            }}>
+              <div style={{ textAlign: "center" }}>
+                <div style={{ fontSize: 18, fontWeight: 900, color: "var(--text-main)" }}>{stats.total}</div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-subtle)", textTransform: "uppercase" }}>Picks</div>
+              </div>
+              <div style={{ textAlign: "center" }}>
+                <div style={{ fontSize: 18, fontWeight: 900, color: "#22c55e" }}>{stats.won}</div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-subtle)", textTransform: "uppercase" }}>Wins</div>
+              </div>
+              <div style={{ textAlign: "center" }}>
+                <div style={{ fontSize: 18, fontWeight: 900, color: "#ef4444" }}>{stats.lost}</div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-subtle)", textTransform: "uppercase" }}>Losses</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Prediction Reputation Achievement Card */}
           <div
             style={{
-              background: "var(--glass-bg)",
+              background: "var(--bg-card)",
               border: "1px solid var(--glass-border)",
-              borderRadius: 14,
-              padding: "16px 18px",
-              marginBottom: 8,
+              borderRadius: 20,
+              padding: "20px",
+              marginBottom: 32,
+              boxShadow: "var(--shadow-premium)",
             }}
           >
             <div
@@ -157,92 +183,61 @@ export function PwaResultsPage() {
               }}
               onClick={() => setRepOpen((o) => !o)}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="#f59e0b"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
-                  <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
-                  <path d="M4 22h16" />
-                  <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" />
-                  <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" />
-                  <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" />
-                </svg>
-                <span
-                  style={{
-                    fontSize: "0.88rem",
-                    fontWeight: 700,
-                    color: "var(--text-main)",
-                  }}
-                >
-                  Prediction Reputation
-                </span>
-                {(() => {
-                  const tier = me?.reputationTier ?? "newcomer";
-                  const label =
-                    tier === "expert"
-                      ? "Legend"
-                      : tier === "reliable"
-                        ? "Hot Hand"
-                        : tier === "regular"
-                          ? "Sharpshooter"
-                          : "Rookie";
-                  const bg =
-                    tier === "expert"
-                      ? "#fef3c7"
-                      : tier === "reliable"
-                        ? "#d1fae5"
-                        : tier === "regular"
-                          ? "#dbeafe"
-                          : "var(--glass-bg)";
-                  const color =
-                    tier === "expert"
-                      ? "#92400e"
-                      : tier === "reliable"
-                        ? "#065f46"
-                        : tier === "regular"
-                          ? "#1e40af"
-                          : "var(--text-muted)";
-                  return (
-                    <span
-                      style={{
-                        fontSize: "0.7rem",
-                        fontWeight: 700,
-                        padding: "2px 8px",
-                        borderRadius: 99,
-                        background: bg,
-                        color,
-                      }}
-                    >
-                      {label}
-                    </span>
-                  );
-                })()}
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 10,
+                  background: "rgba(245, 158, 11, 0.1)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "#f59e0b"
+                }}>
+                  <Award size={20} />
+                </div>
+                <div style={{ display: "flex", flexDirection: "column" }}>
+                  <span
+                    style={{
+                      fontSize: "1rem",
+                      fontWeight: 800,
+                      color: "var(--text-main)",
+                    }}
+                  >
+                    Prediction Tier
+                  </span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    {(() => {
+                      const tier = me?.reputationTier ?? "newcomer";
+                      const label =
+                        tier === "expert" ? "Legend" :
+                        tier === "reliable" ? "Hot Hand" :
+                        tier === "regular" ? "Sharpshooter" : "Rookie";
+                      const color =
+                        tier === "expert" ? "#f59e0b" :
+                        tier === "reliable" ? "#22c55e" :
+                        tier === "regular" ? "#3b82f6" : "var(--text-subtle)";
+                      return (
+                        <span style={{ fontSize: "0.75rem", fontWeight: 700, color }}>
+                          {label} Rank
+                        </span>
+                      );
+                    })()}
+                  </div>
+                </div>
               </div>
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="var(--text-subtle)"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                style={{
-                  transition: "transform 0.2s",
-                  transform: repOpen ? "rotate(0deg)" : "rotate(-90deg)",
-                  flexShrink: 0,
-                }}
-              >
-                <polyline points="6 9 12 15 18 9" />
-              </svg>
+              <div style={{
+                width: 28,
+                height: 28,
+                borderRadius: "50%",
+                background: "var(--bg-secondary)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "var(--text-subtle)"
+              }}>
+                {repOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+              </div>
             </div>
 
             {repOpen && (
@@ -265,45 +260,29 @@ export function PwaResultsPage() {
                     <div
                       style={{
                         display: "flex",
-                        alignItems: "center",
-                        gap: 12,
-                        marginBottom: 12,
-                      }}
-                    >
-                      {me?.reputationScore != null && (
-                        <span
-                          style={{ fontSize: 13, color: "var(--text-subtle)" }}
-                        >
-                          {Math.round(me.reputationScore * 100)}% confidence
-                          score
-                        </span>
-                      )}
-                    </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        gap: 20,
-                        fontSize: 13,
+                        gap: 24,
+                        fontSize: 14,
                         color: "var(--text-subtle)",
-                        marginBottom: 14,
+                        marginBottom: 20,
+                        background: "var(--bg-secondary)",
+                        padding: "14px",
+                        borderRadius: 14,
                       }}
                     >
-                      <span>
-                        <strong
-                          style={{ color: "var(--text-main)", fontSize: 15 }}
-                        >
-                          {me?.totalPredictions ?? 0}
-                        </strong>{" "}
-                        predictions
-                      </span>
-                      <span>
-                        <strong
-                          style={{ color: "var(--text-main)", fontSize: 15 }}
-                        >
-                          {me?.correctPredictions ?? 0}
-                        </strong>{" "}
-                        correct
-                      </span>
+                      <div style={{ display: "flex", flexDirection: "column" }}>
+                        <span style={{ fontSize: 18, fontWeight: 900, color: "var(--text-main)" }}>{me?.totalPredictions ?? 0}</span>
+                        <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>Total Hits</span>
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column" }}>
+                        <span style={{ fontSize: 18, fontWeight: 900, color: "#22c55e" }}>{me?.correctPredictions ?? 0}</span>
+                        <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>Correct</span>
+                      </div>
+                      {me?.reputationScore != null && (
+                        <div style={{ display: "flex", flexDirection: "column" }}>
+                          <span style={{ fontSize: 18, fontWeight: 900, color: "var(--accent)" }}>{Math.round(me.reputationScore * 100)}%</span>
+                          <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>Confidence</span>
+                        </div>
+                      )}
                     </div>
                     {(() => {
                       const total = me?.totalPredictions ?? 0;
@@ -317,7 +296,7 @@ export function PwaResultsPage() {
                               style={{
                                 background: "var(--glass-border)",
                                 borderRadius: 99,
-                                height: 6,
+                                height: 8,
                                 overflow: "hidden",
                               }}
                             >
@@ -333,13 +312,16 @@ export function PwaResultsPage() {
                             </div>
                             <div
                               style={{
-                                marginTop: 6,
-                                fontSize: 11,
-                                color: "#92400e",
-                                fontWeight: 700,
+                                marginTop: 8,
+                                fontSize: 12,
+                                color: "#f59e0b",
+                                fontWeight: 800,
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 6
                               }}
                             >
-                              🏆 Maximum tier reached
+                              <Award size={14} /> Maximum Tier Reached
                             </div>
                           </>
                         );
@@ -353,7 +335,7 @@ export function PwaResultsPage() {
                         const rem = 10 - total;
                         label = "Sharpshooter";
                         color = "#3b82f6";
-                        hint = `${rem} more prediction${rem !== 1 ? "s" : ""} to reach Sharpshooter`;
+                        hint = `Predict ${rem} more to reach ${label}`;
                       } else if (tier === "regular") {
                         progressPct =
                           ((Math.min(total / 50, 1) +
@@ -365,10 +347,10 @@ export function PwaResultsPage() {
                         color = "#059669";
                         hint =
                           rem > 0 && accuracy < 0.65
-                            ? `${rem} more predictions & ${Math.round(accuracy * 100)}% → 65% accuracy for Hot Hand`
+                            ? `${rem} more & 65% accuracy for ${label}`
                             : rem > 0
-                              ? `${rem} more predictions to reach Hot Hand`
-                              : `Reach 65% accuracy to unlock Hot Hand (currently ${Math.round(accuracy * 100)}%)`;
+                              ? `${rem} more for ${label}`
+                              : `Reach 65% accuracy for ${label}`;
                       } else {
                         progressPct =
                           ((Math.min(total / 100, 1) +
@@ -380,10 +362,10 @@ export function PwaResultsPage() {
                         color = "#f59e0b";
                         hint =
                           rem > 0 && accuracy < 0.75
-                            ? `${rem} more predictions & ${Math.round(accuracy * 100)}% → 75% accuracy for Legend`
+                            ? `${rem} more & 75% accuracy for ${label}`
                             : rem > 0
-                              ? `${rem} more predictions to reach Legend`
-                              : `Reach 75% accuracy to unlock Legend (currently ${Math.round(accuracy * 100)}%)`;
+                              ? `${rem} more for ${label}`
+                              : `Reach 75% accuracy for ${label}`;
                       }
                       return (
                         <>
@@ -391,29 +373,30 @@ export function PwaResultsPage() {
                             style={{
                               display: "flex",
                               justifyContent: "space-between",
-                              marginBottom: 5,
+                              marginBottom: 8,
                             }}
                           >
                             <span
                               style={{
                                 fontSize: 11,
-                                fontWeight: 700,
+                                fontWeight: 800,
                                 color: "var(--text-subtle)",
+                                textTransform: "uppercase"
                               }}
                             >
-                              Progress to <span style={{ color }}>{label}</span>
+                              Next Rank: <span style={{ color }}>{label}</span>
                             </span>
                             <span
-                              style={{ fontSize: 11, fontWeight: 800, color }}
+                              style={{ fontSize: 12, fontWeight: 900, color }}
                             >
                               {Math.round(progressPct)}%
                             </span>
                           </div>
                           <div
                             style={{
-                              background: "var(--glass-border)",
+                              background: "var(--bg-secondary)",
                               borderRadius: 99,
-                              height: 6,
+                              height: 8,
                               overflow: "hidden",
                             }}
                           >
@@ -423,19 +406,22 @@ export function PwaResultsPage() {
                                 height: "100%",
                                 borderRadius: 99,
                                 background: color,
-                                transition: "width 0.8s ease",
+                                transition: "width 0.8s cubic-bezier(0.4, 0, 0.2, 1)",
                               }}
                             />
                           </div>
                           <div
                             style={{
-                              marginTop: 5,
+                              marginTop: 10,
                               fontSize: 11,
                               color: "var(--text-subtle)",
                               fontWeight: 600,
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 6
                             }}
                           >
-                            {hint}
+                            <TrendingUp size={12} /> {hint}
                           </div>
                         </>
                       );
@@ -532,13 +518,15 @@ export function PwaResultsPage() {
                   >
                     <div
                       style={{
-                        background: "var(--glass-bg)",
+                        background: "var(--bg-card)",
                         border: "1px solid var(--glass-border)",
-                        borderRadius: 12,
-                        padding: "14px 16px",
+                        borderRadius: 20,
+                        padding: "20px",
                         display: "flex",
                         flexDirection: "column",
-                        gap: 8,
+                        gap: 12,
+                        boxShadow: "var(--shadow-sm)",
+                        transition: "transform 0.2s",
                       }}
                     >
                       <div
@@ -546,13 +534,13 @@ export function PwaResultsPage() {
                           display: "flex",
                           justifyContent: "space-between",
                           alignItems: "flex-start",
-                          gap: 8,
+                          gap: 12,
                         }}
                       >
                         <span
                           style={{
-                            fontWeight: 700,
-                            fontSize: "0.88rem",
+                            fontWeight: 800,
+                            fontSize: "1rem",
                             color: "var(--text-main)",
                             flex: 1,
                             lineHeight: 1.3,
@@ -563,109 +551,96 @@ export function PwaResultsPage() {
                         {m.category && (
                           <span
                             style={{
-                              fontSize: "0.65rem",
-                              fontWeight: 700,
+                              fontSize: "0.7rem",
+                              fontWeight: 800,
                               color: "var(--text-muted)",
-                              background: "var(--glass-bg)",
-                              border: "1px solid var(--glass-border)",
-                              padding: "2px 8px",
-                              borderRadius: 6,
+                              background: "var(--bg-secondary)",
+                              padding: "4px 10px",
+                              borderRadius: 8,
                               whiteSpace: "nowrap",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.03em"
                             }}
                           >
                             {m.category}
                           </span>
                         )}
                       </div>
+
                       {m.winner && (
                         <div
                           style={{
                             display: "flex",
                             alignItems: "center",
-                            gap: 6,
+                            gap: 10,
+                            padding: "10px 14px",
+                            background: "rgba(34, 197, 94, 0.08)",
+                            borderRadius: 12,
+                            border: "1px solid rgba(34, 197, 94, 0.15)",
                           }}
                         >
-                          <svg
-                            width="12"
-                            height="12"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="#22c55e"
-                            strokeWidth="2.5"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          >
-                            <polyline points="20 6 9 17 4 12" />
-                          </svg>
-                          <span
-                            style={{
-                              fontSize: "0.8rem",
-                              fontWeight: 700,
-                              color: "#22c55e",
-                            }}
-                          >
-                            {m.winner.label}
-                          </span>
+                          <Trophy size={16} stroke="#22c55e" />
+                          <div style={{ display: "flex", flexDirection: "column" }}>
+                            <span style={{ fontSize: 10, fontWeight: 800, color: "#22c55e", textTransform: "uppercase" }}>Winning Outcome</span>
+                            <span
+                              style={{
+                                fontSize: "0.9rem",
+                                fontWeight: 800,
+                                color: "#22c55e",
+                              }}
+                            >
+                              {m.winner.label}
+                            </span>
+                          </div>
                         </div>
                       )}
-                      {m.resolutionCriteria && (
-                        <p
-                          style={{
-                            margin: 0,
-                            fontSize: "0.75rem",
-                            color: "var(--text-subtle)",
-                            lineHeight: 1.5,
-                            fontStyle: "italic",
-                          }}
-                        >
-                          "{m.resolutionCriteria}"
-                        </p>
-                      )}
+
                       <div
                         style={{
                           display: "flex",
-                          gap: 14,
+                          gap: 16,
                           flexWrap: "wrap",
-                          paddingTop: 4,
+                          paddingTop: 12,
                           borderTop: "1px solid var(--glass-border)",
                         }}
                       >
-                        <span
-                          style={{
-                            fontSize: "0.72rem",
-                            color: "var(--text-muted)",
-                            fontWeight: 600,
-                          }}
-                        >
-                          BTN {Number(m.totalPool).toLocaleString()} pool
-                        </span>
-                        <span
-                          style={{
-                            fontSize: "0.72rem",
-                            color: "var(--text-muted)",
-                            fontWeight: 600,
-                          }}
-                        >
-                          {m.participantCount} bettors
-                        </span>
-                        {m.resolvedAt && (
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <PieChart size={14} style={{ color: "var(--text-subtle)" }} />
                           <span
                             style={{
-                              fontSize: "0.72rem",
-                              color: "var(--text-muted)",
-                              fontWeight: 600,
+                              fontSize: "0.75rem",
+                              color: "var(--text-subtle)",
+                              fontWeight: 700,
                             }}
                           >
-                            {new Date(m.resolvedAt).toLocaleDateString(
-                              "en-BT",
-                              {
-                                timeZone: "Asia/Thimphu",
-                                year: "numeric",
-                                month: "short",
-                                day: "numeric",
-                              },
-                            )}
+                            Nu {Number(m.totalPool).toLocaleString()}
                           </span>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <Globe size={14} style={{ color: "var(--text-subtle)" }} />
+                          <span
+                            style={{
+                              fontSize: "0.75rem",
+                              color: "var(--text-subtle)",
+                              fontWeight: 700,
+                            }}
+                          >
+                            {m.participantCount} bettors
+                          </span>
+                        </div>
+                        {m.resolvedAt && (
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: "auto" }}>
+                             <Calendar size={14} style={{ color: "var(--text-muted)" }} />
+                             <span
+                              style={{
+                                fontSize: "0.75rem",
+                                color: "var(--text-muted)",
+                                fontWeight: 600,
+                              }}
+                            >
+                              {new Date(m.resolvedAt).toLocaleDateString("en-BT")}
+                            </span>
+                          </div>
                         )}
                       </div>
                     </div>
