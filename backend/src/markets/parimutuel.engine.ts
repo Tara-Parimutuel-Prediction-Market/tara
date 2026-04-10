@@ -337,11 +337,22 @@ export class ParimutuelEngine implements OnModuleInit {
     market.status = MarketStatus.RESOLVED;
     await this.marketRepo.save(market);
 
-    // Refund dispute bonds
-    await this.refundDisputeBonds(marketId);
+    // Settle dispute bonds — returns slashed bond pool (0 if dispute upheld)
+    const slashedBondPool = await this.settleDisputeBonds(
+      marketId,
+      winningOutcomeId,
+      market.proposedOutcomeId,
+    );
 
-    // Settle
-    const settlement = await this.settleMarket(market, winner);
+    // Settle — winning bettors get 95% of any slashed bonds on top of normal payout
+    const settlement = await this.settleMarket(market, winner, slashedBondPool);
+
+    // Bust balance cache for every bettor so the TMA reflects payouts immediately
+    const allBets = await this.betRepo.find({ where: { marketId } });
+    const uniqueUserIds = [...new Set(allBets.map((b) => b.userId))];
+    await Promise.all(
+      uniqueUserIds.map((uid) => this.redis.del(`oro:cache:balance:${uid}`)),
+    );
 
     // Push real BTN from merchant → winners' DK accounts — fire and forget
     this.dispatchDkPayouts(
@@ -365,29 +376,76 @@ export class ParimutuelEngine implements OnModuleInit {
     return settlement;
   }
 
-  // Refund dispute bonds
-  private async refundDisputeBonds(marketId: string): Promise<void> {
+  /**
+   * Settle dispute bonds after final resolution.
+   *
+   * - If the final winner matches the proposed outcome → disputants were WRONG:
+   *     bonds are slashed (no refund). Returns the total slashed pool so 95%
+   *     can be redistributed to winning bettors (5% is the platform fee).
+   *
+   * - If the final winner differs from the proposed outcome → disputants were RIGHT:
+   *     bonds are fully returned via a DISPUTE_REFUND transaction.
+   *     Returns 0 (no slashed pool to distribute).
+   *
+   * In both cases `bondRefunded` is set to `true` to mark the record as processed.
+   */
+  private async settleDisputeBonds(
+    marketId: string,
+    winningOutcomeId: string,
+    proposedOutcomeId: string | null | undefined,
+  ): Promise<number> {
     const disputes = await this.disputeRepo.find({
       where: { marketId, bondRefunded: false },
     });
+
+    if (disputes.length === 0) return 0;
+
+    // Dispute is upheld when the admin's final call differs from the proposal
+    const disputeUpheld =
+      proposedOutcomeId && winningOutcomeId !== proposedOutcomeId;
+
+    let slashedPool = 0;
+
     for (const dispute of disputes) {
       await this.dataSource.transaction(async (em) => {
-        const balanceBefore = await this.getCreditsBalance(em, dispute.userId);
-        await em.save(
-          Transaction,
-          em.create(Transaction, {
-            type: TransactionType.DISPUTE_REFUND,
-            amount: Number(dispute.bondAmount),
-            balanceBefore,
-            balanceAfter: balanceBefore + Number(dispute.bondAmount),
-            userId: dispute.userId,
-            note: "Dispute bond refund after market resolution",
-          }),
-        );
+        if (disputeUpheld) {
+          // Disputant was CORRECT — return bond (credits path only;
+          // DK Bank path bonds were external payments, not credited)
+          if (!dispute.bondPaymentId) {
+            const balanceBefore = await this.getCreditsBalance(em, dispute.userId);
+            await em.save(
+              Transaction,
+              em.create(Transaction, {
+                type: TransactionType.DISPUTE_REFUND,
+                amount: Number(dispute.bondAmount),
+                balanceBefore,
+                balanceAfter: balanceBefore + Number(dispute.bondAmount),
+                userId: dispute.userId,
+                note: "Dispute upheld — bond returned",
+              }),
+            );
+          }
+        } else {
+          // Disputant was WRONG — bond slashed, no refund
+          slashedPool += Number(dispute.bondAmount);
+          this.logger.log(
+            `[Dispute] Bond slashed for user ${dispute.userId}: Nu ${dispute.bondAmount} (proposal confirmed)`,
+          );
+        }
+        // Mark processed regardless of outcome
         dispute.bondRefunded = true;
         await em.save(Dispute, dispute);
       });
     }
+
+    if (slashedPool > 0) {
+      const platformFee = slashedPool * 0.05;
+      this.logger.log(
+        `[Dispute] Total slashed: Nu ${slashedPool} | Platform fee (5%): Nu ${platformFee.toFixed(2)} | To winning bettors (95%): Nu ${(slashedPool * 0.95).toFixed(2)}`,
+      );
+    }
+
+    return slashedPool;
   }
 
   /**
@@ -469,11 +527,14 @@ export class ParimutuelEngine implements OnModuleInit {
   private async settleMarket(
     market: Market,
     winner: Outcome,
+    slashedBondPool = 0,
   ): Promise<Settlement> {
     return await this.dataSource.transaction(async (em) => {
       const totalPool = Number(market.totalPool);
       const houseAmount = totalPool * (Number(market.houseEdgePct) / 100);
-      const payoutPool = totalPool - houseAmount;
+      // 95% of any slashed dispute bonds flows to winning bettors; 5% is platform fee
+      const disputeBonus = slashedBondPool * 0.95;
+      const payoutPool = totalPool - houseAmount + disputeBonus;
 
       const winnerPool = Number(winner.totalBetAmount);
       const bets = await em.find(Position, { where: { marketId: market.id } });

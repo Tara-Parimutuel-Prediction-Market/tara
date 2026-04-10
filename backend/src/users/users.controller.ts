@@ -131,7 +131,7 @@ export class UsersController {
       ],
     });
 
-    const balanceCacheKey = `tara:cache:balance:${userId}`;
+    const balanceCacheKey = `oro:cache:balance:${userId}`;
     let creditsBalance: number | null =
       await this.redis.getJson<number>(balanceCacheKey);
 

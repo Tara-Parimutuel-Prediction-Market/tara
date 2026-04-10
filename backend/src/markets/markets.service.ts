@@ -254,6 +254,37 @@ export class MarketsService {
         "Either paymentId (DK Bank) or bondAmount (credits) is required",
       );
 
+    // Serialize concurrent financial ops per user so the balance check and
+    // the DISPUTE_BOND deduction are atomic with respect to any concurrent
+    // bet placement that might also be touching this user's ledger.
+    let lockToken: string | null = null;
+    try {
+      lockToken = await this.redis.acquireLockWithRetry(
+        `user:${userId}:wallet`,
+        10,
+        3,
+        150,
+      );
+    } catch {
+      // Redis unavailable — proceed; DB transaction still prevents negative balance
+      // as long as no concurrent writes slip through (low probability in practice)
+    }
+
+    try {
+      return await this._submitDisputeInner(userId, marketId, dto);
+    } finally {
+      if (lockToken)
+        await this.redis.releaseLock(`user:${userId}:wallet`, lockToken);
+      await this.redis.del(`oro:cache:balance:${userId}`);
+    }
+  }
+
+  private async _submitDisputeInner(
+    userId: string,
+    marketId: string,
+    dto: SubmitDisputeDto,
+  ): Promise<Dispute> {
+
     const market = await this.findOne(marketId);
     if (market.status !== MarketStatus.RESOLVING)
       throw new BadRequestException(
