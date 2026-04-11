@@ -6,7 +6,8 @@ interface BetShareCardProps {
   userPhotoUrl?: string | null;
   marketTitle: string;
   outcomePicked: string;
-  stakeAmount: number;
+  stakeAmount?: number;
+  totalPool?: number;
   outcomeColor?: string;
   /** Telegram bot username for deep-link */
   botUsername?: string;
@@ -142,7 +143,7 @@ async function renderCard(
   ctx.fillText(opts.userName, avatarX + avatarR * 2 + 12, avatarY + 18);
   ctx.font = "13px system-ui";
   ctx.fillStyle = "rgba(255,255,255,0.45)";
-  ctx.fillText("just placed a bet", avatarX + avatarR * 2 + 12, avatarY + 36);
+  ctx.fillText("just called it! ", avatarX + avatarR * 2 + 12, avatarY + 36);
 
   // Market title (wrapped)
   const maxTitleWidth = CARD_W - 64;
@@ -186,16 +187,24 @@ async function renderCard(
   ctx.textBaseline = "middle";
   ctx.fillText(pillText, 46, pillY + 17);
 
-  // Stake badge (right side)
-  const stakeText = `Nu ${opts.stakeAmount.toLocaleString()}`;
-  ctx.font = "bold 28px system-ui";
-  ctx.fillStyle = "#f59e0b";
-  ctx.textAlign = "right";
-  ctx.textBaseline = "alphabetic";
-  ctx.fillText(stakeText, CARD_W - 32, pillY + 22);
-  ctx.font = "12px system-ui";
-  ctx.fillStyle = "rgba(255,255,255,0.4)";
-  ctx.fillText("staked", CARD_W - 32, pillY + 36);
+  // Right-side badge: stake OR total pool
+  const badgeAmount = opts.stakeAmount || opts.totalPool;
+  const badgeLabel = opts.stakeAmount
+    ? "staked"
+    : opts.totalPool
+      ? "total pool"
+      : null;
+  if (badgeAmount && badgeLabel) {
+    const badgeText = `Nu ${badgeAmount.toLocaleString()}`;
+    ctx.font = "bold 28px system-ui";
+    ctx.fillStyle = opts.stakeAmount ? "#f59e0b" : "#a78bfa";
+    ctx.textAlign = "right";
+    ctx.textBaseline = "alphabetic";
+    ctx.fillText(badgeText, CARD_W - 32, pillY + 22);
+    ctx.font = "12px system-ui";
+    ctx.fillStyle = "rgba(255,255,255,0.4)";
+    ctx.fillText(badgeLabel, CARD_W - 32, pillY + 36);
+  }
 
   // CTA / reflink
   const refLink = `t.me/${opts.botUsername ?? BOT_USERNAME}/app?startapp=ref_${opts.referralId ?? ""}`;
@@ -260,10 +269,17 @@ export const BetShareCard: FC<BetShareCardProps> = (props) => {
       if (blobUrl) URL.revokeObjectURL(blobUrl);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [props.marketTitle, props.outcomePicked, props.stakeAmount]);
+  }, [
+    props.marketTitle,
+    props.outcomePicked,
+    props.stakeAmount,
+    props.totalPool,
+  ]);
 
   const refLink = `https://t.me/${props.botUsername ?? BOT_USERNAME}/app?startapp=ref_${props.referralId ?? ""}`;
-  const shareText = `🏆 I'm calling it! Nu ${props.stakeAmount.toLocaleString()} on "${props.outcomePicked}" in:\n"${props.marketTitle}"\n\nCan you predict better? Join 👇\n${refLink}`;
+  const shareText = props.stakeAmount
+    ? `🏆 I'm calling it! Nu ${props.stakeAmount.toLocaleString()} on "${props.outcomePicked}" in:\n"${props.marketTitle}"\n\nCan you predict better? Join 👇\n${refLink}`
+    : `🔥 Check this out: "${props.outcomePicked}" in\n"${props.marketTitle}"\n\nJoin Oro Predict 👇\n${refLink}`;
 
   const handleShare = async () => {
     if (sharing) return;

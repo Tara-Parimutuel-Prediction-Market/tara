@@ -110,6 +110,8 @@ export interface AuthUser {
   dayInCycle?: number;
   nextBoostInDays?: number;
   boostReady?: boolean;
+  // Referrals
+  referralCount?: number;
 }
 
 export interface AuthResponse {
@@ -407,4 +409,31 @@ export function getBetsByWallet(walletAddress: string) {
   return fetch(`${API_URL}/bets/wallet/${walletAddress}`).then((r) =>
     r.ok ? r.json() : Promise.reject(r.statusText),
   );
+}
+
+// ─── Leaderboard ─────────────────────────────────────────────────────────────
+
+export interface LeaderboardEntry {
+  rank: number;
+  id: string;
+  firstName: string;
+  lastName: string | null;
+  username: string | null;
+  photoUrl: string | null;
+  reputationScore: number | null;
+  reputationTier: string;
+  totalPredictions: number;
+  correctPredictions: number;
+  winRate: number;
+  isMe: boolean;
+}
+
+export interface LeaderboardResponse {
+  board: LeaderboardEntry[];
+  myRank: number | null;
+  totalRanked: number;
+}
+
+export function getLeaderboard(): Promise<LeaderboardResponse> {
+  return request<LeaderboardResponse>("/users/leaderboard");
 }

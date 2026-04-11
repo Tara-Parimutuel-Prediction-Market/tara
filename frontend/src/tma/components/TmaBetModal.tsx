@@ -680,7 +680,7 @@ export function TmaBetModal({
                     marginBottom: 12,
                   }}
                 >
-                  ⚠️ Insufficient balance. Please deposit first.
+                  ⚠️ Insufficient balance. Please top up first.
                 </div>
               )}
 

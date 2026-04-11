@@ -11,9 +11,10 @@ import {
 import { useAuth } from "@/tma/hooks/useAuth";
 import { TmaBetModal } from "@/tma/components/TmaBetModal";
 import { Link } from "@/tma/components/Link/Link";
-import { Flame } from "lucide-react";
+import { Flame, X } from "lucide-react";
+import { BetShareCard } from "@/components/BetShareCard";
 
-// ── Live Activity Ticker ──────────────────────────────────────────────────────
+// Live Activity Ticker
 
 interface FormattedEvent {
   userName: string;
@@ -77,24 +78,10 @@ function LiveTicker() {
   const current = events[idx];
 
   return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-        background: "var(--bg-card)",
-        border: "1px solid var(--glass-border)",
-        borderRadius: 14,
-        padding: "8px 12px",
-        marginBottom: 16,
-        overflow: "hidden",
-        boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-        position: "relative",
-      }}
-    >
+    <>
       <style>{`
         @keyframes tickerSlideUp {
-          from { opacity: 0; transform: translateY(10px); }
+          from { opacity: 0; transform: translateY(6px); }
           to { opacity: 1; transform: translateY(0); }
         }
         @keyframes livePulse {
@@ -102,114 +89,81 @@ function LiveTicker() {
           50% { opacity: 0.5; }
         }
       `}</style>
-
-      {/* Avatar / Initial */}
+      {/* Separator */}
       <div
         style={{
-          width: 32,
-          height: 32,
-          borderRadius: "50%",
-          background:
-            current.type === "win"
-              ? "linear-gradient(135deg, #22c55e, #16a34a)"
-              : "linear-gradient(135deg, #3b82f6, #2563eb)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontSize: 14,
-          fontWeight: 800,
-          color: "#ffffffff",
+          width: 1,
+          height: 14,
+          background: "var(--glass-border)",
           flexShrink: 0,
-          boxShadow: "0 2px 6px rgba(0,0,0,0.15)",
         }}
-      >
-        {current.initials === "@" ? (
-          <Flame size={16} color="#fff" fill="#fff" />
-        ) : (
-          current.initials
-        )}
-      </div>
-
+      />
+      {/* Flame icon — no avatar */}
+      <Flame
+        size={12}
+        color="#ff6b00"
+        fill="#ff9500"
+        style={{ flexShrink: 0 }}
+      />
+      {/* Text */}
       <div
         style={{
           flex: 1,
           minWidth: 0,
-          display: "flex",
-          flexDirection: "column",
-          gap: 1,
           animation: visible ? "tickerSlideUp 0.4s ease-out forwards" : "none",
           opacity: visible ? 1 : 0,
+          display: "flex",
+          alignItems: "center",
+          gap: 4,
+          overflow: "hidden",
         }}
       >
-        <div
+        <span
           style={{
-            fontSize: 12,
+            fontSize: 11,
             fontWeight: 700,
             color: "var(--text-main)",
             whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
+            flexShrink: 0,
           }}
         >
-          {current.userName}{" "}
-          <span style={{ fontWeight: 500, color: "var(--text-muted)" }}>
-            {current.action}
-          </span>{" "}
-          <span
-            style={{ color: current.type === "win" ? "#22c55e" : "#3b82f6" }}
-          >
-            {current.amount}
-          </span>
-        </div>
-        <div
+          {current.userName}
+        </span>
+        <span
           style={{
-            fontSize: 10,
-            fontWeight: 600,
+            fontSize: 11,
+            fontWeight: 500,
+            color: "var(--text-muted)",
+            whiteSpace: "nowrap",
+            flexShrink: 0,
+          }}
+        >
+          {current.action}
+        </span>
+        <span
+          style={{
+            fontSize: 11,
+            fontWeight: 800,
+            color: current.type === "win" ? "#22c55e" : "#3b82f6",
+            whiteSpace: "nowrap",
+            flexShrink: 0,
+          }}
+        >
+          {current.amount}
+        </span>
+        <span
+          style={{
+            fontSize: 11,
             color: "var(--text-subtle)",
             whiteSpace: "nowrap",
             overflow: "hidden",
             textOverflow: "ellipsis",
           }}
         >
-          on{" "}
-          <span style={{ color: "var(--text-muted)" }}>{current.outcome}</span>{" "}
-          · {current.marketTitle}
-        </div>
-      </div>
-
-      {/* Live Indicator */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 4,
-          background: "rgba(239, 68, 68, 0.1)",
-          padding: "4px 8px",
-          borderRadius: 8,
-          flexShrink: 0,
-        }}
-      >
-        <div
-          style={{
-            width: 5,
-            height: 5,
-            borderRadius: "50%",
-            background: "#ef4444",
-            animation: "livePulse 1.5s ease-in-out infinite",
-          }}
-        />
-        <span
-          style={{
-            fontSize: 9,
-            fontWeight: 900,
-            color: "#ef4444",
-            textTransform: "uppercase",
-          }}
-        >
-          Live
+          · {current.outcome}
         </span>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -253,13 +207,19 @@ function MarketCard({
   onBet,
   hasBet,
   telegramId,
+  userName,
+  userPhotoUrl,
 }: {
   market: Market;
   onBet: (outcomeId: string) => void;
   hasBet: boolean;
   telegramId?: string | number | null;
+  userName?: string | null;
+  userPhotoUrl?: string | null;
 }) {
   const [showAll, setShowAll] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+
   const isUpcoming = market.status === "upcoming";
   const isResolving = market.status === "resolving";
   const countdown = useCountdown(
@@ -269,19 +229,7 @@ function MarketCard({
 
   const handleShare = (e: React.MouseEvent) => {
     e.stopPropagation();
-    const refLink = `https://t.me/OroPredictBot/app?startapp=ref_${telegramId || ""}`;
-    // Pick the top outcome the user (or crowd) is backing
-    const topOutcome = [...market.outcomes].sort(
-      (a, b) => (b.lmsrProbability ?? 0) - (a.lmsrProbability ?? 0),
-    )[0];
-    const outcomeLabel = topOutcome?.label ?? "an outcome";
-    const text = `🔥 I just called it — betting on *${outcomeLabel}* in:\n"${market.title}"\n\nThink you can predict better? Prove it 👇\n${refLink}`;
-    const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(refLink)}&text=${encodeURIComponent(text)}`;
-    if (window.Telegram?.WebApp?.openTelegramLink) {
-      window.Telegram.WebApp.openTelegramLink(shareUrl);
-    } else {
-      window.open(shareUrl, "_blank");
-    }
+    setShowShareModal(true);
   };
 
   const sentiment = (() => {
@@ -661,6 +609,82 @@ function MarketCard({
           </button>
         </div>
       </div>
+      {/* Share modal with card image */}
+      {showShareModal && (
+        <div
+          onClick={() => setShowShareModal(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 2000,
+            background: "rgba(0,0,0,0.85)",
+            backdropFilter: "blur(10px)",
+            WebkitBackdropFilter: "blur(10px)",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px 16px",
+            gap: 16,
+          }}
+        >
+          <div
+            style={{
+              width: "100%",
+              maxWidth: 560,
+              position: "relative",
+              animation:
+                "shareModalIn 0.3s cubic-bezier(0.34,1.56,0.64,1) forwards",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <style>{`
+              @keyframes shareModalIn {
+                from { opacity: 0; transform: scale(0.93); }
+                to   { opacity: 1; transform: scale(1); }
+              }
+            `}</style>
+
+            {/* Close */}
+            <button
+              onClick={() => setShowShareModal(false)}
+              style={{
+                position: "absolute",
+                top: -36,
+                right: 0,
+                background: "transparent",
+                border: "none",
+                color: "rgba(255,255,255,0.7)",
+                cursor: "pointer",
+                padding: 6,
+              }}
+            >
+              <X size={22} />
+            </button>
+
+            {/* Card image — built-in Share Image / Download buttons included */}
+            <BetShareCard
+              userName={
+                userName
+                  ? userName
+                  : telegramId
+                    ? `User ${telegramId}`
+                    : "A Predictor"
+              }
+              userPhotoUrl={userPhotoUrl ?? null}
+              marketTitle={market.title}
+              outcomePicked={
+                [...market.outcomes].sort(
+                  (a, b) => (b.lmsrProbability ?? 0) - (a.lmsrProbability ?? 0),
+                )[0]?.label ?? ""
+              }
+              totalPool={totalPool}
+              outcomeColor="#3b82f6"
+              referralId={String(telegramId ?? "")}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1072,6 +1096,12 @@ export const TmaFeedPage: FC = () => {
                 market={market}
                 hasBet={bettedMarketIds.has(market.id)}
                 telegramId={user?.telegramId}
+                userName={
+                  user?.username
+                    ? `@${user.username}`
+                    : (user?.firstName ?? null)
+                }
+                userPhotoUrl={user?.photoUrl ?? null}
                 onBet={(outcomeId) =>
                   setActiveBet({ marketId: market.id, outcomeId })
                 }
@@ -1089,6 +1119,7 @@ export const TmaFeedPage: FC = () => {
                 gap: 8,
                 marginBottom: 12,
                 paddingLeft: 4,
+                overflow: "hidden",
               }}
             >
               <div
@@ -1110,10 +1141,8 @@ export const TmaFeedPage: FC = () => {
               >
                 LIVE
               </div>
+              <LiveTicker />
             </div>
-
-            {/* ── Live activity ticker (Redesigned & Relocated) ── */}
-            <LiveTicker />
 
             {filteredOpen.map((market) => (
               <MarketCard
@@ -1121,6 +1150,12 @@ export const TmaFeedPage: FC = () => {
                 market={market}
                 hasBet={bettedMarketIds.has(market.id)}
                 telegramId={user?.telegramId}
+                userName={
+                  user?.username
+                    ? `@${user.username}`
+                    : (user?.firstName ?? null)
+                }
+                userPhotoUrl={user?.photoUrl ?? null}
                 onBet={(outcomeId) =>
                   setActiveBet({ marketId: market.id, outcomeId })
                 }
@@ -1166,6 +1201,12 @@ export const TmaFeedPage: FC = () => {
                 market={market}
                 hasBet={bettedMarketIds.has(market.id)}
                 telegramId={user?.telegramId}
+                userName={
+                  user?.username
+                    ? `@${user.username}`
+                    : (user?.firstName ?? null)
+                }
+                userPhotoUrl={user?.photoUrl ?? null}
                 onBet={(outcomeId) =>
                   setActiveBet({ marketId: market.id, outcomeId })
                 }

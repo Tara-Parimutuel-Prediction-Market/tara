@@ -148,7 +148,7 @@ async function renderCard(
   ctx.fillText(opts.userName, avatarX + avatarR * 2 + 12, avatarY + 18);
   ctx.font = "13px system-ui";
   ctx.fillStyle = "rgba(255,255,255,0.45)";
-  ctx.fillText("just placed a bet", avatarX + avatarR * 2 + 12, avatarY + 36);
+  ctx.fillText("just called it!", avatarX + avatarR * 2 + 12, avatarY + 36);
 
   // Market title (wrapped)
   const maxTitleWidth = CARD_W - 64;

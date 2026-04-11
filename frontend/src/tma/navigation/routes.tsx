@@ -15,6 +15,8 @@ import { PwaResultsPage } from "@/pwa/pages/PwaResultsPage";
 import { TmaPageWrapper } from "@/tma/components/TmaPageWrapper";
 import { TmaProfilePage } from "@/tma/pages/TmaProfilePage";
 import { ResolvedMarketsPage } from "@/tma/pages/ResolvedMarketsPage";
+import { TmaLeaderboardPage } from "@/tma/pages/TmaLeaderboardPage";
+import { TmaSettingsPage } from "@/tma/pages/TmaSettingsPage";
 
 interface Route {
   path: string;
@@ -83,5 +85,11 @@ export const routes: Route[] = [
     title: "Results",
   },
   { path: "/profile", Component: TmaProfilePage, title: "Profile" },
-  { path: "/resolved", Component: ResolvedMarketsPage, title: "Resolution Record" },
+  {
+    path: "/resolved",
+    Component: ResolvedMarketsPage,
+    title: "Resolution Record",
+  },
+  { path: "/leaderboard", Component: TmaLeaderboardPage, title: "Leaderboard" },
+  { path: "/settings", Component: TmaSettingsPage, title: "Settings" },
 ];

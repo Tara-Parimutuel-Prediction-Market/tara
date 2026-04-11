@@ -1,4 +1,11 @@
-import { Controller, Get, UseGuards, Request, Query } from "@nestjs/common";
+import {
+  Controller,
+  Get,
+  UseGuards,
+  Request,
+  Query,
+  Optional,
+} from "@nestjs/common";
 import {
   ApiBearerAuth,
   ApiTags,
@@ -254,5 +261,74 @@ export class UsersController {
       })
       .orderBy("bet.placedAt", "DESC")
       .getMany();
+  }
+
+  // ── Leaderboard ───────────────────────────────────────────────────────────
+
+  @Get("leaderboard")
+  @ApiOperation({ summary: "Global leaderboard — top 50 predictors" })
+  async getLeaderboard(@Request() req: any) {
+    const myId: string = req.user.userId;
+
+    const rows = await this.userRepo
+      .createQueryBuilder("u")
+      .select([
+        "u.id",
+        "u.firstName",
+        "u.lastName",
+        "u.username",
+        "u.photoUrl",
+        "u.reputationScore",
+        "u.reputationTier",
+        "u.totalPredictions",
+        "u.correctPredictions",
+      ])
+      .where("u.totalPredictions > 0")
+      .orderBy("u.reputationScore", "DESC", "NULLS LAST")
+      .addOrderBy("u.correctPredictions", "DESC")
+      .limit(50)
+      .getMany();
+
+    const board = rows.map((u, i) => ({
+      rank: i + 1,
+      id: u.id,
+      firstName: u.firstName,
+      lastName: u.lastName,
+      username: u.username,
+      photoUrl: u.photoUrl,
+      reputationScore: u.reputationScore,
+      reputationTier: u.reputationTier,
+      totalPredictions: u.totalPredictions,
+      correctPredictions: u.correctPredictions,
+      winRate:
+        u.totalPredictions > 0
+          ? Math.round((u.correctPredictions / u.totalPredictions) * 100)
+          : 0,
+      isMe: u.id === myId,
+    }));
+
+    // Compute caller's rank even if outside top 50
+    let myRank: number | null = null;
+    const meInBoard = board.find((r) => r.isMe);
+    if (meInBoard) {
+      myRank = meInBoard.rank;
+    } else {
+      const above = await this.userRepo
+        .createQueryBuilder("u")
+        .where("u.totalPredictions > 0")
+        .andWhere(
+          "(u.reputationScore > (SELECT reputationScore FROM users WHERE id = :myId) OR (u.reputationScore = (SELECT reputationScore FROM users WHERE id = :myId) AND u.correctPredictions > (SELECT correctPredictions FROM users WHERE id = :myId)))",
+          { myId },
+        )
+        .getCount();
+      myRank = above + 1;
+    }
+
+    const totalRanked = await this.userRepo
+      .createQueryBuilder("u")
+      .where("u.totalPredictions > 0")
+      .getCount();
+
+    return { board, myRank, totalRanked };
   }
 }

@@ -115,8 +115,6 @@ export function PwaResultsPage() {
 
       {!loading && !error && (
         <>
-
-
           {/* Prediction Reputation Achievement Card */}
           <div
             style={{
@@ -254,13 +252,22 @@ export function PwaResultsPage() {
                   style={{
                     fontSize: 7,
                     fontWeight: 800,
-                    color: Number(stats.winRate) >= 50 ? "#22c55e" : "#f59e0b",
+                    color:
+                      Number(stats.winRate) >= 65
+                        ? "#22c55e"
+                        : Number(stats.winRate) >= 50
+                          ? "#3b82f6"
+                          : "#f59e0b",
                     textTransform: "uppercase",
                     marginTop: 2,
                     letterSpacing: "0.02em",
                   }}
                 >
-                  {Number(stats.winRate) >= 50 ? "Excellent" : "Learning"}
+                  {Number(stats.winRate) >= 65
+                    ? "Win Rate"
+                    : Number(stats.winRate) >= 50
+                      ? "Win Rate"
+                      : "Win Rate"}
                 </div>
               </div>
 
@@ -346,69 +353,25 @@ export function PwaResultsPage() {
               </div>
             </div>
 
-
-                {repOpen && (
-                  <div style={{ marginTop: 0 }}>
-                    {(me?.totalPredictions ?? 0) === 0 ? (
-                      <p
-                        style={{
-                          margin: 0,
-                          fontSize: 13,
-                          color: "var(--text-muted)",
-                          lineHeight: 1.6,
-                          paddingTop: 10,
-                          borderTop: "1px solid var(--glass-border)",
-                        }}
-                      >
-                        Make your first prediction to start building your
-                        reputation score. Top predictors earn a Legend badge and
-                        their predictions carry more weight in market
-                        probabilities.
-                      </p>
-                    ) : (
-                      <>
-                        {me?.reputationScore != null && (
-                          <div
-                            style={{
-                              display: "flex",
-                              justifyContent: "center",
-                              padding: "16px 0",
-                              background: "var(--bg-secondary)",
-                              borderRadius: 14,
-                              marginBottom: 20,
-                              borderTop: "1px solid var(--glass-border)",
-                            }}
-                          >
-                            <div
-                              style={{
-                                display: "flex",
-                                flexDirection: "column",
-                                alignItems: "center",
-                              }}
-                            >
-                              <span
-                                style={{
-                                  fontSize: 24,
-                                  fontWeight: 900,
-                                  color: "var(--accent)",
-                                }}
-                              >
-                                {Math.round(me.reputationScore * 100)}%
-                              </span>
-                              <span
-                                style={{
-                                  fontSize: 10,
-                                  fontWeight: 700,
-                                  textTransform: "uppercase",
-                                  color: "var(--text-subtle)",
-                                }}
-                              >
-                                Predictor Confidence
-                              </span>
-                            </div>
-                          </div>
-                        )}
-
+            {repOpen && (
+              <div style={{ marginTop: 0 }}>
+                {(me?.totalPredictions ?? 0) === 0 ? (
+                  <p
+                    style={{
+                      margin: 0,
+                      fontSize: 13,
+                      color: "var(--text-muted)",
+                      lineHeight: 1.6,
+                      paddingTop: 10,
+                      borderTop: "1px solid var(--glass-border)",
+                    }}
+                  >
+                    Make your first prediction to start building your reputation
+                    score. Top predictors earn a Legend badge and their
+                    predictions carry more weight in market probabilities.
+                  </p>
+                ) : (
+                  <>
                     {(() => {
                       const total = me?.totalPredictions ?? 0;
                       const correct = me?.correctPredictions ?? 0;
@@ -674,7 +637,7 @@ export function PwaResultsPage() {
                         >
                           {m.title}
                         </span>
-                        {m.category && (
+                        {m.category && m.category.toLowerCase() !== "other" && (
                           <span
                             style={{
                               fontSize: "0.7rem",
