@@ -12,7 +12,6 @@ import {
   Flame,
   Crosshair,
   Sprout,
-  Swords,
 } from "lucide-react";
 import {
   getMyResults,

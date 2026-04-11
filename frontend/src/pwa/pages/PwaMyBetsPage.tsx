@@ -303,7 +303,7 @@ export function PwaMyBetsPage() {
     setFilter(key);
     setShowAll(false);
   };
-  const { isAuthenticated } = useAuth(); // We just need it to ensure auth, but user data comes from elsewhere if needed
+  // const { isAuthenticated } = useAuth(); // We just need it to ensure auth, but user data comes from elsewhere if needed
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
