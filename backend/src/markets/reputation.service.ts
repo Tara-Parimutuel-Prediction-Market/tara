@@ -290,7 +290,7 @@ export class ReputationService {
    * effectiveAmount = bet.amount × (0.5 + reputationScore) × decayFactor × calibrationMultiplier
    *
    * High-rep, recently-active, well-calibrated bettors contribute up to ~1.5×
-   * their bet amount; newcomers and inactive users contribute ~0.5–0.75×.
+   * their bet amount; rookies and inactive users contribute ~0.5–0.75×.
    */
   async computeReputationWeightedShares(
     marketId: string,
@@ -411,7 +411,7 @@ export class ReputationService {
         catTotal = catScores?.[category]?.total ?? 0;
       }
       seen.set(row.userId, {
-        tier: row.reputationTier ?? "newcomer",
+        tier: row.reputationTier ?? "rookie",
         totalPredictions: Number(row.totalPredictions ?? 0),
         catTotal,
         lastActiveAt: row.lastActiveAt ? new Date(row.lastActiveAt) : null,
@@ -433,7 +433,7 @@ export class ReputationService {
 
     // reputationDepth — decay-weighted fraction of reliable/expert bettors
     const depthSum = bettors.reduce((sum, b) => {
-      const isQualified = b.tier === "reliable" || b.tier === "expert" ? 1 : 0;
+      const isQualified = b.tier === "hot_hand" || b.tier === "legend" ? 1 : 0;
       return sum + isQualified * this.decayFactor(b.lastActiveAt);
     }, 0);
     const reputationDepth = parseFloat(
@@ -484,17 +484,17 @@ export class ReputationService {
 
   /**
    * Tier based on volume and accuracy (unchanged thresholds).
-   *   newcomer  < 10 predictions
-   *   regular   10–49 predictions
-   *   reliable  50+ predictions AND accuracy >= 65%
-   *   expert    100+ predictions AND accuracy >= 75%
+   *   rookie        < 10 predictions
+   *   sharpshooter  10–49 predictions
+   *   hot_hand      50+ predictions AND accuracy >= 65%
+   *   legend        100+ predictions AND accuracy >= 75%
    */
   calcTier(total: number, correct: number): string {
-    if (total < 10) return "newcomer";
+    if (total < 10) return "rookie";
     const accuracy = correct / total;
-    if (total >= 100 && accuracy >= 0.75) return "expert";
-    if (total >= 50 && accuracy >= 0.65) return "reliable";
-    return "regular";
+    if (total >= 100 && accuracy >= 0.75) return "legend";
+    if (total >= 50 && accuracy >= 0.65) return "hot_hand";
+    return "sharpshooter";
   }
 
   /**

@@ -147,12 +147,12 @@ export const PwaMarketCard: FC<PwaMarketCardProps> = ({ market, onBet }) => {
                 </div>
                 {/* Content */}
                 <div style={{ position: "relative", padding: "10px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                   <span style={{ fontSize: "0.85rem", fontWeight: 800, color: "var(--text-main)", letterSpacing: "-0.01em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                   <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--text-main)", letterSpacing: "-0.01em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                      {s.label}
                    </span>
                    <div style={{
                      background: `${s.color}12`, border: `1px solid ${s.color}30`, color: s.color,
-                     fontSize: "0.85rem", fontWeight: 900, padding: "2px 10px", borderRadius: 99, flexShrink: 0
+                     fontSize: "0.72rem", fontWeight: 800, padding: "2px 8px", borderRadius: 99, flexShrink: 0
                    }}>
                      {s.pct.toFixed(0)}%
                    </div>

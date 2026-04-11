@@ -79,7 +79,6 @@ function LiveTicker() {
     }}>
       <style>{`
         @keyframes tickerSlideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes livePulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
       `}</style>
       <div style={{
         width: 32, height: 32, borderRadius: "50%",
@@ -100,8 +99,8 @@ function LiveTicker() {
           on <span style={{ color: "var(--text-muted)" }}>{current.outcome}</span> · {current.marketTitle}
         </div>
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 4, background: "rgba(239, 68, 68, 0.1)", padding: "4px 8px", borderRadius: 8, flexShrink: 0 }}>
-        <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#ef4444", animation: "livePulse 1.5s ease-in-out infinite" }} />
+      <div style={{ display: "flex", alignItems: "center", gap: 4, background: "rgba(239, 68, 68, 0.1)", padding: "4px 8px", borderRadius: 8, flexShrink: 0, animation: "liveBadgePulse 1.6s ease-in-out infinite" }}>
+        <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#ef4444", animation: "heartbeat 1.6s ease-in-out infinite" }} />
         <span style={{ fontSize: 9, fontWeight: 900, color: "#ef4444", textTransform: "uppercase" }}>Live</span>
       </div>
     </div>
@@ -196,14 +195,32 @@ export function PwaFeedPage() {
 
   return (
     <div style={{ padding: "32px 16px 100px", maxWidth: 1200, margin: "0 auto", position: "relative" }}>
+      <style>{`
+        @keyframes heartbeat {
+          0%   { transform: scale(1);    opacity: 1; }
+          14%  { transform: scale(1.5);  opacity: 1; }
+          28%  { transform: scale(1);    opacity: 0.8; }
+          42%  { transform: scale(1.35); opacity: 1; }
+          70%  { transform: scale(1);    opacity: 0.6; }
+          100% { transform: scale(1);    opacity: 1; }
+        }
+        @keyframes liveBadgePulse {
+          0%, 70%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); }
+          14%            { box-shadow: 0 0 0 4px rgba(239,68,68,0.25); }
+          42%            { box-shadow: 0 0 0 3px rgba(239,68,68,0.15); }
+        }
+      `}</style>
       <div className="mesh-bg" />
-      
+
       <LiveTicker />
 
       {openMarkets.length > 0 && (
         <section style={{ marginBottom: 48 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
-            <div style={{ padding: "4px 10px", borderRadius: 8, background: "rgba(34, 197, 94, 0.15)", color: "#22c55e", fontSize: 10, fontWeight: 900, letterSpacing: "0.05em", textTransform: "uppercase" }}>Live</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 10px", borderRadius: 8, background: "rgba(34, 197, 94, 0.15)", color: "#22c55e", fontSize: 10, fontWeight: 900, letterSpacing: "0.05em", textTransform: "uppercase" }}>
+              <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#22c55e", animation: "heartbeat 1.6s ease-in-out infinite" }} />
+              Live
+            </div>
             <h2 style={{ fontSize: 18, fontWeight: 800, color: "var(--text-main)", margin: 0, fontFamily: "var(--font-display)" }}>Active Markets</h2>
           </div>
           {renderGrid(openMarkets)}

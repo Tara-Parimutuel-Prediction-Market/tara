@@ -34,7 +34,7 @@ export class AuthController {
     summary: "Login/register with Telegram initData (HMAC validated)",
   })
   async telegramLogin(@Body() dto: TelegramAuthDto) {
-    return this.authService.loginWithTelegram(dto.initData);
+    return this.authService.loginWithTelegram(dto.initData, dto.referralCode);
   }
 
   @Post("dkbank")

@@ -103,9 +103,24 @@ export class AuthService {
   }
 
   // ── Login / Register via Telegram ─────────────────────────────────────────
-  async loginWithTelegram(rawInitData: string) {
+  async loginWithTelegram(rawInitData: string, referralCode?: string) {
     const tgUser = this.validateTelegramInitData(rawInitData);
     const providerId = String(tgUser.id);
+
+    // Resolve referrer from code like "ref_<telegramId>" — ignore self-referrals
+    let referredByUserId: string | null = null;
+    if (referralCode) {
+      const refTelegramId = referralCode.startsWith("ref_")
+        ? referralCode.slice(4)
+        : referralCode;
+      if (refTelegramId && refTelegramId !== providerId) {
+        const referrer = await this.userRepo.findOne({
+          where: { telegramId: refTelegramId },
+          select: ["id"],
+        });
+        if (referrer) referredByUserId = referrer.id;
+      }
+    }
 
     // Find or create auth method
     let authMethod = await this.authMethodRepo.findOne({
@@ -126,6 +141,8 @@ export class AuthService {
           lastName: tgUser.last_name,
           username: tgUser.username,
           photoUrl: tgUser.photo_url,
+          // Store referrer only on first registration — never overwrite
+          referredByUserId,
         });
         await this.userRepo.save(user);
 

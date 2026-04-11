@@ -54,9 +54,9 @@ export function buildBadges(
     { id: "half_century", icon: <Dumbbell size={18} color="#ec4899" />,   name: "Half Century",  requirement: "Get 50 correct predictions",         unlocked: correct >= 50 },
     // ── Tiers ──
     { id: "rookie",       icon: <Sprout size={18} color="#84cc16" />,     name: "Rookie",        requirement: "Join Oro — you're already here!",   unlocked: true },
-    { id: "sharpshooter", icon: <Swords size={18} color="#3b82f6" />,     name: "Sharpshooter",  requirement: "Reach Sharpshooter tier",           unlocked: ["regular","reliable","expert"].includes(tier) },
-    { id: "hot_hand",     icon: <Flame size={18} color="#ef4444" />,      name: "Hot Hand",      requirement: "Reach Hot Hand tier",               unlocked: ["reliable","expert"].includes(tier) },
-    { id: "legend",       icon: <Trophy size={18} color="#f59e0b" />,     name: "Legend",        requirement: "Reach Legend tier",                 unlocked: tier === "expert" },
+    { id: "sharpshooter", icon: <Swords size={18} color="#3b82f6" />,     name: "Sharpshooter",  requirement: "Reach Sharpshooter tier",           unlocked: ["sharpshooter","hot_hand","legend"].includes(tier) },
+    { id: "hot_hand",     icon: <Flame size={18} color="#ef4444" />,      name: "Hot Hand",      requirement: "Reach Hot Hand tier",               unlocked: ["hot_hand","legend"].includes(tier) },
+    { id: "legend",       icon: <Trophy size={18} color="#f59e0b" />,     name: "Legend",        requirement: "Reach Legend tier",                 unlocked: tier === "legend" },
     // ── Profile ──
     { id: "verified",     icon: <Smartphone size={18} color="#6366f1" />, name: "Verified",      requirement: "Verify your phone via Oro bot",     unlocked: hasPhone },
     { id: "bankrolled",   icon: <Building2 size={18} color="#0ea5e9" />,  name: "Bankrolled",    requirement: "Link your DK Bank account",         unlocked: hasDK },

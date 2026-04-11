@@ -16,16 +16,16 @@ const CARD_W = 640;
 const CARD_H = 360;
 
 function tierLabel(tier: string): string {
-  if (tier === "expert") return "Legend";
-  if (tier === "reliable") return "Hot Hand";
-  if (tier === "regular") return "Sharpshooter";
+  if (tier === "legend") return "Legend";
+  if (tier === "hot_hand") return "Hot Hand";
+  if (tier === "sharpshooter") return "Sharpshooter";
   return "Rookie";
 }
 
 function tierColor(tier: string): string {
-  if (tier === "expert") return "#f59e0b";
-  if (tier === "reliable") return "#10b981";
-  if (tier === "regular") return "#3b82f6";
+  if (tier === "legend") return "#f59e0b";
+  if (tier === "hot_hand") return "#10b981";
+  if (tier === "sharpshooter") return "#3b82f6";
   return "#a3a3a3";
 }
 

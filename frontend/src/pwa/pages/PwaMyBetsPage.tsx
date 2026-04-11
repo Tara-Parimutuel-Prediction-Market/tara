@@ -116,8 +116,8 @@ function BetCard({ bet, onBrag }: { bet: Bet; onBrag: (bet: Bet) => void }) {
           </div>
           <h3
             style={{
-              fontSize: "0.95rem",
-              fontWeight: 800,
+              fontSize: "0.8rem",
+              fontWeight: 700,
               color: "var(--text-main)",
               lineHeight: 1.3,
               margin: 0,
@@ -192,8 +192,8 @@ function BetCard({ bet, onBrag }: { bet: Bet; onBrag: (bet: Bet) => void }) {
             </span>
             <span
               style={{
-                fontSize: 14,
-                fontWeight: 800,
+                fontSize: 12,
+                fontWeight: 700,
                 color: "var(--text-main)",
               }}
             >
@@ -213,7 +213,7 @@ function BetCard({ bet, onBrag }: { bet: Bet; onBrag: (bet: Bet) => void }) {
             Odds
           </span>
           <div
-            style={{ fontSize: 14, fontWeight: 800, color: "var(--text-main)" }}
+            style={{ fontSize: 12, fontWeight: 700, color: "var(--text-main)" }}
           >
             {displayOdds}x
           </div>
@@ -349,9 +349,9 @@ export function PwaMyBetsPage() {
       <div className="mesh-bg" />
       <h1
         style={{
-          fontSize: "1.7rem",
-          fontWeight: 900,
-          marginBottom: 6,
+          fontSize: "1.4rem",
+          fontWeight: 800,
+          marginBottom: 4,
           color: "var(--text-main)",
           letterSpacing: "-0.02em",
           fontFamily: "var(--font-display)",
@@ -361,9 +361,9 @@ export function PwaMyBetsPage() {
       </h1>
       <p
         style={{
-          fontSize: "0.9rem",
+          fontSize: "0.85rem",
           color: "var(--text-muted)",
-          marginBottom: 24,
+          marginBottom: 20,
           fontWeight: 600,
         }}
       >

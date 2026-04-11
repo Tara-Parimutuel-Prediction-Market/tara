@@ -21,42 +21,43 @@ import {
   Crosshair,
   Sprout,
   Medal,
+  Award,
   X,
 } from "lucide-react";
 
 // ── Tier helpers ──────────────────────────────────────────────────────────────
 
 function tierLabel(tier: string) {
-  return tier === "expert"
+  return tier === "legend"
     ? "Legend"
-    : tier === "reliable"
+    : tier === "hot_hand"
       ? "Hot Hand"
-      : tier === "regular"
+      : tier === "sharpshooter"
         ? "Sharpshooter"
         : "Rookie";
 }
 
 function tierColor(tier: string) {
-  return tier === "expert"
+  return tier === "legend"
     ? "#f59e0b"
-    : tier === "reliable"
+    : tier === "hot_hand"
       ? "#22c55e"
-      : tier === "regular"
+      : tier === "sharpshooter"
         ? "#3b82f6"
         : "#94a3b8";
 }
 
 function tierIcon(tier: string, size = 12) {
-  if (tier === "expert") return <Trophy size={size} color="#f59e0b" />;
-  if (tier === "reliable") return <Flame size={size} color="#22c55e" />;
-  if (tier === "regular") return <Crosshair size={size} color="#3b82f6" />;
+  if (tier === "legend") return <Trophy size={size} color="#f59e0b" />;
+  if (tier === "hot_hand") return <Flame size={size} color="#22c55e" />;
+  if (tier === "sharpshooter") return <Crosshair size={size} color="#3b82f6" />;
   return <Sprout size={size} color="#94a3b8" />;
 }
 
 function rankMedal(rank: number) {
-  if (rank === 1) return "🥇";
-  if (rank === 2) return "🥈";
-  if (rank === 3) return "🥉";
+  if (rank === 1) return <Trophy size={18} color="#f59e0b" />;
+  if (rank === 2) return <Medal size={18} color="#94a3b8" />;
+  if (rank === 3) return <Award size={18} color="#b45309" />;
   return null;
 }
 
@@ -71,9 +72,31 @@ function percentileLabel(rank: number, total: number) {
 
 // ── Leaderboard row ───────────────────────────────────────────────────────────
 
+const RANK_STYLES: Record<number, { bg: string; border: string; avatarBorder: string; animation: string }> = {
+  1: {
+    bg: "linear-gradient(135deg, rgba(245,158,11,0.15), rgba(245,158,11,0.05))",
+    border: "1px solid rgba(245,158,11,0.4)",
+    avatarBorder: "2.5px solid #f59e0b",
+    animation: "rank1Pulse 2.5s ease-in-out infinite",
+  },
+  2: {
+    bg: "linear-gradient(135deg, rgba(148,163,184,0.12), rgba(148,163,184,0.04))",
+    border: "1px solid rgba(148,163,184,0.3)",
+    avatarBorder: "2.5px solid #94a3b8",
+    animation: "rank2Shimmer 3s ease-in-out infinite",
+  },
+  3: {
+    bg: "linear-gradient(135deg, rgba(180,83,9,0.12), rgba(180,83,9,0.04))",
+    border: "1px solid rgba(180,83,9,0.3)",
+    avatarBorder: "2.5px solid #b45309",
+    animation: "rank3Glow 3.5s ease-in-out infinite",
+  },
+};
+
 function LeaderRow({ entry }: { entry: LeaderboardEntry }) {
   const medal = rankMedal(entry.rank);
   const color = tierColor(entry.reputationTier);
+  const rankStyle = RANK_STYLES[entry.rank];
   const displayName = entry.username
     ? `@${entry.username}`
     : entry.firstName + (entry.lastName ? ` ${entry.lastName}` : "");
@@ -85,23 +108,32 @@ function LeaderRow({ entry }: { entry: LeaderboardEntry }) {
         alignItems: "center",
         gap: 12,
         padding: "12px 16px",
-        background: entry.isMe
-          ? `linear-gradient(135deg, ${color}18, ${color}08)`
-          : "transparent",
-        borderRadius: entry.isMe ? 14 : 0,
-        border: entry.isMe ? `1px solid ${color}33` : "none",
+        background: rankStyle
+          ? rankStyle.bg
+          : entry.isMe
+            ? `linear-gradient(135deg, ${color}18, ${color}08)`
+            : "transparent",
+        borderRadius: rankStyle || entry.isMe ? 14 : 0,
+        border: rankStyle
+          ? rankStyle.border
+          : entry.isMe
+            ? `1px solid ${color}33`
+            : "none",
         position: "relative",
+        animation: rankStyle ? rankStyle.animation : "none",
       }}
     >
       {/* Rank */}
       <div
         style={{
           width: 32,
-          textAlign: "center",
           flexShrink: 0,
-          fontSize: medal ? 18 : 13,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: 13,
           fontWeight: 900,
-          color: entry.rank <= 3 ? color : "var(--text-subtle)",
+          color: "var(--text-subtle)",
         }}
       >
         {medal ?? `#${entry.rank}`}
@@ -115,9 +147,11 @@ function LeaderRow({ entry }: { entry: LeaderboardEntry }) {
           borderRadius: "50%",
           flexShrink: 0,
           overflow: "hidden",
-          border: entry.isMe
-            ? `2px solid ${color}`
-            : "2px solid var(--glass-border)",
+          border: rankStyle
+            ? rankStyle.avatarBorder
+            : entry.isMe
+              ? `2px solid ${color}`
+              : "2px solid var(--glass-border)",
           background: "var(--bg-secondary)",
           display: "flex",
           alignItems: "center",
@@ -459,13 +493,7 @@ export const TmaLeaderboardPage: FC = () => {
                   <div key={entry.id}>
                     <LeaderRow entry={entry} />
                     {i < Math.min(visibleCount, lb.board.length) - 1 && (
-                      <div
-                        style={{
-                          height: 1,
-                          background: "var(--glass-border)",
-                          margin: "0 16px",
-                        }}
-                      />
+                      <div style={{ height: 6 }} />
                     )}
                   </div>
                 ))}
@@ -516,7 +544,7 @@ export const TmaLeaderboardPage: FC = () => {
                         username: me.username ?? null,
                         photoUrl: me.photoUrl ?? null,
                         reputationScore: me.reputationScore ?? null,
-                        reputationTier: me.reputationTier ?? "newcomer",
+                        reputationTier: me.reputationTier ?? "rookie",
                         totalPredictions: me.totalPredictions ?? 0,
                         correctPredictions: me.correctPredictions ?? 0,
                         winRate,
@@ -655,6 +683,148 @@ export const TmaLeaderboardPage: FC = () => {
                   </span>
                 </div>
               )}
+
+              {/* Tier progression */}
+              {(() => {
+                const total = me?.totalPredictions ?? 0;
+                const correct = me?.correctPredictions ?? 0;
+                const acc = total > 0 ? correct / total : 0;
+                const tier = me?.reputationTier ?? "rookie";
+
+                type ProgressInfo = {
+                  label: string;
+                  nextTier: string;
+                  nextColor: string;
+                  progress: number;
+                  hint: string;
+                } | null;
+
+                let info: ProgressInfo = null;
+
+                if (tier === "rookie") {
+                  const progress = Math.min(total / 10, 1);
+                  const left = Math.max(10 - total, 0);
+                  info = {
+                    label: "Rookie → Sharpshooter",
+                    nextTier: "Sharpshooter",
+                    nextColor: "#3b82f6",
+                    progress,
+                    hint: left > 0 ? `${left} more prediction${left !== 1 ? "s" : ""} to reach Sharpshooter` : "Almost there!",
+                  };
+                } else if (tier === "sharpshooter") {
+                  // Need 50 preds + 65% acc
+                  const predProgress = Math.min(total / 50, 1);
+                  const accProgress = Math.min(acc / 0.65, 1);
+                  const progress = Math.min((predProgress + accProgress) / 2, 1);
+                  const predLeft = Math.max(50 - total, 0);
+                  const accNeeded = total >= 50 && acc < 0.65;
+                  const hint = predLeft > 0
+                    ? `${predLeft} more predictions needed${acc < 0.65 ? " · aim for 65%+ accuracy" : ""}`
+                    : accNeeded
+                      ? `${Math.round((0.65 - acc) * 100)}% more accuracy needed`
+                      : "Keep it up!";
+                  info = {
+                    label: "Sharpshooter → Hot Hand",
+                    nextTier: "Hot Hand",
+                    nextColor: "#10b981",
+                    progress,
+                    hint,
+                  };
+                } else if (tier === "hot_hand") {
+                  // Need 100 preds + 75% acc
+                  const predProgress = Math.min(total / 100, 1);
+                  const accProgress = Math.min(acc / 0.75, 1);
+                  const progress = Math.min((predProgress + accProgress) / 2, 1);
+                  const predLeft = Math.max(100 - total, 0);
+                  const accNeeded = total >= 100 && acc < 0.75;
+                  const hint = predLeft > 0
+                    ? `${predLeft} more predictions needed${acc < 0.75 ? " · aim for 75%+ accuracy" : ""}`
+                    : accNeeded
+                      ? `${Math.round((0.75 - acc) * 100)}% more accuracy needed`
+                      : "So close to Legend!";
+                  info = {
+                    label: "Hot Hand → Legend",
+                    nextTier: "Legend",
+                    nextColor: "#f59e0b",
+                    progress,
+                    hint,
+                  };
+                }
+
+                if (!info) {
+                  // Legend tier — already at max
+                  return (
+                    <div
+                      style={{
+                        marginTop: 12,
+                        padding: "10px 14px",
+                        background: "rgba(245,158,11,0.1)",
+                        borderRadius: 10,
+                        border: "1px solid rgba(245,158,11,0.25)",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                      }}
+                    >
+                      <Trophy size={14} color="#f59e0b" />
+                      <span style={{ fontSize: 12, fontWeight: 700, color: "#f59e0b" }}>
+                        You've reached the top — Legend tier!
+                      </span>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div
+                    style={{
+                      marginTop: 12,
+                      padding: "12px 14px",
+                      background: "var(--bg-secondary)",
+                      borderRadius: 10,
+                      border: "1px solid var(--glass-border)",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        marginBottom: 8,
+                      }}
+                    >
+                      <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-muted)" }}>
+                        {info.label}
+                      </span>
+                      <span style={{ fontSize: 11, fontWeight: 800, color: info.nextColor }}>
+                        {Math.round(info.progress * 100)}%
+                      </span>
+                    </div>
+                    {/* Progress bar */}
+                    <div
+                      style={{
+                        height: 6,
+                        borderRadius: 99,
+                        background: "var(--bg-card)",
+                        overflow: "hidden",
+                        marginBottom: 7,
+                      }}
+                    >
+                      <div
+                        style={{
+                          height: "100%",
+                          width: `${Math.round(info.progress * 100)}%`,
+                          borderRadius: 99,
+                          background: `linear-gradient(90deg, ${info.nextColor}99, ${info.nextColor})`,
+                          transition: "width 0.6s ease",
+                        }}
+                      />
+                    </div>
+                    <span style={{ fontSize: 11, color: "var(--text-subtle)", fontWeight: 600 }}>
+                      {info.hint}
+                    </span>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* ── Collectibles ── */}
@@ -671,7 +841,7 @@ export const TmaLeaderboardPage: FC = () => {
               <BadgeGrid
                 totalPredictions={me?.totalPredictions ?? 0}
                 correctPredictions={me?.correctPredictions ?? 0}
-                reputationTier={me?.reputationTier ?? "newcomer"}
+                reputationTier={me?.reputationTier ?? "rookie"}
                 reputationScore={me?.reputationScore ?? 0}
                 hasPhone={!!me?.isPhoneVerified}
                 hasDKBank={!!me?.dkCid}
@@ -926,6 +1096,18 @@ export const TmaLeaderboardPage: FC = () => {
               @keyframes shareIn {
                 from { opacity: 0; transform: scale(0.93); }
                 to   { opacity: 1; transform: scale(1); }
+              }
+              @keyframes rank1Pulse {
+                0%, 100% { box-shadow: 0 0 0 0 rgba(245,158,11,0); }
+                50%       { box-shadow: 0 0 16px 4px rgba(245,158,11,0.25); }
+              }
+              @keyframes rank2Shimmer {
+                0%, 100% { box-shadow: 0 0 0 0 rgba(148,163,184,0); }
+                50%       { box-shadow: 0 0 12px 3px rgba(148,163,184,0.2); }
+              }
+              @keyframes rank3Glow {
+                0%, 100% { box-shadow: 0 0 0 0 rgba(180,83,9,0); }
+                50%       { box-shadow: 0 0 12px 3px rgba(180,83,9,0.2); }
               }
             `}</style>
             <button

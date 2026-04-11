@@ -122,10 +122,11 @@ export interface AuthResponse {
 /** Login / register using Telegram initData (HMAC validated on server) */
 export async function loginWithTelegram(
   initData: string,
+  referralCode?: string,
 ): Promise<AuthResponse> {
   const result = await request<AuthResponse>("/auth/telegram", {
     method: "POST",
-    body: JSON.stringify({ initData }),
+    body: JSON.stringify({ initData, ...(referralCode ? { referralCode } : {}) }),
   });
   setToken(result.token);
   return result;
@@ -343,7 +344,8 @@ export interface Transaction {
     | "bet_payout"
     | "refund"
     | "dispute_bond"
-    | "dispute_refund";
+    | "dispute_refund"
+    | "referral_bonus";
   amount: number;
   balanceBefore: number;
   balanceAfter: number;

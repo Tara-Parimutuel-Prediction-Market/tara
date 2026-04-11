@@ -84,10 +84,6 @@ function LiveTicker() {
           from { opacity: 0; transform: translateY(6px); }
           to { opacity: 1; transform: translateY(0); }
         }
-        @keyframes livePulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.5; }
-        }
       `}</style>
       {/* Separator */}
       <div
@@ -220,6 +216,11 @@ function MarketCard({
   const [showAll, setShowAll] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
 
+  // A Legend-tier user has bet here if any outcome carries a reputation signal
+  const hasLegendBet = market.outcomes.some(
+    (o) => o.reputationSignal != null && o.reputationSignal > 0,
+  );
+
   const isUpcoming = market.status === "upcoming";
   const isResolving = market.status === "resolving";
   const countdown = useCountdown(
@@ -260,7 +261,7 @@ function MarketCard({
     <div
       style={{
         background: "var(--bg-card)",
-        border: "none",
+        border: hasLegendBet ? "1.5px solid rgba(245,158,11,0.55)" : "none",
         borderRadius: 20,
         padding: "18px 16px",
         marginBottom: 14,
@@ -268,11 +269,42 @@ function MarketCard({
         flexDirection: "column",
         gap: 12,
         position: "relative",
-        boxShadow:
-          "6px 6px 16px rgba(0,0,0,0.35), -3px -3px 10px rgba(255,255,255,0.04)",
+        boxShadow: hasLegendBet
+          ? "6px 6px 16px rgba(0,0,0,0.35), -3px -3px 10px rgba(255,255,255,0.04), 0 0 0 1px rgba(245,158,11,0.2), 0 0 18px rgba(245,158,11,0.18)"
+          : "6px 6px 16px rgba(0,0,0,0.35), -3px -3px 10px rgba(255,255,255,0.04)",
+        animation: hasLegendBet ? "legendCardPulse 3s ease-in-out infinite" : "none",
       }}
     >
-      <style>{`@keyframes shimmer-slide{0%{transform:translateX(-100%)}100%{transform:translateX(250%)}}`}</style>
+      <style>{`
+        @keyframes shimmer-slide{0%{transform:translateX(-100%)}100%{transform:translateX(250%)}}
+        @keyframes legendCardPulse{
+          0%,100%{box-shadow:6px 6px 16px rgba(0,0,0,0.35),-3px -3px 10px rgba(255,255,255,0.04),0 0 0 1px rgba(245,158,11,0.2),0 0 18px rgba(245,158,11,0.18)}
+          50%{box-shadow:6px 6px 16px rgba(0,0,0,0.35),-3px -3px 10px rgba(255,255,255,0.04),0 0 0 1px rgba(245,158,11,0.45),0 0 32px rgba(245,158,11,0.35)}
+        }
+      `}</style>
+      {hasLegendBet && (
+        <div
+          style={{
+            position: "absolute",
+            top: 10,
+            left: 12,
+            display: "flex",
+            alignItems: "center",
+            gap: 4,
+            background: "rgba(245,158,11,0.15)",
+            border: "1px solid rgba(245,158,11,0.35)",
+            borderRadius: 8,
+            padding: "2px 7px",
+            fontSize: 10,
+            fontWeight: 800,
+            color: "#f59e0b",
+            pointerEvents: "none",
+            zIndex: 1,
+          }}
+        >
+          ★ Legend pick
+        </div>
+      )}
       <div
         style={{
           fontSize: 15,
@@ -281,6 +313,7 @@ function MarketCard({
           color: "var(--text-main)",
           fontFamily: "var(--font-display)",
           paddingRight: isUpcoming || isResolving ? 40 : 0,
+          paddingTop: hasLegendBet ? 18 : 0,
         }}
       >
         {market.title}
@@ -839,6 +872,16 @@ export const TmaFeedPage: FC = () => {
 
   return (
     <Page>
+      <style>{`
+        @keyframes heartbeat {
+          0%   { transform: scale(1);    opacity: 1; }
+          14%  { transform: scale(1.5);  opacity: 1; }
+          28%  { transform: scale(1);    opacity: 0.8; }
+          42%  { transform: scale(1.35); opacity: 1; }
+          70%  { transform: scale(1);    opacity: 0.6; }
+          100% { transform: scale(1);    opacity: 1; }
+        }
+      `}</style>
       <div
         style={{
           padding: "20px 14px 100px",
@@ -1128,6 +1171,7 @@ export const TmaFeedPage: FC = () => {
                   height: 8,
                   borderRadius: "50%",
                   background: "#22c55e",
+                  animation: "heartbeat 1.6s ease-in-out infinite",
                 }}
               />
               <div

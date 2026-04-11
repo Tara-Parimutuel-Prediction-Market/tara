@@ -17,6 +17,7 @@ export enum TransactionType {
   REFUND = "refund",
   DISPUTE_BOND = "dispute_bond",
   DISPUTE_REFUND = "dispute_refund",
+  REFERRAL_BONUS = "referral_bonus",
 }
 
 // Back-compat aliases

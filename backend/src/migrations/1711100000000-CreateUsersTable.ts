@@ -21,7 +21,7 @@ export class CreateUsersTable1711100000000 implements MigrationInterface {
         "dkPhoneHash" character varying,
         "telegramLinkedAt" TIMESTAMP WITH TIME ZONE,
         "reputationScore" numeric(5,4),
-        "reputationTier" character varying NOT NULL DEFAULT 'newcomer',
+        "reputationTier" character varying NOT NULL DEFAULT 'rookie',
         "totalPredictions" integer NOT NULL DEFAULT 0,
         "correctPredictions" integer NOT NULL DEFAULT 0,
         "categoryScores" jsonb,
@@ -34,6 +34,8 @@ export class CreateUsersTable1711100000000 implements MigrationInterface {
         "betStreakCount" integer NOT NULL DEFAULT 0,
         "betStreakLastAt" DATE,
         "streakBoostUsed" boolean NOT NULL DEFAULT false,
+        "referredByUserId" uuid,
+        "referralBonusTriggered" boolean NOT NULL DEFAULT false,
         "createdAt" TIMESTAMP NOT NULL DEFAULT now(),
         "updatedAt" TIMESTAMP NOT NULL DEFAULT now(),
         CONSTRAINT "PK_users" PRIMARY KEY ("id")

@@ -620,18 +620,56 @@ export class DKBankPaymentService {
           `[CREDITS] Crediting ${payment.amount} to user ${params.userId} from DK payment ${payment.id}`,
         );
 
+        const depositAmount = Number(payment.amount);
+
         await em.save(
           Transaction,
           em.create(Transaction, {
             type: TransactionType.DEPOSIT,
-            amount: Number(payment.amount),
+            amount: depositAmount,
             balanceBefore,
-            balanceAfter: balanceBefore + Number(payment.amount),
+            balanceAfter: balanceBefore + depositAmount,
             paymentId: payment.id,
             userId: params.userId,
             note: `DK Bank deposit confirmed (dk_payment: ${payment.id})`,
           }),
         );
+
+        // ── 5% first-deposit bonus for referred users ──────────────────────
+        // Fires once: only if this is the user's very first deposit and
+        // they were referred by someone (referredByUserId is set).
+        const user = await em.getRepository(User).findOne({
+          where: { id: params.userId },
+          select: ["id", "referredByUserId"],
+        });
+
+        if (user?.referredByUserId) {
+          const priorDepositCount = await em
+            .getRepository(Transaction)
+            .count({ where: { userId: params.userId, type: TransactionType.DEPOSIT } });
+
+          // priorDepositCount is now 1 (the one we just saved) — so 1 means first deposit
+          if (priorDepositCount === 1) {
+            const bonusAmount = Math.round(depositAmount * 0.05 * 100) / 100;
+            const balAfterDeposit = balanceBefore + depositAmount;
+
+            await em.save(
+              Transaction,
+              em.create(Transaction, {
+                type: TransactionType.REFERRAL_BONUS,
+                amount: bonusAmount,
+                balanceBefore: balAfterDeposit,
+                balanceAfter: balAfterDeposit + bonusAmount,
+                userId: params.userId,
+                note: `Welcome bonus — 5% on your first deposit`,
+              }),
+            );
+
+            this.logger.log(
+              `[Referral] First-deposit bonus ${bonusAmount} BTN credited to referred user ${params.userId}`,
+            );
+          }
+        }
 
         // Invalidate cached balance so the next /users/me returns the updated value
         await this.redis.del(`oro:cache:balance:${params.userId}`);

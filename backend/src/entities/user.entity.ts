@@ -101,8 +101,8 @@ export class User {
   @Column({ type: "decimal", precision: 5, scale: 4, nullable: true })
   reputationScore: number | null;
 
-  /** 'newcomer' | 'regular' | 'reliable' | 'expert' */
-  @Column({ default: "newcomer" })
+  /** 'rookie' | 'sharpshooter' | 'hot_hand' | 'legend' */
+  @Column({ default: "rookie" })
   reputationTier: string;
 
   /** Total resolved predictions (won + lost, excludes refunded). */
@@ -159,6 +159,23 @@ export class User {
    */
   @Column({ type: "varchar", nullable: true })
   contrarianBadge: string | null;
+
+  // ── Referral ───────────────────────────────────────────────────────────────
+
+  /**
+   * The user ID of whoever referred this user.
+   * Set once at registration if the user opened the bot via a referral deep-link.
+   * Null for organic sign-ups.
+   */
+  @Column({ type: "uuid", nullable: true })
+  referredByUserId: string | null;
+
+  /**
+   * True once the referrer has been credited their bonus for this user's first bet.
+   * Ensures the bonus fires exactly once regardless of how many bets this user places.
+   */
+  @Column({ default: false })
+  referralBonusTriggered: boolean;
 
   @CreateDateColumn()
   createdAt: Date;

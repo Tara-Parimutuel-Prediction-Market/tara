@@ -109,6 +109,7 @@ export class ParimutuelEngine implements OnModuleInit {
     let betOutcome: Outcome | null = null;
     let betUser: User | null = null;
     let balanceAfterBet = 0;
+    let capturedHouseEdgePct = 8; // default; overwritten inside transaction
 
     try {
       lockToken = await this.redis.acquireLockWithRetry(
@@ -159,6 +160,7 @@ export class ParimutuelEngine implements OnModuleInit {
         betUser = user;
         betMarket = market;
         betOutcome = outcome;
+        capturedHouseEdgePct = Number(market.houseEdgePct) || 8;
 
         const balanceBefore = await this.getCreditsBalance(em, userId);
         this.logger.log(
@@ -276,6 +278,14 @@ export class ParimutuelEngine implements OnModuleInit {
           );
       }
 
+      // ── Referral bonus (non-blocking) ────────────────────────────────────
+      // Fires exactly once: on the referred user's first ever bet.
+      // Referrer earns 20% of the house rake on that bet.
+      this.creditReferralBonusIfEligible(userId, amount, capturedHouseEdgePct).catch(
+        (err: any) =>
+          this.logger.error(`Referral bonus credit failed: ${err.message}`),
+      );
+
       const result = completedPosition! as Position & {
         streak?: { count: number; dayInCycle: number; boostActive: boolean };
       };
@@ -300,6 +310,71 @@ export class ParimutuelEngine implements OnModuleInit {
       // Invalidate balance cache for the bettor
       await this.redis.del(`oro:cache:balance:${userId}`);
     }
+  }
+
+  // ── Referral bonus ─────────────────────────────────────────────────────────
+  /**
+   * Credits the referrer 20% of the house rake on the referred user's first bet.
+   * Idempotent: the `referralBonusTriggered` flag ensures it runs exactly once.
+   */
+  private async creditReferralBonusIfEligible(
+    bettorUserId: string,
+    betAmount: number,
+    houseEdgePct: number,
+  ): Promise<void> {
+    const bettor = await this.dataSource
+      .getRepository(User)
+      .findOne({
+        where: { id: bettorUserId },
+        select: ["id", "referredByUserId", "referralBonusTriggered"],
+      });
+
+    if (!bettor?.referredByUserId || bettor.referralBonusTriggered) return;
+
+    const referrer = await this.dataSource
+      .getRepository(User)
+      .findOne({ where: { id: bettor.referredByUserId }, select: ["id"] });
+
+    if (!referrer) return;
+
+    // 20% of the rake on this bet, rounded to 2 decimal places
+    const rake = betAmount * (houseEdgePct / 100);
+    const bonus = Math.round(rake * 0.2 * 100) / 100;
+    if (bonus <= 0) return;
+
+    await this.dataSource.transaction(async (em) => {
+      const txRepo = em.getRepository(Transaction);
+      const userRepo = em.getRepository(User);
+
+      const { balance: referrerBalance } = await txRepo
+        .createQueryBuilder("t")
+        .select("COALESCE(SUM(t.amount), 0)", "balance")
+        .where("t.userId = :id", { id: referrer.id })
+        .getRawOne();
+
+      const balBefore = Number(referrerBalance);
+
+      await txRepo.save(
+        txRepo.create({
+          type: TransactionType.REFERRAL_BONUS,
+          amount: bonus,
+          balanceBefore: balBefore,
+          balanceAfter: balBefore + bonus,
+          userId: referrer.id,
+          note: `Referral bonus — friend placed their first bet`,
+        }),
+      );
+
+      // Mark so this never fires again for this referred user
+      await userRepo.update(bettor.id, { referralBonusTriggered: true });
+    });
+
+    // Invalidate referrer's cached balance
+    await this.redis.del(`oro:cache:balance:${referrer.id}`);
+
+    this.logger.log(
+      `[Referral] Credited ${bonus} BTN to referrer ${referrer.id} for referred user ${bettor.id}`,
+    );
   }
 
   // Transition market state
@@ -703,7 +778,7 @@ Good luck! 🍀
     const tiersBefore: Record<string, string> = {};
     for (const bet of bets) {
       if (bet.user)
-        tiersBefore[bet.userId] = bet.user.reputationTier ?? "newcomer";
+        tiersBefore[bet.userId] = bet.user.reputationTier ?? "rookie";
     }
 
     // 2. Recalculate reputation for all bettors
@@ -756,15 +831,15 @@ Good luck! 🍀
 
       const chatId = Number(user.telegramId);
       const firstName = user.firstName?.trim() || "there";
-      const tierNow = user.reputationTier ?? "newcomer";
-      const tierBefore = tiersBefore[userId] ?? "newcomer";
+      const tierNow = user.reputationTier ?? "rookie";
+      const tierBefore = tiersBefore[userId] ?? "rookie";
       const totalPredictions = user.totalPredictions ?? 0;
       const accuracy =
         totalPredictions > 0 && user.reputationScore != null
           ? `${Math.round(user.reputationScore * 100)}%`
           : null;
 
-      const tierOrder = ["newcomer", "regular", "reliable", "expert"];
+      const tierOrder = ["rookie", "sharpshooter", "hot_hand", "legend"];
       const tierUpgraded =
         tierOrder.indexOf(tierNow) > tierOrder.indexOf(tierBefore);
 

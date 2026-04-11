@@ -45,7 +45,13 @@ export function useAuth() {
       const raw =
         (window as any).Telegram?.WebApp?.initData || tmaInitData.raw();
       if (raw) {
-        const { user, token } = await loginWithTelegram(raw);
+        // Pass the deep-link start_param so the backend can record the referrer.
+        // Format: t.me/OroPredictBot?start=ref_<telegramId>
+        const startParam: string | undefined =
+          (window as any).Telegram?.WebApp?.initDataUnsafe?.start_param;
+        const referralCode =
+          startParam?.startsWith("ref_") ? startParam : undefined;
+        const { user, token } = await loginWithTelegram(raw, referralCode);
         setState({ user, token, loading: false, error: null });
         return;
       }

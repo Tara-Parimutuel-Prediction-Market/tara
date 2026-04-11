@@ -160,6 +160,11 @@ export class UsersController {
     // Streak info (cached key reused from balance; separate small query)
     const streakInfo = await this.streakService.getStreakInfo(userId);
 
+    // Count referred users who have triggered their first-bet bonus
+    const referralCount = await this.userRepo.count({
+      where: { referredByUserId: userId, referralBonusTriggered: true },
+    });
+
     return {
       ...safeUser,
       creditsBalance,
@@ -169,6 +174,7 @@ export class UsersController {
         dkPhoneHash &&
         telegramPhoneHash === dkPhoneHash
       ),
+      referralCount,
       ...streakInfo,
     };
   }

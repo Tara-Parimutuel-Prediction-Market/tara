@@ -189,9 +189,9 @@ export class BotController {
           "\n\n⭐ <i>Make your first prediction to start building your reputation score. Top predictors carry more weight in market probabilities.</i>";
       } else {
         const tierLabel =
-          user.reputationTier === "expert" ? "Expert" :
-          user.reputationTier === "reliable" ? "Reliable" :
-          user.reputationTier === "regular" ? "Regular" : "Newcomer";
+          user.reputationTier === "legend" ? "Legend" :
+          user.reputationTier === "hot_hand" ? "Hot Hand" :
+          user.reputationTier === "sharpshooter" ? "Sharpshooter" : "Rookie";
         const pct = user.reputationScore != null
           ? ` · ${Math.round(user.reputationScore * 100)}% accuracy`
           : "";

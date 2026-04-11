@@ -48,6 +48,7 @@ import {
   Sprout,
   Swords,
   Settings,
+  UserPlus,
 } from "lucide-react";
 
 const AnimatedCounter = ({ value }: { value: number }) => {
@@ -89,24 +90,26 @@ const TX_COLOR_IN = "#22c55e";
 const TX_COLOR_OUT = "#ef4444";
 
 const TX_ICON: Record<Transaction["type"], React.ReactNode> = {
-  deposit: <ArrowDownLeft size={18} />,
-  withdrawal: <ArrowUpRight size={18} />,
-  bet_placed: <Target size={18} />,
-  bet_payout: <Trophy size={18} />,
-  refund: <RotateCcw size={18} />,
-  dispute_bond: <Lock size={18} />,
+  deposit:        <ArrowDownLeft size={18} />,
+  withdrawal:     <ArrowUpRight size={18} />,
+  bet_placed:     <Target size={18} />,
+  bet_payout:     <Trophy size={18} />,
+  refund:         <RotateCcw size={18} />,
+  dispute_bond:   <Lock size={18} />,
   dispute_refund: <Unlock size={18} />,
+  referral_bonus: <UserPlus size={18} />,
 };
 
 // Human-readable labels — no developer language
 const TX_LABEL: Record<Transaction["type"], string> = {
-  deposit: "Top Up",
-  withdrawal: "Cash Out",
-  bet_placed: "Bet placed",
-  bet_payout: "Win — payout received",
-  refund: "Bet refunded",
-  dispute_bond: "Dispute bond",
+  deposit:        "Top Up",
+  withdrawal:     "Cash Out",
+  bet_placed:     "Bet placed",
+  bet_payout:     "Win — payout received",
+  refund:         "Bet refunded",
+  dispute_bond:   "Dispute bond",
   dispute_refund: "Dispute bond refunded",
+  referral_bonus: "Referral bonus",
 };
 
 function TxRow({
@@ -505,45 +508,45 @@ export const TmaProfilePage: FC = () => {
                 }}
               >
                 {(() => {
-                  const tier = user?.reputationTier ?? "newcomer";
+                  const tier = user?.reputationTier ?? "rookie";
                   const label =
-                    tier === "expert"
+                    tier === "legend"
                       ? "Legend"
-                      : tier === "reliable"
+                      : tier === "hot_hand"
                         ? "Hot Hand"
-                        : tier === "regular"
+                        : tier === "sharpshooter"
                           ? "Sharpshooter"
                           : "Rookie";
                   const bg =
-                    tier === "expert"
+                    tier === "legend"
                       ? "rgba(245,158,11,0.25)"
-                      : tier === "reliable"
+                      : tier === "hot_hand"
                         ? "rgba(16,185,129,0.25)"
-                        : tier === "regular"
+                        : tier === "sharpshooter"
                           ? "rgba(59,130,246,0.25)"
                           : "rgba(255,255,255,0.12)";
                   const color =
-                    tier === "expert"
+                    tier === "legend"
                       ? "#fbbf24"
-                      : tier === "reliable"
+                      : tier === "hot_hand"
                         ? "#6ee7b7"
-                        : tier === "regular"
+                        : tier === "sharpshooter"
                           ? "#93c5fd"
                           : "rgba(255,255,255,0.6)";
                   const border =
-                    tier === "expert"
+                    tier === "legend"
                       ? "rgba(245,158,11,0.4)"
-                      : tier === "reliable"
+                      : tier === "hot_hand"
                         ? "rgba(16,185,129,0.4)"
-                        : tier === "regular"
+                        : tier === "sharpshooter"
                           ? "rgba(59,130,246,0.4)"
                           : "rgba(255,255,255,0.2)";
                   const tierIcon =
-                    tier === "expert" ? (
+                    tier === "legend" ? (
                       <Trophy size={11} />
-                    ) : tier === "reliable" ? (
+                    ) : tier === "hot_hand" ? (
                       <Flame size={11} />
-                    ) : tier === "regular" ? (
+                    ) : tier === "sharpshooter" ? (
                       <Swords size={11} />
                     ) : (
                       <Sprout size={11} />
@@ -569,7 +572,7 @@ export const TmaProfilePage: FC = () => {
                   );
                 })()}
               </div>
-              {/* Referral count */}
+              {/* Referral count — only when a referred friend has actually placed a bet */}
               {(user?.referralCount ?? 0) > 0 && (
                 <div
                   style={{
@@ -588,10 +591,7 @@ export const TmaProfilePage: FC = () => {
                     {user?.referralCount} friend
                     {user?.referralCount !== 1 ? "s" : ""}
                   </span>{" "}
-                  · Earned{" "}
-                  <span style={{ color: "#fbbf24" }}>
-                    {Math.min(50, (user?.referralCount ?? 0) * 2)}% bonus
-                  </span>
+                  who placed bets
                 </div>
               )}
             </div>
@@ -1069,6 +1069,57 @@ export const TmaProfilePage: FC = () => {
           )}
           {!txLoading && !txError && (
             <>
+              {/* ── Referral earnings summary — only shown when a friend actually placed a bet ── */}
+              {(() => {
+                const referralTxs = txs.filter((t) => t.type === "referral_bonus");
+                if (referralTxs.length === 0) return null;
+                const totalEarned = referralTxs.reduce((s, t) => s + Number(t.amount), 0);
+                return (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 12,
+                      padding: "12px 16px",
+                      marginBottom: 8,
+                      borderRadius: 12,
+                      background: "rgba(34,197,94,0.06)",
+                      border: "1px solid rgba(34,197,94,0.18)",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: 10,
+                        background: "rgba(34,197,94,0.15)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: 16,
+                        flexShrink: 0,
+                      }}
+                    >
+                      👥
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-main)" }}>
+                        Friends earned you a bonus
+                      </div>
+                      <div style={{ fontSize: 11, color: "var(--text-subtle)", marginTop: 2 }}>
+                        {referralTxs.length} friend{referralTxs.length !== 1 ? "s" : ""} placed a bet · bonus credited to your wallet
+                      </div>
+                    </div>
+                    <div style={{ textAlign: "right", flexShrink: 0 }}>
+                      <div style={{ fontSize: 14, fontWeight: 800, color: "#22c55e" }}>
+                        +{totalEarned.toLocaleString()}
+                      </div>
+                      <div style={{ fontSize: 10, color: "var(--text-subtle)", marginTop: 1 }}>BTN earned</div>
+                    </div>
+                  </div>
+                );
+              })()}
+
               <div style={walletStyles.txList}>
                 {txs.length === 0 ? (
                   <div style={walletStyles.emptyState}>
@@ -1600,7 +1651,7 @@ export const TmaProfilePage: FC = () => {
                   : (user?.firstName ?? "Predictor")
               }
               userPhotoUrl={user?.photoUrl ?? null}
-              reputationTier={user?.reputationTier ?? "newcomer"}
+              reputationTier={user?.reputationTier ?? "rookie"}
               reputationScore={Number(user?.reputationScore ?? 0)}
               totalPredictions={user?.totalPredictions ?? 0}
               correctPredictions={user?.correctPredictions ?? 0}
