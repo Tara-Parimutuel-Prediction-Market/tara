@@ -95,6 +95,18 @@ export class Market {
   @Column({ type: "timestamptz", nullable: true })
   resolvedAt: Date;
 
+  /** football-data.org match ID — set when a market is created from a fixture */
+  @Column({ type: "int", nullable: true })
+  externalMatchId: number | null;
+
+  /** Source identifier, e.g. "football-data.org" */
+  @Column({ type: "varchar", length: 64, nullable: true })
+  externalSource: string | null;
+
+  /** market type for auto-resolution: "match-winner" | "over-under" */
+  @Column({ type: "varchar", length: 32, nullable: true })
+  externalMarketType: string | null;
+
   @CreateDateColumn()
   createdAt: Date;
 

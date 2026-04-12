@@ -25,7 +25,14 @@ import { DKGatewayAuthToken } from "./entities/dk-gateway-auth-token.entity";
 import { PaymentOtp } from "./entities/payment-otp.entity";
 import { AuditLog } from "./entities/audit-log.entity";
 import { Challenge } from "./entities/challenge.entity";
+import { Tournament } from "./entities/tournament.entity";
+import { TournamentRound } from "./entities/tournament-round.entity";
+import { TournamentParticipant } from "./entities/tournament-participant.entity";
+import { TournamentNomination } from "./entities/tournament-nomination.entity";
+import { NominationVote } from "./entities/nomination-vote.entity";
+import { Season } from "./entities/season.entity";
 import { ChallengesModule } from "./challenges/challenges.module";
+import { TournamentsModule } from "./tournaments/tournaments.module";
 
 @Module({
   imports: [
@@ -73,6 +80,12 @@ import { ChallengesModule } from "./challenges/challenges.module";
           PaymentOtp,
           AuditLog,
           Challenge,
+          Tournament,
+          TournamentRound,
+          TournamentParticipant,
+          TournamentNomination,
+          NominationVote,
+          Season,
         ],
         synchronize: false,
         logging: false,
@@ -91,6 +104,7 @@ import { ChallengesModule } from "./challenges/challenges.module";
     TelegramModule,
     PaymentModule,
     ChallengesModule,
+    TournamentsModule,
   ],
 })
 export class AppModule {}

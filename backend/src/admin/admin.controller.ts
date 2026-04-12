@@ -31,6 +31,7 @@ import { FixturesService } from "./fixtures.service";
 import { AuditService } from "./audit.service";
 import { TelegramSimpleService } from "../telegram/telegram.service.simple";
 import { RedisService } from "../redis/redis.service";
+import { TournamentsService } from "../tournaments/tournaments.service";
 import { AuditAction } from "../entities/audit-log.entity";
 import { Market, MarketStatus } from "../entities/market.entity";
 import { Outcome } from "../entities/outcome.entity";
@@ -71,6 +72,7 @@ export class AdminController {
     private telegramSimple: TelegramSimpleService,
     private dataSource: DataSource,
     private redis: RedisService,
+    private tournamentsService: TournamentsService,
     @InjectRepository(Settlement)
     private settlementRepo: Repository<Settlement>,
     @InjectRepository(Dispute) private disputeRepo: Repository<Dispute>,
@@ -655,5 +657,71 @@ export class AdminController {
       job as "expiry" | "dispute" | "liquidity",
     );
     return { triggered: job };
+  }
+
+  // ── Tournaments ───────────────────────────────────────────────────────────
+
+  @Get("tournaments")
+  @ApiOperation({ summary: "List all tournaments" })
+  listTournaments() {
+    return this.tournamentsService.findAll();
+  }
+
+  @Post("tournaments")
+  @ApiOperation({
+    summary: "Create a new tournament (opens for voting immediately)",
+  })
+  createTournament(
+    @Body()
+    dto: {
+      name: string;
+      description?: string;
+      maxParticipants?: number;
+      nominationDeadline: string;
+      registrationDeadline: string;
+      prizePoolPct?: number;
+    },
+  ) {
+    return this.tournamentsService.createTournament(dto);
+  }
+
+  @Post("tournaments/:id/nominations")
+  @HttpCode(200)
+  @ApiOperation({ summary: "Add a market as a candidate for a round" })
+  addNomination(
+    @Param("id") id: string,
+    @Body() dto: { marketId: string; targetRound: number },
+  ) {
+    return this.tournamentsService.addNomination(
+      id,
+      dto.marketId,
+      dto.targetRound,
+    );
+  }
+
+  @Delete("tournaments/:id/nominations/:nominationId")
+  @ApiOperation({ summary: "Remove a nomination" })
+  removeNomination(
+    @Param("id") id: string,
+    @Param("nominationId") nominationId: string,
+  ) {
+    return this.tournamentsService.removeNomination(id, nominationId);
+  }
+
+  @Post("tournaments/:id/close-nominations")
+  @HttpCode(200)
+  @ApiOperation({
+    summary:
+      "Close voting phase — assigns top-voted markets to rounds and opens registration",
+  })
+  closeNominations(@Param("id") id: string) {
+    return this.tournamentsService.closeNominations(id);
+  }
+
+  @Post("tournaments/:id/start")
+  @HttpCode(200)
+  @ApiOperation({ summary: "Open Round 1 (moves tournament to ACTIVE)" })
+  startTournament(@Param("id") id: string) {
+    return this.tournamentsService.startTournament(id);
   }
 }

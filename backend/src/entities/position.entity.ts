@@ -51,6 +51,14 @@ export class Position {
   @Column({ type: "decimal", precision: 10, scale: 6, nullable: true })
   predictedProbability: number | null;
 
+  /**
+   * Fraction of the total pool sitting on this outcome at bet time (0–1).
+   * Used to compute the confidence score for tournament scoring and the
+   * early-confidence bonus payout: closer to 0.5 = higher uncertainty = more conviction.
+   */
+  @Column({ type: "decimal", precision: 10, scale: 6, nullable: true })
+  poolPctAtBet: number | null;
+
   @CreateDateColumn()
   placedAt: Date;
 

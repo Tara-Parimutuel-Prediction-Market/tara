@@ -146,6 +146,9 @@ export class MarketsService {
         outcomes: outcomes,
         totalPool: 0,
         status: MarketStatus.UPCOMING,
+        externalMatchId: dto.externalMatchId ?? null,
+        externalSource: dto.externalSource ?? null,
+        externalMarketType: dto.externalMarketType ?? null,
       });
 
       const saved = await this.marketRepo.save(market);
@@ -316,8 +319,50 @@ export class MarketsService {
   }
 
   async cancel(marketId: string) {
+    // Load market + affected positions BEFORE cancelling so we can notify bettors
+    const market = await this.marketRepo.findOne({
+      where: { id: marketId },
+    });
+
+    // Collect all pending positions for this market to know who to notify
+    const pendingPositions = market
+      ? await this.dataSource
+          .getRepository(Position)
+          .createQueryBuilder("p")
+          .innerJoinAndSelect("p.user", "u")
+          .where("p.marketId = :marketId", { marketId })
+          .andWhere("p.status = :status", { status: PositionStatus.PENDING })
+          .getMany()
+      : [];
+
     const result = await this.engine.cancelMarket(marketId);
     await this.invalidateMarketCache(marketId);
+
+    if (market) {
+      // 1. Channel announcement
+      this.telegram
+        .postToChannel(
+          `❌ <b>Market Cancelled: ${market.title}</b>\n\nAll pending bets have been fully refunded.`,
+        )
+        .catch(() => undefined);
+
+      // 2. Individual DM to every unique bettor whose position was refunded
+      const seenUsers = new Set<string>();
+      for (const pos of pendingPositions) {
+        const user = (pos as any).user as User | undefined;
+        if (!user?.telegramId || seenUsers.has(user.id)) continue;
+        seenUsers.add(user.id);
+        this.telegram
+          .sendMessage(
+            Number(user.telegramId),
+            `❌ <b>Market Cancelled</b>\n\n` +
+              `📊 <b>${market.title}</b>\n\n` +
+              `Your bet of <b>Nu ${Number(pos.amount).toLocaleString()}</b> has been fully refunded to your balance.`,
+          )
+          .catch(() => undefined);
+      }
+    }
+
     return result;
   }
 

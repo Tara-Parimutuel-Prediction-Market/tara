@@ -21,6 +21,7 @@ import { ReputationService } from "./reputation.service";
 import { TelegramSimpleService } from "../telegram/telegram.service.simple";
 import { DKGatewayService } from "../payment/services/dk-gateway/dk-gateway.service";
 import { StreakService, STREAK_BONUS_MULT } from "../users/streak.service";
+import { TournamentsService } from "../tournaments/tournaments.service";
 
 // ─── Valid state machine transitions ────────────────────────────────────────
 const VALID_TRANSITIONS: Record<MarketStatus, MarketStatus[]> = {
@@ -61,6 +62,7 @@ export class ParimutuelEngine implements OnModuleInit {
     private dkGateway: DKGatewayService,
     private configService: ConfigService,
     private streakService: StreakService,
+    private tournamentsService: TournamentsService,
   ) {}
 
   private async getCreditsBalance(
@@ -184,6 +186,13 @@ export class ParimutuelEngine implements OnModuleInit {
         const predictedProbability =
           outcomeIndex >= 0 ? preBetProbs[outcomeIndex] : null;
 
+        // Snapshot pool % for this outcome BEFORE the new bet is added.
+        // Used for tournament confidence scoring: 0.5 = maximally uncertain.
+        const preBetTotalPool = Number(market.totalPool);
+        const preBetOutcomePool = Number(outcome.totalBetAmount);
+        const poolPctAtBet =
+          preBetTotalPool > 0 ? preBetOutcomePool / preBetTotalPool : 0.5;
+
         // Update outcome pool
         outcome.totalBetAmount = Number(outcome.totalBetAmount) + amount;
 
@@ -227,6 +236,7 @@ export class ParimutuelEngine implements OnModuleInit {
           status: PositionStatus.PENDING,
           oddsAtPlacement: outcome.currentOdds,
           predictedProbability,
+          poolPctAtBet,
         });
         const savedPosition = await em.save(Position, bet);
 
@@ -511,6 +521,15 @@ export class ParimutuelEngine implements OnModuleInit {
         `[Notify] Settlement notifications failed for market ${marketId}: ${err.message}`,
       ),
     );
+
+    // Score any tournament rounds linked to this market — fire and forget
+    this.tournamentsService
+      .scoreRound(marketId, winningOutcomeId)
+      .catch((err) =>
+        this.logger.warn(
+          `[Tournament] scoreRound failed for market ${marketId}: ${err.message}`,
+        ),
+      );
 
     return settlement;
   }

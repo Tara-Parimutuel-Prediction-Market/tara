@@ -256,6 +256,159 @@ export class KeeperService {
     this.addLog("info", "Daily counters reset at midnight.");
   }
 
+  // ── Cron: auto-propose results for fixture-linked markets (every 5 minutes) ──
+
+  private autoProposalRunning = false;
+
+  @Cron(CronExpression.EVERY_5_MINUTES)
+  async handleAutoProposal() {
+    if (!this.isActive) return;
+    if (this.autoProposalRunning) return;
+    this.autoProposalRunning = true;
+    try {
+      await this.runAutoProposal();
+    } finally {
+      this.autoProposalRunning = false;
+    }
+  }
+
+  private async runAutoProposal() {
+    const apiKey = this.config.get<string>("FOOTBALL_DATA_API_KEY");
+    if (!apiKey) return;
+
+    // Find CLOSED markets that are linked to an external match and haven't
+    // had an outcome proposed yet.
+    const candidates = await this.marketRepo
+      .createQueryBuilder("m")
+      .leftJoinAndSelect("m.outcomes", "o")
+      .where("m.status = :status", { status: MarketStatus.CLOSED })
+      .andWhere("m.externalMatchId IS NOT NULL")
+      .andWhere("m.proposedOutcomeId IS NULL")
+      .getMany();
+
+    if (candidates.length === 0) return;
+
+    this.addLog(
+      "info",
+      `Auto-Proposal: checking ${candidates.length} fixture-linked closed market(s)...`,
+    );
+
+    // Group by match ID so we only fetch each match once.
+    const byMatchId = new Map<number, Market[]>();
+    for (const m of candidates) {
+      const mid = m.externalMatchId!;
+      if (!byMatchId.has(mid)) byMatchId.set(mid, []);
+      byMatchId.get(mid)!.push(m);
+    }
+
+    for (const [matchId, markets] of byMatchId) {
+      let matchData: any;
+      try {
+        const res = await fetch(
+          `https://api.football-data.org/v4/matches/${matchId}`,
+          {
+            headers: { "X-Auth-Token": apiKey },
+            signal: AbortSignal.timeout(10_000),
+          },
+        );
+        if (!res.ok) {
+          this.addLog("warn", `Auto-Proposal: HTTP ${res.status} for match ${matchId}`);
+          continue;
+        }
+        matchData = await res.json();
+      } catch (err: any) {
+        this.addLog("error", `Auto-Proposal: fetch failed for match ${matchId}: ${err.message}`);
+        continue;
+      }
+
+      const status: string = matchData.status ?? "";
+      if (!["FINISHED", "AWARDED"].includes(status)) {
+        this.addLog("info", `Auto-Proposal: match ${matchId} not finished yet (${status})`);
+        continue;
+      }
+
+      const homeScore: number = matchData.score?.fullTime?.home ?? 0;
+      const awayScore: number = matchData.score?.fullTime?.away ?? 0;
+      const homeTeam: string = matchData.homeTeam?.name ?? "";
+      const awayTeam: string = matchData.awayTeam?.name ?? "";
+      const totalGoals = homeScore + awayScore;
+
+      for (const market of markets) {
+        try {
+          const winningOutcomeId = this.resolveOutcome(
+            market,
+            homeTeam,
+            awayTeam,
+            homeScore,
+            awayScore,
+            totalGoals,
+          );
+          if (!winningOutcomeId) {
+            this.addLog(
+              "warn",
+              `Auto-Proposal: could not resolve outcome for "${market.title}" (match ${matchId})`,
+            );
+            continue;
+          }
+          await this.marketsService.proposeResolution(market.id, winningOutcomeId);
+          this.disputeWindowsOpened++;
+          const label = market.outcomes.find((o) => o.id === winningOutcomeId)?.label ?? winningOutcomeId;
+          this.addLog(
+            "success",
+            `Auto-Proposal: proposed "${label}" for "${market.title}"`,
+          );
+          await this.notifyAdmin(
+            `🤖 <b>Keeper: Auto-Proposal</b>\n\n` +
+              `📊 <b>${market.title}</b>\n` +
+              `🏆 Proposed Winner: <b>${label}</b>\n` +
+              `⏳ 24h dispute window now open.`,
+          );
+        } catch (err: any) {
+          this.addLog(
+            "error",
+            `Auto-Proposal: failed for "${market.title}": ${err.message}`,
+          );
+        }
+      }
+    }
+  }
+
+  /**
+   * Match the real-world result to one of the market's outcome labels.
+   * Supports "match-winner" (Home / Draw / Away) and "over-under" markets.
+   */
+  private resolveOutcome(
+    market: Market,
+    homeTeam: string,
+    awayTeam: string,
+    homeScore: number,
+    awayScore: number,
+    totalGoals: number,
+  ): string | null {
+    const type = market.externalMarketType ?? "match-winner";
+
+    if (type === "over-under") {
+      const label = totalGoals > 2.5 ? "Over 2.5" : "Under 2.5";
+      return market.outcomes.find((o) => o.label === label)?.id ?? null;
+    }
+
+    // match-winner: find outcome whose label matches home team, away team, or "Draw"
+    let targetLabel: string;
+    if (homeScore > awayScore) targetLabel = homeTeam;
+    else if (awayScore > homeScore) targetLabel = awayTeam;
+    else targetLabel = "Draw";
+
+    // Exact match first, then partial match (team names may be shortened)
+    const exact = market.outcomes.find((o) => o.label === targetLabel);
+    if (exact) return exact.id;
+
+    const partial = market.outcomes.find((o) =>
+      targetLabel.toLowerCase().includes(o.label.toLowerCase()) ||
+      o.label.toLowerCase().includes(targetLabel.toLowerCase()),
+    );
+    return partial?.id ?? null;
+  }
+
   // ── Demo liquidity bot (every 10 minutes) ─────────────────────────────────
 
   @Cron(CronExpression.EVERY_10_MINUTES)

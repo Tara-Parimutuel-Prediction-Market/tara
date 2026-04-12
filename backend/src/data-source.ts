@@ -13,6 +13,12 @@ import { DKGatewayAuthToken } from "./entities/dk-gateway-auth-token.entity";
 import { PaymentOtp } from "./entities/payment-otp.entity";
 import { AuditLog } from "./entities/audit-log.entity";
 import { Challenge } from "./entities/challenge.entity";
+import { Season } from "./entities/season.entity";
+import { Tournament } from "./entities/tournament.entity";
+import { TournamentRound } from "./entities/tournament-round.entity";
+import { TournamentParticipant } from "./entities/tournament-participant.entity";
+import { TournamentNomination } from "./entities/tournament-nomination.entity";
+import { NominationVote } from "./entities/nomination-vote.entity";
 
 dotenv.config();
 
@@ -44,6 +50,12 @@ export const AppDataSource = new DataSource({
     PaymentOtp,
     AuditLog,
     Challenge,
+    Season,
+    Tournament,
+    TournamentRound,
+    TournamentParticipant,
+    TournamentNomination,
+    NominationVote,
   ],
   migrations: [__dirname + "/migrations/*{.ts,.js}"],
   subscribers: [],

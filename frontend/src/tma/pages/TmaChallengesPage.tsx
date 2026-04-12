@@ -1,4 +1,5 @@
 import { FC, useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Page } from "@/tma/components/Page";
 import { useAuth } from "@/tma/hooks/useAuth";
 import {
@@ -170,15 +171,27 @@ function CreateChallengeCard({
   markets,
   userName,
   myBetMarketIds,
+  preselectedMarketId,
+  tournamentName,
   onCreated,
 }: {
   markets: Market[];
   userName: string;
   myBetMarketIds: Set<string>;
+  preselectedMarketId?: string;
+  tournamentName?: string;
   onCreated?: (challenge: Challenge) => void;
 }) {
   const [selectedMarket, setSelectedMarket] = useState<Market | null>(null);
   const [selectedOutcomeId, setSelectedOutcomeId] = useState<string>("");
+
+  // Pre-select market from query param on first render
+  useEffect(() => {
+    if (preselectedMarketId && markets.length > 0 && !selectedMarket) {
+      const m = markets.find((x) => x.id === preselectedMarketId);
+      if (m) setSelectedMarket(m);
+    }
+  }, [preselectedMarketId, markets, selectedMarket]);
   const [created, setCreated] = useState(false);
   const [link, setLink] = useState("");
   const [copied, setCopied] = useState(false);
@@ -220,7 +233,8 @@ function CreateChallengeCard({
     const outcome = selectedMarket?.outcomes.find(
       (o) => o.id === selectedOutcomeId,
     );
-    const text = `${userName} challenged you!\n\nI bet on "${outcome?.label}" in:\n"${selectedMarket?.title}"\n\nThink you can predict better? Beat me\n${link}`;
+    const context = tournamentName ? ` in the ${tournamentName} Cup` : "";
+    const text = `${userName} challenged you${context}!\n\nI bet on "${outcome?.label}" in:\n"${selectedMarket?.title}"\n\nThink you can predict better? Beat me\n${link}`;
     const url = `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(text)}`;
     if (window.Telegram?.WebApp?.openTelegramLink) {
       window.Telegram.WebApp.openTelegramLink(url);
@@ -742,6 +756,10 @@ function ActiveChallenges({ challenges }: { challenges: Challenge[] }) {
 
 export const TmaChallengesPage: FC = () => {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
+  const preselectedMarketId = searchParams.get("marketId") ?? undefined;
+  const tournamentName = searchParams.get("tournament") ?? undefined;
+
   const [markets, setMarkets] = useState<Market[]>([]);
   const [myBetMarketIds, setMyBetMarketIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
@@ -948,6 +966,8 @@ export const TmaChallengesPage: FC = () => {
             markets={markets}
             userName={userName}
             myBetMarketIds={myBetMarketIds}
+            preselectedMarketId={preselectedMarketId}
+            tournamentName={tournamentName}
             onCreated={(c) => setChallenges((prev) => [c, ...prev])}
           />
 

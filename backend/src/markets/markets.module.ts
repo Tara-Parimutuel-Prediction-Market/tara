@@ -1,4 +1,4 @@
-import { Module } from "@nestjs/common";
+import { Module, forwardRef } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { Market } from "../entities/market.entity";
@@ -18,6 +18,7 @@ import { ReputationService } from "./reputation.service";
 import { TelegramModule } from "../telegram/telegram.module";
 import { PaymentModule } from "../payment/payment.module";
 import { UsersModule } from "../users/users.module";
+import { TournamentsModule } from "../tournaments/tournaments.module";
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { UsersModule } from "../users/users.module";
     TelegramModule,
     PaymentModule,
     UsersModule,
+    forwardRef(() => TournamentsModule),
   ],
   providers: [
     MarketsService,

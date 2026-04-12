@@ -35,4 +35,26 @@ export class CreateMarketDto {
   @IsArray()
   @IsString({ each: true })
   outcomes: string[];
+
+  /** football-data.org match ID — set when creating a market from a fixture */
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  externalMatchId?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  externalSource?: string;
+
+  /** "match-winner" | "over-under" — used by the keeper to auto-propose results */
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  externalMarketType?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  category?: string;
 }
