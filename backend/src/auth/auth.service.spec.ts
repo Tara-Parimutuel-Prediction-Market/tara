@@ -10,12 +10,14 @@ import { TransactionType } from "../entities/transaction.entity";
 const BOT_TOKEN = "1234567890:AABBCCDDEEFFGGHHIIJJKKLLMMNNOOPPQQRR";
 
 /** Build a valid, freshly-signed Telegram initData string. */
-function buildValidInitData(overrides: {
-  id?: number;
-  first_name?: string;
-  username?: string;
-  auth_date?: number;
-} = {}): string {
+function buildValidInitData(
+  overrides: {
+    id?: number;
+    first_name?: string;
+    username?: string;
+    auth_date?: number;
+  } = {},
+): string {
   const id = overrides.id ?? 99999;
   const first_name = overrides.first_name ?? "Test";
   const username = overrides.username ?? "testuser";
@@ -33,8 +35,12 @@ function buildValidInitData(overrides: {
     .map(([k, v]) => `${k}=${v}`)
     .join("\n");
 
-  const secretKey = createHmac("sha256", "WebAppData").update(BOT_TOKEN).digest();
-  const hash = createHmac("sha256", secretKey).update(dataCheckString).digest("hex");
+  const secretKey = createHmac("sha256", "WebAppData")
+    .update(BOT_TOKEN)
+    .digest();
+  const hash = createHmac("sha256", secretKey)
+    .update(dataCheckString)
+    .digest("hex");
   params.set("hash", hash);
 
   return params.toString();
@@ -47,7 +53,9 @@ function makeUserRepo(user: any = null) {
     findOneBy: jest.fn().mockResolvedValue(user),
     findOne: jest.fn().mockResolvedValue(user),
     create: jest.fn().mockImplementation((data: any) => data),
-    save: jest.fn().mockImplementation((u: any) => Promise.resolve({ id: "user-1", ...u })),
+    save: jest
+      .fn()
+      .mockImplementation((u: any) => Promise.resolve({ id: "user-1", ...u })),
     update: jest.fn().mockResolvedValue(undefined),
   };
 }
@@ -81,7 +89,7 @@ function makeDkGateway(account: any = null) {
         accountNumber: "ACC001",
         accountName: "Test User",
         phoneNumber: "17000001",
-      }
+      },
     ),
   };
 }
@@ -129,7 +137,10 @@ describe("AuthService.validateTelegramInitData", () => {
   });
 
   it("throws when hash is missing", () => {
-    const params = new URLSearchParams({ user: '{"id":1}', auth_date: "9999999999" });
+    const params = new URLSearchParams({
+      user: '{"id":1}',
+      auth_date: "9999999999",
+    });
     expect(() => service.validateTelegramInitData(params.toString())).toThrow(
       UnauthorizedException,
     );
@@ -153,9 +164,9 @@ describe("AuthService.validateTelegramInitData", () => {
 
   it("throws when TELEGRAM_BOT_TOKEN is not set", () => {
     delete process.env.TELEGRAM_BOT_TOKEN;
-    expect(() => service.validateTelegramInitData("hash=abc&auth_date=1")).toThrow(
-      UnauthorizedException,
-    );
+    expect(() =>
+      service.validateTelegramInitData("hash=abc&auth_date=1"),
+    ).toThrow(UnauthorizedException);
   });
 });
 
@@ -192,7 +203,11 @@ describe("AuthService.loginWithTelegram", () => {
     // No existing auth method, no existing user
     authMethodRepo.findOne.mockResolvedValue(null);
     userRepo.findOneBy.mockResolvedValue(null);
-    userRepo.save.mockResolvedValue({ id: "new-user", telegramId: "99999", isAdmin: false });
+    userRepo.save.mockResolvedValue({
+      id: "new-user",
+      telegramId: "99999",
+      isAdmin: false,
+    });
     userRepo.findOneBy.mockResolvedValueOnce(null).mockResolvedValue({
       id: "new-user",
       telegramId: "99999",
@@ -209,8 +224,17 @@ describe("AuthService.loginWithTelegram", () => {
   });
 
   it("updates profile on subsequent login", async () => {
-    const existingUser = { id: "user-1", telegramId: "99999", isAdmin: false, firstName: "Old" };
-    const existingMethod = { user: existingUser, userId: "user-1", id: "method-1" };
+    const existingUser = {
+      id: "user-1",
+      telegramId: "99999",
+      isAdmin: false,
+      firstName: "Old",
+    };
+    const existingMethod = {
+      user: existingUser,
+      userId: "user-1",
+      id: "method-1",
+    };
 
     authMethodRepo.findOne.mockResolvedValue(existingMethod);
     userRepo.findOneBy.mockResolvedValue(existingUser);
@@ -246,7 +270,39 @@ describe("AuthService.loginWithTelegram", () => {
     expect(result.user).not.toHaveProperty("phoneNumber");
   });
 
-  it("does NOT seed credits in test/staging environment", async () => {
+  it("grants Nu 20 free credit on first registration (all environments)", async () => {
+    const txRepo = makeTransactionRepo();
+    process.env.NODE_ENV = "test";
+
+    service = new AuthService(
+      userRepo as any,
+      authMethodRepo as any,
+      txRepo as any,
+      makeJwtService(),
+      makeDkGateway() as any,
+      makeTelegramVerification() as any,
+      makeAuditService() as any,
+    );
+
+    authMethodRepo.findOne.mockResolvedValue(null);
+    userRepo.findOneBy
+      .mockResolvedValueOnce(null)
+      .mockResolvedValue({ id: "new-user", isAdmin: false });
+    userRepo.save.mockResolvedValue({ id: "new-user", isAdmin: false });
+
+    const initData = buildValidInitData({ id: 77777 });
+    await service.loginWithTelegram(initData);
+
+    expect(txRepo.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: TransactionType.FREE_CREDIT,
+        amount: 20,
+        isBonus: true,
+      }),
+    );
+  });
+
+  it("does NOT grant dev seed credits in test environment", async () => {
     const txRepo = makeTransactionRepo();
     process.env.NODE_ENV = "test";
 
@@ -273,7 +329,7 @@ describe("AuthService.loginWithTelegram", () => {
     );
   });
 
-  it("seeds 1000 credits in development environment", async () => {
+  it("seeds 1000 extra credits in development environment on top of free credit", async () => {
     const txRepo = makeTransactionRepo();
     process.env.NODE_ENV = "development";
 
@@ -296,8 +352,22 @@ describe("AuthService.loginWithTelegram", () => {
     const initData = buildValidInitData({ id: 88888 });
     await service.loginWithTelegram(initData);
 
+    // Free credit must fire first
     expect(txRepo.save).toHaveBeenCalledWith(
-      expect.objectContaining({ type: TransactionType.DEPOSIT, amount: 1000 }),
+      expect.objectContaining({
+        type: TransactionType.FREE_CREDIT,
+        amount: 20,
+        isBonus: true,
+      }),
+    );
+    // Dev seed on top
+    expect(txRepo.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: TransactionType.DEPOSIT,
+        amount: 1000,
+        balanceBefore: 20,
+        balanceAfter: 1020,
+      }),
     );
 
     process.env.NODE_ENV = "test";
@@ -340,7 +410,11 @@ describe("AuthService.loginWithDKBank", () => {
   it("creates a new user for an unknown CID", async () => {
     authMethodRepo.findOne.mockResolvedValue(null);
     userRepo.findOneBy.mockResolvedValue(null);
-    userRepo.save.mockResolvedValue({ id: "new-dk-user", dkCid: "11000000001", isAdmin: false });
+    userRepo.save.mockResolvedValue({
+      id: "new-dk-user",
+      dkCid: "11000000001",
+      isAdmin: false,
+    });
     userRepo.findOneBy.mockResolvedValue({ id: "new-dk-user", isAdmin: false });
 
     const result = await service.loginWithDKBank("11000000001");

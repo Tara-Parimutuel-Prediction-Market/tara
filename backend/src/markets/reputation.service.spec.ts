@@ -7,7 +7,7 @@ function makeUser(overrides: any = {}) {
   return {
     id: "u1",
     reputationScore: null,
-    reputationTier: "newcomer",
+    reputationTier: "rookie",
     totalPredictions: 0,
     correctPredictions: 0,
     categoryScores: null,
@@ -100,30 +100,30 @@ describe("ReputationService.adjustedScore", () => {
 describe("ReputationService.calcTier", () => {
   const svc = new ReputationService(null as any, null as any, null as any);
 
-  it("newcomer when total < 10", () => {
-    expect(svc.calcTier(5, 5)).toBe("newcomer");
-    expect(svc.calcTier(0, 0)).toBe("newcomer");
+  it("rookie when total < 10", () => {
+    expect(svc.calcTier(5, 5)).toBe("rookie");
+    expect(svc.calcTier(0, 0)).toBe("rookie");
   });
 
-  it("regular when 10–49 predictions regardless of accuracy", () => {
-    expect(svc.calcTier(10, 2)).toBe("regular");
-    expect(svc.calcTier(49, 49)).toBe("regular");
+  it("sharpshooter when 10–49 predictions regardless of accuracy", () => {
+    expect(svc.calcTier(10, 2)).toBe("sharpshooter");
+    expect(svc.calcTier(49, 49)).toBe("sharpshooter");
   });
 
-  it("reliable when 50+ predictions and accuracy >= 65%", () => {
-    expect(svc.calcTier(50, 33)).toBe("reliable"); // 33/50 = 66%
+  it("hot_hand when 50+ predictions and accuracy >= 65%", () => {
+    expect(svc.calcTier(50, 33)).toBe("hot_hand"); // 33/50 = 66%
   });
 
-  it("still regular when 50+ predictions but accuracy < 65%", () => {
-    expect(svc.calcTier(50, 30)).toBe("regular"); // 30/50 = 60%
+  it("still sharpshooter when 50+ predictions but accuracy < 65%", () => {
+    expect(svc.calcTier(50, 30)).toBe("sharpshooter"); // 30/50 = 60%
   });
 
-  it("expert when 100+ predictions and accuracy >= 75%", () => {
-    expect(svc.calcTier(100, 80)).toBe("expert"); // 80%
+  it("legend when 100+ predictions and accuracy >= 75%", () => {
+    expect(svc.calcTier(100, 80)).toBe("legend"); // 80%
   });
 
-  it("reliable (not expert) when 100+ predictions but accuracy < 75%", () => {
-    expect(svc.calcTier(100, 70)).toBe("reliable"); // 70%
+  it("hot_hand (not legend) when 100+ predictions but accuracy < 75%", () => {
+    expect(svc.calcTier(100, 70)).toBe("hot_hand"); // 70%
   });
 });
 

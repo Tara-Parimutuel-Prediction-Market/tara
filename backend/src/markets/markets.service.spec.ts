@@ -96,6 +96,7 @@ function makeService({
     null as any,
     mockRedis as any,
     mockReputationService as any,
+    { postToChannel: jest.fn().mockResolvedValue(undefined) } as any, // TelegramSimpleService
   );
 
   return { svc, mockReputationService };
@@ -278,5 +279,64 @@ describe("MarketsService.attachSignal — partial signal map", () => {
     expect((result.outcomes[1] as any).reputationSignal).toBeCloseTo(0.45, 4);
     // o3 not in signalMap → should be null, not undefined
     expect((result.outcomes[2] as any).reputationSignal).toBeNull();
+  });
+});
+
+// ─── Channel auto-posts ───────────────────────────────────────────────────────
+
+describe("MarketsService channel auto-posts", () => {
+  function makeServiceWithTelegram() {
+    const mockTelegram = { postToChannel: jest.fn().mockResolvedValue(undefined) };
+    const market = makeMarket({
+      totalPool: 0,
+      outcomes: [makeOutcome("o1"), makeOutcome("o2")],
+    });
+    const mockMarketRepo = {
+      create: jest.fn((d: any) => d),
+      save: jest.fn((d: any) => Promise.resolve({ id: "m1", ...d })),
+      findOne: jest.fn().mockResolvedValue(market),
+    };
+    const mockReputationService = {
+      computeMarketSignal: jest.fn().mockResolvedValue({}),
+      computeSignalConfidence: jest.fn().mockResolvedValue({ participantCount: 0, reputationDepth: 0, maturityScore: 0, composite: 0 }),
+      computeReputationWeightedShares: jest.fn().mockResolvedValue({}),
+    };
+    const mockRedis = {
+      getJson: jest.fn().mockResolvedValue(null),
+      setJsonEx: jest.fn().mockResolvedValue(undefined),
+      del: jest.fn().mockResolvedValue(undefined),
+    };
+    const mockOutcomeRepo = { create: jest.fn((d: any) => d), save: jest.fn() };
+    const svc = new MarketsService(
+      mockMarketRepo as any,
+      mockOutcomeRepo as any,
+      null as any,
+      null as any,
+      null as any,
+      null as any,
+      null as any,
+      new LMSRService(),
+      null as any,
+      mockRedis as any,
+      mockReputationService as any,
+      mockTelegram as any,
+    );
+    return { svc, mockTelegram };
+  }
+
+  it("posts to channel after resolve() is called", async () => {
+    const { svc, mockTelegram } = makeServiceWithTelegram();
+    // engine.resolveMarket is null, so we stub resolve via the service's own findOne path
+    (svc as any).engine = {
+      resolveMarket: jest.fn().mockResolvedValue({ id: "s1" }),
+    };
+
+    await svc.resolve("m1", "o1");
+
+    // Give the non-blocking postToChannel promise a tick to settle
+    await new Promise((r) => setTimeout(r, 0));
+    expect(mockTelegram.postToChannel).toHaveBeenCalledWith(
+      expect.stringContaining("Test"), // market title
+    );
   });
 });
