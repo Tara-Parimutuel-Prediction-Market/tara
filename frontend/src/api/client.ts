@@ -481,103 +481,6 @@ export function joinChallenge(challengeId: string): Promise<ChallengeResponse> {
   });
 }
 
-// ─── Tournaments ─────────────────────────────────────────────────────────────
-
-export interface TournamentNomination {
-  id: string;
-  marketId: string;
-  targetRound: number;
-  voteCount: number;
-  market: {
-    id: string;
-    title: string;
-    closesAt: string;
-    category: string | null;
-  };
-}
-
-export interface TournamentRound {
-  id: string;
-  roundNumber: number;
-  roundLabel: string;
-  marketId: string | null;
-  status: "pending" | "open" | "scoring" | "completed";
-  opensAt: string | null;
-  closesAt: string | null;
-  market: { id: string; title: string; totalPool: string } | null;
-}
-
-export interface TournamentParticipant {
-  id: string;
-  userId: string;
-  status: "active" | "eliminated" | "winner";
-  currentRound: number;
-  totalConfidenceScore: number;
-  correctPredictions: number;
-  user?: { username?: string; firstName?: string };
-}
-
-export interface Tournament {
-  id: string;
-  name: string;
-  description: string | null;
-  status: "nominations" | "registration" | "active" | "completed" | "cancelled";
-  maxParticipants: number;
-  nominationDeadline: string;
-  registrationDeadline: string;
-  /** % of round house fees redistributed as prizes (default 50) */
-  prizePoolPct: number;
-  winnerId: string | null;
-  rounds: TournamentRound[];
-  nominations: TournamentNomination[];
-}
-
-export function getTournaments(): Promise<Tournament[]> {
-  return request<Tournament[]>("/tournaments");
-}
-
-export function getTournament(id: string): Promise<Tournament> {
-  return request<Tournament>(`/tournaments/${id}`);
-}
-
-export function getTournamentLeaderboard(
-  id: string,
-): Promise<TournamentParticipant[]> {
-  return request<TournamentParticipant[]>(`/tournaments/${id}/leaderboard`);
-}
-
-export function getTournamentNominations(
-  id: string,
-): Promise<TournamentNomination[]> {
-  return request<TournamentNomination[]>(`/tournaments/${id}/nominations`);
-}
-
-export function getMyTournamentParticipation(
-  id: string,
-): Promise<TournamentParticipant | null> {
-  return request<TournamentParticipant | null>(`/tournaments/${id}/me`);
-}
-
-export function voteForNomination(
-  tournamentId: string,
-  nominationId: string,
-): Promise<void> {
-  return request<void>(`/tournaments/${tournamentId}/vote/${nominationId}`, {
-    method: "POST",
-  });
-}
-
-export function registerForTournament(
-  tournamentId: string,
-): Promise<TournamentParticipant> {
-  return request<TournamentParticipant>(
-    `/tournaments/${tournamentId}/register`,
-    {
-      method: "POST",
-    },
-  );
-}
-
 // ─── Seasons ─────────────────────────────────────────────────────────────────
 
 export interface Season {
@@ -619,6 +522,9 @@ export interface ReferralStats {
   flatBonus: number;
   betPct: number;
   cap: number;
+  prizeThreshold: number;
+  prizeAmount: number;
+  prizeClaimed: boolean;
 }
 
 export function getReferralStats(): Promise<ReferralStats> {

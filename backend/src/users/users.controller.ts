@@ -1,10 +1,4 @@
-import {
-  Controller,
-  Get,
-  UseGuards,
-  Request,
-  Query,
-} from "@nestjs/common";
+import { Controller, Get, UseGuards, Request, Query } from "@nestjs/common";
 import {
   ApiBearerAuth,
   ApiTags,
@@ -284,7 +278,8 @@ export class UsersController {
       select: ["id", "telegramId"],
     });
 
-    const botUsername = this.config.get<string>("TELEGRAM_BOT_USERNAME") ?? "OroPredictBot";
+    const botUsername =
+      this.config.get<string>("TELEGRAM_BOT_USERNAME") ?? "OroPredictBot";
     const referralLink = `https://t.me/${botUsername}?start=ref_${user?.telegramId ?? userId}`;
 
     // Total bonus credited across all referrals
@@ -302,6 +297,11 @@ export class UsersController {
       where: { referredByUserId: userId, referralBonusTriggered: true },
     });
 
+    const referrer = await this.userRepo.findOne({
+      where: { id: userId },
+      select: ["id", "referralPrizeClaimed"],
+    });
+
     return {
       referralLink,
       referredCount,
@@ -310,6 +310,9 @@ export class UsersController {
       flatBonus: ParimutuelEngine.REFERRAL_FLAT_BONUS,
       betPct: ParimutuelEngine.REFERRAL_BET_PCT * 100,
       cap: ParimutuelEngine.REFERRAL_CAP,
+      prizeThreshold: ParimutuelEngine.REFERRAL_PRIZE_THRESHOLD,
+      prizeAmount: ParimutuelEngine.REFERRAL_PRIZE_AMOUNT,
+      prizeClaimed: referrer?.referralPrizeClaimed ?? false,
     };
   }
 
@@ -393,6 +396,8 @@ export class UsersController {
   @Get("seasons/history")
   @ApiOperation({ summary: "Past seasons with winners snapshot" })
   async getSeasonHistory(@Query("limit") limit?: string) {
-    return this.seasonService.getSeasonHistory(Math.min(Number(limit) || 10, 52));
+    return this.seasonService.getSeasonHistory(
+      Math.min(Number(limit) || 10, 52),
+    );
   }
 }

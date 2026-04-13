@@ -7,9 +7,11 @@ import {
   getMyBets,
   getChallenges,
   createChallenge,
+  getReferralStats,
   type Market,
   type Bet,
   type ChallengeResponse,
+  type ReferralStats,
 } from "@/api/client";
 import {
   Swords,
@@ -23,6 +25,9 @@ import {
   Clock,
   Target,
   Send,
+  Gift,
+  Star,
+  UserPlus,
 } from "lucide-react";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -172,14 +177,12 @@ function CreateChallengeCard({
   userName,
   myBetMarketIds,
   preselectedMarketId,
-  tournamentName,
   onCreated,
 }: {
   markets: Market[];
   userName: string;
   myBetMarketIds: Set<string>;
   preselectedMarketId?: string;
-  tournamentName?: string;
   onCreated?: (challenge: Challenge) => void;
 }) {
   const [selectedMarket, setSelectedMarket] = useState<Market | null>(null);
@@ -233,8 +236,7 @@ function CreateChallengeCard({
     const outcome = selectedMarket?.outcomes.find(
       (o) => o.id === selectedOutcomeId,
     );
-    const context = tournamentName ? ` in the ${tournamentName} Cup` : "";
-    const text = `${userName} challenged you${context}!\n\nI bet on "${outcome?.label}" in:\n"${selectedMarket?.title}"\n\nThink you can predict better? Beat me\n${link}`;
+    const text = `${userName} challenged you!\n\nI bet on "${outcome?.label}" in:\n"${selectedMarket?.title}"\n\nThink you can predict better? Beat me\n${link}`;
     const url = `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(text)}`;
     if (window.Telegram?.WebApp?.openTelegramLink) {
       window.Telegram.WebApp.openTelegramLink(url);
@@ -750,7 +752,318 @@ function ActiveChallenges({ challenges }: { challenges: Challenge[] }) {
   );
 }
 
-// ── Duel Collectibles ─────────────────────────────────────────────────────────
+// ── Referral Prize Pool ───────────────────────────────────────────────────────
+
+// Fallback constants — overridden by live values from API
+const DEFAULT_REFERRAL_THRESHOLD = 10;
+const DEFAULT_PRIZE_AMOUNT = 500;
+
+function ReferralPrizePool({
+  referralStats,
+}: {
+  referralStats: ReferralStats | null;
+}) {
+  const [copied, setCopied] = useState(false);
+  const referred = referralStats?.referredCount ?? 0;
+  const converted = referralStats?.convertedCount ?? 0;
+  const threshold = referralStats?.prizeThreshold ?? DEFAULT_REFERRAL_THRESHOLD;
+  const prizeAmount = referralStats?.prizeAmount ?? DEFAULT_PRIZE_AMOUNT;
+  const prizeClaimed = referralStats?.prizeClaimed ?? false;
+  const progress = Math.min(100, (converted / threshold) * 100);
+  const remaining = Math.max(0, threshold - converted);
+  const unlocked = converted >= threshold;
+
+  const referralLink = referralStats?.referralLink ?? "";
+
+  const handleCopy = () => {
+    if (!referralLink) return;
+    navigator.clipboard.writeText(referralLink).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  const handleShare = () => {
+    if (!referralLink) return;
+    const text = `Join me on Tara — the prediction app for Bhutan 🇧🇹\n\nSign up and place your first bet to unlock real money prizes together!\n${referralLink}`;
+    const url = `https://t.me/share/url?url=${encodeURIComponent(referralLink)}&text=${encodeURIComponent(text)}`;
+    if (window.Telegram?.WebApp?.openTelegramLink) {
+      window.Telegram.WebApp.openTelegramLink(url);
+    } else {
+      window.open(url, "_blank");
+    }
+  };
+
+  return (
+    <div
+      style={{
+        margin: "16px 16px 0",
+        borderRadius: 20,
+        overflow: "hidden",
+        border: unlocked
+          ? "1.5px solid rgba(34,197,94,0.4)"
+          : "1.5px solid rgba(245,158,11,0.3)",
+        boxShadow: "6px 6px 18px rgba(0,0,0,0.28)",
+      }}
+    >
+      {/* Header band */}
+      <div
+        style={{
+          background: unlocked
+            ? "linear-gradient(135deg, rgba(34,197,94,0.18), rgba(34,197,94,0.06))"
+            : "linear-gradient(135deg, rgba(245,158,11,0.18), rgba(245,158,11,0.06))",
+          padding: "14px 16px",
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+        }}
+      >
+        <div
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: 12,
+            background: unlocked
+              ? "rgba(34,197,94,0.15)"
+              : "rgba(245,158,11,0.15)",
+            border: `1px solid ${unlocked ? "rgba(34,197,94,0.35)" : "rgba(245,158,11,0.35)"}`,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+          }}
+        >
+          {unlocked ? (
+            <Gift size={20} color="#22c55e" />
+          ) : (
+            <Star size={20} color="#f59e0b" />
+          )}
+        </div>
+        <div style={{ flex: 1 }}>
+          <div
+            style={{
+              fontSize: "0.85rem",
+              fontWeight: 800,
+              color: "var(--text-main)",
+              marginBottom: 1,
+            }}
+          >
+            {unlocked ? "🎉 Prize Unlocked!" : `Nu ${prizeAmount} Prize Pool`}
+          </div>
+          <div
+            style={{
+              fontSize: "0.7rem",
+              color: "var(--text-muted)",
+              fontWeight: 500,
+            }}
+          >
+            {unlocked
+              ? "You've referred enough friends — prize is yours!"
+              : `Refer ${threshold} friends who place a bet`}
+          </div>
+        </div>
+        {unlocked && (
+          <div
+            style={{
+              padding: "4px 10px",
+              borderRadius: 20,
+              background: prizeClaimed
+                ? "rgba(99,102,241,0.15)"
+                : "rgba(34,197,94,0.15)",
+              border: `1px solid ${prizeClaimed ? "rgba(99,102,241,0.35)" : "rgba(34,197,94,0.35)"}`,
+              fontSize: "0.65rem",
+              fontWeight: 800,
+              color: prizeClaimed ? "#818cf8" : "#22c55e",
+              letterSpacing: "0.04em",
+            }}
+          >
+            {prizeClaimed ? "CLAIMED" : "UNLOCKED"}
+          </div>
+        )}
+      </div>
+
+      {/* Body */}
+      <div
+        style={{
+          padding: "14px 16px",
+          background: "var(--bg-card)",
+          display: "flex",
+          flexDirection: "column",
+          gap: 12,
+        }}
+      >
+        {/* Stats row */}
+        <div style={{ display: "flex", gap: 10 }}>
+          {[
+            {
+              label: "Invited",
+              value: referred,
+              icon: <UserPlus size={12} color="#818cf8" />,
+            },
+            {
+              label: "Joined & Bet",
+              value: converted,
+              icon: <CheckCircle size={12} color="#22c55e" />,
+            },
+            {
+              label: "Goal",
+              value: threshold,
+              icon: <Trophy size={12} color="#f59e0b" />,
+            },
+          ].map((s) => (
+            <div
+              key={s.label}
+              style={{
+                flex: 1,
+                padding: "10px 8px",
+                borderRadius: 12,
+                background: "var(--bg-main)",
+                border: "1px solid var(--glass-border)",
+                textAlign: "center",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "center",
+                  marginBottom: 4,
+                }}
+              >
+                {s.icon}
+              </div>
+              <div
+                style={{
+                  fontSize: "1.1rem",
+                  fontWeight: 800,
+                  color: "var(--text-main)",
+                  lineHeight: 1,
+                }}
+              >
+                {s.value}
+              </div>
+              <div
+                style={{
+                  fontSize: "0.62rem",
+                  color: "var(--text-subtle)",
+                  fontWeight: 600,
+                  marginTop: 2,
+                }}
+              >
+                {s.label}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Progress bar */}
+        {!unlocked && (
+          <div>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                fontSize: "0.68rem",
+                fontWeight: 700,
+                marginBottom: 6,
+                color: "var(--text-muted)",
+              }}
+            >
+              <span>
+                {converted} / {threshold} friends bet
+              </span>
+              <span style={{ color: "#f59e0b" }}>{remaining} to go</span>
+            </div>
+            <div
+              style={{
+                height: 8,
+                borderRadius: 99,
+                background: "rgba(245,158,11,0.15)",
+                overflow: "hidden",
+              }}
+            >
+              <div
+                style={{
+                  height: "100%",
+                  width: `${progress}%`,
+                  borderRadius: 99,
+                  background: "linear-gradient(90deg, #f59e0b, #fbbf24)",
+                  transition: "width 0.6s ease",
+                }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* CTA buttons */}
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            onClick={handleCopy}
+            disabled={!referralLink}
+            style={{
+              flex: 1,
+              padding: "10px",
+              borderRadius: 10,
+              background: copied ? "rgba(34,197,94,0.15)" : "var(--bg-main)",
+              border: `1px solid ${copied ? "rgba(34,197,94,0.4)" : "var(--glass-border)"}`,
+              color: copied ? "#22c55e" : "var(--text-muted)",
+              fontWeight: 700,
+              fontSize: "0.75rem",
+              cursor: referralLink ? "pointer" : "not-allowed",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6,
+              opacity: referralLink ? 1 : 0.5,
+            }}
+          >
+            {copied ? <CheckCircle size={13} /> : <Copy size={13} />}
+            {copied ? "Copied!" : "Copy Link"}
+          </button>
+          <button
+            onClick={handleShare}
+            disabled={!referralLink}
+            style={{
+              flex: 2,
+              padding: "10px",
+              borderRadius: 10,
+              background: unlocked
+                ? "linear-gradient(135deg, #22c55e, #16a34a)"
+                : "linear-gradient(135deg, #f59e0b, #d97706)",
+              border: "none",
+              color: "#fff",
+              fontWeight: 800,
+              fontSize: "0.8rem",
+              cursor: referralLink ? "pointer" : "not-allowed",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6,
+              opacity: referralLink ? 1 : 0.5,
+            }}
+          >
+            <UserPlus size={14} />
+            {unlocked ? "Invite More Friends" : "Invite Friends"}
+          </button>
+        </div>
+
+        {/* Fine print */}
+        <div
+          style={{
+            fontSize: "0.65rem",
+            color: "var(--text-subtle)",
+            textAlign: "center",
+            lineHeight: 1.5,
+            paddingTop: 2,
+          }}
+        >
+          {prizeClaimed
+            ? `Nu ${prizeAmount} has been credited to your DK Bank wallet. Keep inviting friends!`
+            : `Friends must sign up via your link and place at least one bet to count. Prize of Nu ${prizeAmount} auto-credited to your DK Bank wallet.`}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
@@ -758,13 +1071,15 @@ export const TmaChallengesPage: FC = () => {
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const preselectedMarketId = searchParams.get("marketId") ?? undefined;
-  const tournamentName = searchParams.get("tournament") ?? undefined;
 
   const [markets, setMarkets] = useState<Market[]>([]);
   const [myBetMarketIds, setMyBetMarketIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [challenges, setChallenges] = useState<Challenge[]>([]);
   const [totalBetCount, setTotalBetCount] = useState(0);
+  const [referralStats, setReferralStats] = useState<ReferralStats | null>(
+    null,
+  );
 
   const isEligible = totalBetCount >= MIN_PREDICTIONS_REQUIRED;
 
@@ -773,21 +1088,25 @@ export const TmaChallengesPage: FC = () => {
     : (user?.firstName ?? "You");
 
   useEffect(() => {
-    if (!user) return; 
+    if (!user) return;
     Promise.all([
       getMarkets(),
-      getMyBets(), 
-      getMyBets("pending"), 
+      getMyBets(),
+      getMyBets("pending"),
       getChallenges().catch(() => [] as Challenge[]),
+      getReferralStats().catch(() => null),
     ])
-      .then(([allMarkets, allBets, pendingBets, activeChallenges]) => {
-        setMarkets(allMarkets.filter((m) => m.status === "open"));
-        setTotalBetCount((allBets as Bet[]).length);
-        setMyBetMarketIds(
-          new Set((pendingBets as Bet[]).map((b) => b.marketId)),
-        );
-        setChallenges(activeChallenges as Challenge[]);
-      })
+      .then(
+        ([allMarkets, allBets, pendingBets, activeChallenges, refStats]) => {
+          setMarkets(allMarkets.filter((m) => m.status === "open"));
+          setTotalBetCount((allBets as Bet[]).length);
+          setMyBetMarketIds(
+            new Set((pendingBets as Bet[]).map((b) => b.marketId)),
+          );
+          setChallenges(activeChallenges as Challenge[]);
+          setReferralStats(refStats as ReferralStats | null);
+        },
+      )
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [user?.id]);
@@ -823,7 +1142,6 @@ export const TmaChallengesPage: FC = () => {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            animation: "swordsShake 2.5s ease-in-out infinite",
           }}
         >
           <Swords size={20} color="#f59e0b" />
@@ -840,7 +1158,7 @@ export const TmaChallengesPage: FC = () => {
               marginBottom: 0,
             }}
           >
-            Prediction Duels
+            Duels
           </h1>
           <div
             style={{
@@ -850,7 +1168,7 @@ export const TmaChallengesPage: FC = () => {
               marginTop: 3,
             }}
           >
-            Challenge friends · {MIN_PREDICTIONS_REQUIRED} predictions to unlock
+            Bet on what you like · Share · Challenge friends
           </div>
         </div>
       </div>
@@ -910,7 +1228,7 @@ export const TmaChallengesPage: FC = () => {
               },
               {
                 icon: <Trophy size={13} color="#818cf8" />,
-                text: "Whoever predicts better wins bragging rights",
+                text: "Whoever predicts better wins real DK Bank money",
               },
             ].map((step, i) => (
               <div
@@ -967,7 +1285,6 @@ export const TmaChallengesPage: FC = () => {
             userName={userName}
             myBetMarketIds={myBetMarketIds}
             preselectedMarketId={preselectedMarketId}
-            tournamentName={tournamentName}
             onCreated={(c) => setChallenges((prev) => [c, ...prev])}
           />
 
@@ -985,6 +1302,21 @@ export const TmaChallengesPage: FC = () => {
             Active Challenges
           </div>
           <ActiveChallenges challenges={challenges} />
+
+          {/* Referral Prize Pool */}
+          <div
+            style={{
+              padding: "16px 16px 6px",
+              fontSize: "0.65rem",
+              fontWeight: 700,
+              color: "var(--text-muted)",
+              textTransform: "uppercase",
+              letterSpacing: "0.06em",
+            }}
+          >
+            Prize Pool Challenge
+          </div>
+          <ReferralPrizePool referralStats={referralStats} />
 
           <div style={{ height: 100 }} />
         </>

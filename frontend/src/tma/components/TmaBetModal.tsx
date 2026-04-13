@@ -11,7 +11,7 @@ import { StreakBanner } from "@/tma/components/StreakBanner";
 import { useAuth } from "@/tma/hooks/useAuth";
 
 const QUICK_AMOUNTS = [100, 500, 1000];
-const MIN_BET = 50;
+const MIN_BET = 100;
 
 interface TmaBetModalProps {
   isOpen: boolean;

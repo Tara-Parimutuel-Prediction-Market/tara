@@ -192,6 +192,14 @@ export class User {
   @Column({ default: false })
   referralBonusTriggered: boolean;
 
+  /**
+   * True once this user has been paid their Nu 500 referral prize pool reward
+   * for reaching the REFERRAL_PRIZE_THRESHOLD converted referrals.
+   * Ensures the prize fires exactly once.
+   */
+  @Column({ default: false })
+  referralPrizeClaimed: boolean;
+
   @CreateDateColumn()
   createdAt: Date;
 

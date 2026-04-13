@@ -21,7 +21,6 @@ import { ReputationService } from "./reputation.service";
 import { TelegramSimpleService } from "../telegram/telegram.service.simple";
 import { DKGatewayService } from "../payment/services/dk-gateway/dk-gateway.service";
 import { StreakService, STREAK_BONUS_MULT } from "../users/streak.service";
-import { TournamentsService } from "../tournaments/tournaments.service";
 
 // ─── Valid state machine transitions ────────────────────────────────────────
 const VALID_TRANSITIONS: Record<MarketStatus, MarketStatus[]> = {
@@ -62,7 +61,6 @@ export class ParimutuelEngine implements OnModuleInit {
     private dkGateway: DKGatewayService,
     private configService: ConfigService,
     private streakService: StreakService,
-    private tournamentsService: TournamentsService,
   ) {}
 
   private async getCreditsBalance(
@@ -294,7 +292,8 @@ export class ParimutuelEngine implements OnModuleInit {
       const streakChatId = betUserTelegramId ? Number(betUserTelegramId) : null;
       if (streakResult && streakChatId) {
         const { dayInCycle, boostActive } = streakResult;
-        const shouldNotify = boostActive || dayInCycle === 3 || dayInCycle === 1;
+        const shouldNotify =
+          boostActive || dayInCycle === 3 || dayInCycle === 1;
         if (shouldNotify) {
           let msg: string;
           if (boostActive) {
@@ -355,8 +354,16 @@ export class ParimutuelEngine implements OnModuleInit {
    * Capped at Nu 50 total. Idempotent: `referralBonusTriggered` ensures exactly once.
    */
   static readonly REFERRAL_FLAT_BONUS = 50; // Nu 50 flat
-  static readonly REFERRAL_BET_PCT = 0.05;  // 5% of first bet
-  static readonly REFERRAL_CAP = 50;         // total cap Nu 50
+  static readonly REFERRAL_BET_PCT = 0.05; // 5% of first bet
+  static readonly REFERRAL_CAP = 50; // total cap Nu 50
+
+  // ── Referral prize pool (funded from house edge) ──────────────────────────
+  /** % of each market's houseAmount contributed to the referral prize fund */
+  static readonly PRIZE_FUND_PCT = 0.2; // 20% of house cut per market
+  /** How many converted referrals unlock the prize */
+  static readonly REFERRAL_PRIZE_THRESHOLD = 10;
+  /** Fixed prize credited to the referrer on reaching the threshold */
+  static readonly REFERRAL_PRIZE_AMOUNT = 500; // Nu 500
 
   private async creditReferralBonusIfEligible(
     bettorUserId: string,
@@ -377,7 +384,8 @@ export class ParimutuelEngine implements OnModuleInit {
     if (!referrer) return;
 
     // Nu 50 flat + 5% of the first bet, capped at Nu 50
-    const pct = Math.round(betAmount * ParimutuelEngine.REFERRAL_BET_PCT * 100) / 100;
+    const pct =
+      Math.round(betAmount * ParimutuelEngine.REFERRAL_BET_PCT * 100) / 100;
     const bonus = Math.min(
       ParimutuelEngine.REFERRAL_FLAT_BONUS + pct,
       ParimutuelEngine.REFERRAL_CAP,
@@ -416,6 +424,69 @@ export class ParimutuelEngine implements OnModuleInit {
 
     this.logger.log(
       `[Referral] Credited ${bonus} BTN to referrer ${referrer.id} for referred user ${bettor.id}`,
+    );
+
+    // Check if referrer has now hit the prize threshold
+    await this.creditReferralPrizeIfEligible(referrer.id);
+  }
+
+  /**
+   * Auto-credits Nu 500 to the referrer once they hit REFERRAL_PRIZE_THRESHOLD
+   * converted referrals. Idempotent: `referralPrizeClaimed` ensures exactly once.
+   *
+   * Funded by 20% of each market's house cut (PRIZE_FUND_PCT). The platform
+   * earns the house edge on all those referred users' bets — at 8% house edge
+   * on even modest activity the fund self-replenishes well before the prize fires.
+   */
+  private async creditReferralPrizeIfEligible(
+    referrerId: string,
+  ): Promise<void> {
+    const referrer = await this.dataSource.getRepository(User).findOne({
+      where: { id: referrerId },
+      select: ["id", "referralPrizeClaimed"],
+    });
+
+    if (!referrer || referrer.referralPrizeClaimed) return;
+
+    const convertedCount = await this.dataSource.getRepository(User).count({
+      where: { referredByUserId: referrerId, referralBonusTriggered: true },
+    });
+
+    if (convertedCount < ParimutuelEngine.REFERRAL_PRIZE_THRESHOLD) return;
+
+    const prize = ParimutuelEngine.REFERRAL_PRIZE_AMOUNT;
+
+    await this.dataSource.transaction(async (em) => {
+      const txRepo = em.getRepository(Transaction);
+      const userRepo = em.getRepository(User);
+
+      const { balance } = await txRepo
+        .createQueryBuilder("t")
+        .select("COALESCE(SUM(t.amount), 0)", "balance")
+        .where("t.userId = :id", { id: referrerId })
+        .getRawOne();
+
+      const balBefore = Number(balance);
+
+      await txRepo.save(
+        txRepo.create({
+          type: TransactionType.REFERRAL_PRIZE,
+          amount: prize,
+          balanceBefore: balBefore,
+          balanceAfter: balBefore + prize,
+          userId: referrerId,
+          note: `Referral prize — reached ${ParimutuelEngine.REFERRAL_PRIZE_THRESHOLD} converted friends`,
+        }),
+      );
+
+      // Mark claimed so this never fires again
+      await userRepo.update(referrerId, { referralPrizeClaimed: true });
+    });
+
+    await this.redis.del(`oro:cache:balance:${referrerId}`);
+
+    this.logger.log(
+      `[ReferralPrize] Credited Nu ${prize} prize to user ${referrerId} (${convertedCount} converted referrals)`,
     );
   }
 
@@ -521,15 +592,6 @@ export class ParimutuelEngine implements OnModuleInit {
         `[Notify] Settlement notifications failed for market ${marketId}: ${err.message}`,
       ),
     );
-
-    // Score any tournament rounds linked to this market — fire and forget
-    this.tournamentsService
-      .scoreRound(marketId, winningOutcomeId)
-      .catch((err) =>
-        this.logger.warn(
-          `[Tournament] scoreRound failed for market ${marketId}: ${err.message}`,
-        ),
-      );
 
     return settlement;
   }

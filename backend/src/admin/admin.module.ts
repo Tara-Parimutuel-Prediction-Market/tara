@@ -12,7 +12,6 @@ import { MarketsModule } from "../markets/markets.module";
 import { FixturesService } from "./fixtures.service";
 import { AuditService } from "./audit.service";
 import { TelegramModule } from "../telegram/telegram.module";
-import { TournamentsModule } from "../tournaments/tournaments.module";
 
 @Module({
   imports: [
@@ -27,7 +26,6 @@ import { TournamentsModule } from "../tournaments/tournaments.module";
     ]),
     MarketsModule,
     TelegramModule,
-    TournamentsModule,
   ],
   controllers: [AdminController],
   providers: [FixturesService, AuditService],
