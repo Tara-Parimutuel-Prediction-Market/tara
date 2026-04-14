@@ -631,7 +631,7 @@ export class DKBankPaymentService {
             balanceAfter: balanceBefore + depositAmount,
             paymentId: payment.id,
             userId: params.userId,
-            note: `DK Bank deposit confirmed (dk_payment: ${payment.id})`,
+            note: `DK Bank deposit confirmed`,
           }),
         );
 
@@ -978,7 +978,7 @@ export class DKBankPaymentService {
           balanceAfter: balanceBefore - withdrawalAmount,
           paymentId: lockedPayment.id,
           userId,
-          note: `DK Bank withdrawal confirmed (txn: ${transferResult?.txnId ?? "n/a"})`,
+          note: `DK Bank withdrawal confirmed`,
         }),
       );
 
