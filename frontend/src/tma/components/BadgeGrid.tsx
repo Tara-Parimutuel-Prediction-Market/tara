@@ -1,39 +1,54 @@
 import { useState } from "react";
-import {
-  Target,
-  Flame,
-  Lightbulb,
-  TrendingUp,
-  Activity,
-  Award,
-  ThumbsUp,
-  Eye,
-  Crosshair,
-  Sparkles,
-  Zap,
-  Star,
-  Hash,
-  Brain,
-  Dumbbell,
-  Sprout,
-  Swords,
-  Trophy,
-  Smartphone,
-  Building2,
-  Link2,
-  BarChart2,
-  Lock,
-  CheckCircle2,
-  Medal,
-  Users,
-  Crown,
-  Gem,
-} from "lucide-react";
+import { Target, Swords, Lock, CheckCircle2, Medal } from "lucide-react";
+
+// ── Collectible badge images ──────────────────────────────────────────────────
+// Volume
+import imgFirstCall from "../../assets/collectibles/volumebadges/firstcall.png";
+import imgTripleThreat from "../../assets/collectibles/volumebadges/triplethreat.png";
+import imgSharpStart from "../../assets/collectibles/volumebadges/sharpstart.png";
+import imgTenDeep from "../../assets/collectibles/volumebadges/tendeep.png";
+import imgCommitted from "../../assets/collectibles/volumebadges/committed.png";
+import imgCenturion from "../../assets/collectibles/volumebadges/centurian.png";
+// Accuracy
+import imgAboveAverage from "../../assets/collectibles/accuraybadges/aboveaverage.png";
+import imgEagleEye from "../../assets/collectibles/accuraybadges/eagleeye.png";
+import imgSharpened from "../../assets/collectibles/accuraybadges/sharpened.png";
+import imgOracle from "../../assets/collectibles/accuraybadges/oracle.png";
+import imgElectrified from "../../assets/collectibles/accuraybadges/electrified.png";
+import imgGodlike from "../../assets/collectibles/accuraybadges/godlike.png";
+// Correct calls
+import imgRightOnce from "../../assets/collectibles/correctcallsbadges/rightonce.png";
+import imgDoubleDigit from "../../assets/collectibles/correctcallsbadges/doubledigit.png";
+import imgThinkTank from "../../assets/collectibles/correctcallsbadges/thinktank.png";
+import imgHalfCentury from "../../assets/collectibles/correctcallsbadges/halfcentury.png";
+// Tiers
+import imgRookie from "../../assets/collectibles/tierbadges/rookie.png";
+import imgSharpshooter from "../../assets/collectibles/tierbadges/sharpshooter.png";
+import imgHotHand from "../../assets/collectibles/tierbadges/hothand.png";
+import imgLegend from "../../assets/collectibles/tierbadges/legend.png";
+// Profile
+import imgVerified from "../../assets/collectibles/profilebadges/verified.png";
+import imgBankrolled from "../../assets/collectibles/profilebadges/bankrolled.png";
+import imgConnected from "../../assets/collectibles/profilebadges/connected.png";
+import imgHighScore from "../../assets/collectibles/profilebadges/highscore.png";
+// Referral
+import imgConnector from "../../assets/collectibles/referralbadges/connector.png";
+import imgAmbassador from "../../assets/collectibles/referralbadges/ambassador.png";
+import imgInfluencer from "../../assets/collectibles/referralbadges/influencer.png";
+import imgKingmaker from "../../assets/collectibles/referralbadges/kingmaker.png";
+// Duels
+import imgChallenger from "../../assets/collectibles/duelbadges/challenger.png";
+import imgOnFire from "../../assets/collectibles/duelbadges/onfire.png";
+import imgDuelMaster from "../../assets/collectibles/duelbadges/duelmaster.png";
+import imgDeadEye from "../../assets/collectibles/duelbadges/deadeye.png";
+import imgPackLeader from "../../assets/collectibles/duelbadges/packleader.png";
+import imgDuelOracle from "../../assets/collectibles/duelbadges/dueloracle.png";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type CollectibleBadge = {
   id: string;
+  img?: string; // image path — if present, renders instead of icon
   icon: React.ReactNode;
   name: string;
   /** What the user needs to do to unlock it */
@@ -59,6 +74,7 @@ export function buildBadges(
     // ── Volume ──
     {
       id: "first_call",
+      img: imgFirstCall,
       icon: <Target size={18} color="#3b82f6" />,
       name: "First Call",
       requirement: "Make your first prediction",
@@ -66,35 +82,40 @@ export function buildBadges(
     },
     {
       id: "triple",
-      icon: <Flame size={18} color="#f97316" />,
+      img: imgTripleThreat,
+      icon: <Target size={18} color="#f97316" />,
       name: "Triple Threat",
       requirement: "Make 3 predictions",
       unlocked: total >= 3,
     },
     {
       id: "sharp_start",
-      icon: <Lightbulb size={18} color="#eab308" />,
+      img: imgSharpStart,
+      icon: <Target size={18} color="#eab308" />,
       name: "Sharp Start",
       requirement: "Make 5 predictions",
       unlocked: total >= 5,
     },
     {
       id: "ten_deep",
-      icon: <TrendingUp size={18} color="#22c55e" />,
+      img: imgTenDeep,
+      icon: <Target size={18} color="#22c55e" />,
       name: "Ten Deep",
       requirement: "Make 10 predictions",
       unlocked: total >= 10,
     },
     {
       id: "committed",
-      icon: <Activity size={18} color="#06b6d4" />,
+      img: imgCommitted,
+      icon: <Target size={18} color="#06b6d4" />,
       name: "Committed",
       requirement: "Make 25 predictions",
       unlocked: total >= 25,
     },
     {
       id: "centurion",
-      icon: <Award size={18} color="#a855f7" />,
+      img: imgCenturion,
+      icon: <Target size={18} color="#a855f7" />,
       name: "Centurion",
       requirement: "Make 100 predictions",
       unlocked: total >= 100,
@@ -102,42 +123,48 @@ export function buildBadges(
     // ── Accuracy ──
     {
       id: "above_avg",
-      icon: <ThumbsUp size={18} color="#3b82f6" />,
+      img: imgAboveAverage,
+      icon: <Target size={18} color="#3b82f6" />,
       name: "Above Average",
       requirement: "50%+ accuracy (5+ picks)",
       unlocked: total >= 5 && acc >= 0.5,
     },
     {
       id: "eagle_eye",
-      icon: <Eye size={18} color="#0ea5e9" />,
+      img: imgEagleEye,
+      icon: <Target size={18} color="#0ea5e9" />,
       name: "Eagle Eye",
       requirement: "60%+ accuracy (10+ picks)",
       unlocked: total >= 10 && acc >= 0.6,
     },
     {
       id: "sharpened",
-      icon: <Crosshair size={18} color="#10b981" />,
+      img: imgSharpened,
+      icon: <Target size={18} color="#10b981" />,
       name: "Sharpened",
       requirement: "70%+ accuracy (15+ picks)",
       unlocked: total >= 15 && acc >= 0.7,
     },
     {
       id: "oracle",
-      icon: <Sparkles size={18} color="#8b5cf6" />,
+      img: imgOracle,
+      icon: <Target size={18} color="#8b5cf6" />,
       name: "Oracle",
       requirement: "75%+ accuracy (20+ picks)",
       unlocked: total >= 20 && acc >= 0.75,
     },
     {
       id: "electrified",
-      icon: <Zap size={18} color="#f59e0b" />,
+      img: imgElectrified,
+      icon: <Target size={18} color="#f59e0b" />,
       name: "Electrified",
       requirement: "80%+ accuracy (30+ picks)",
       unlocked: total >= 30 && acc >= 0.8,
     },
     {
       id: "godlike",
-      icon: <Star size={18} color="#f59e0b" />,
+      img: imgGodlike,
+      icon: <Target size={18} color="#f59e0b" />,
       name: "Godlike",
       requirement: "85%+ accuracy (50+ picks)",
       unlocked: total >= 50 && acc >= 0.85,
@@ -145,6 +172,7 @@ export function buildBadges(
     // ── Correct calls ──
     {
       id: "right_once",
+      img: imgRightOnce,
       icon: <CheckCircle2 size={18} color="#22c55e" />,
       name: "Right Once",
       requirement: "Get 1 correct prediction",
@@ -152,21 +180,24 @@ export function buildBadges(
     },
     {
       id: "double_digit",
-      icon: <Hash size={18} color="#14b8a6" />,
+      img: imgDoubleDigit,
+      icon: <Target size={18} color="#14b8a6" />,
       name: "Double Digit",
       requirement: "Get 10 correct predictions",
       unlocked: correct >= 10,
     },
     {
       id: "think_tank",
-      icon: <Brain size={18} color="#6366f1" />,
+      img: imgThinkTank,
+      icon: <Target size={18} color="#6366f1" />,
       name: "Think Tank",
       requirement: "Get 25 correct predictions",
       unlocked: correct >= 25,
     },
     {
       id: "half_century",
-      icon: <Dumbbell size={18} color="#ec4899" />,
+      img: imgHalfCentury,
+      icon: <Target size={18} color="#ec4899" />,
       name: "Half Century",
       requirement: "Get 50 correct predictions",
       unlocked: correct >= 50,
@@ -174,13 +205,15 @@ export function buildBadges(
     // ── Tiers ──
     {
       id: "rookie",
-      icon: <Sprout size={18} color="#84cc16" />,
+      img: imgRookie,
+      icon: <Target size={18} color="#84cc16" />,
       name: "Rookie",
       requirement: "Join Oro — you're already here!",
       unlocked: true,
     },
     {
       id: "sharpshooter",
+      img: imgSharpshooter,
       icon: <Swords size={18} color="#3b82f6" />,
       name: "Sharpshooter",
       requirement: "Reach Sharpshooter tier",
@@ -188,14 +221,16 @@ export function buildBadges(
     },
     {
       id: "hot_hand",
-      icon: <Flame size={18} color="#ef4444" />,
+      img: imgHotHand,
+      icon: <Target size={18} color="#ef4444" />,
       name: "Hot Hand",
       requirement: "Reach Hot Hand tier",
       unlocked: ["hot_hand", "legend"].includes(tier),
     },
     {
       id: "legend",
-      icon: <Trophy size={18} color="#f59e0b" />,
+      img: imgLegend,
+      icon: <Target size={18} color="#f59e0b" />,
       name: "Legend",
       requirement: "Reach Legend tier",
       unlocked: tier === "legend",
@@ -203,28 +238,32 @@ export function buildBadges(
     // ── Profile ──
     {
       id: "verified",
-      icon: <Smartphone size={18} color="#6366f1" />,
+      img: imgVerified,
+      icon: <Target size={18} color="#6366f1" />,
       name: "Verified",
       requirement: "Verify your phone via Oro bot",
       unlocked: hasPhone,
     },
     {
       id: "bankrolled",
-      icon: <Building2 size={18} color="#0ea5e9" />,
+      img: imgBankrolled,
+      icon: <Target size={18} color="#0ea5e9" />,
       name: "Bankrolled",
       requirement: "Link your DK Bank account",
       unlocked: hasDK,
     },
     {
       id: "connected",
-      icon: <Link2 size={18} color="#10b981" />,
+      img: imgConnected,
+      icon: <Target size={18} color="#10b981" />,
       name: "Connected",
       requirement: "Link both phone and DK Bank",
       unlocked: hasPhone && hasDK,
     },
     {
       id: "high_score",
-      icon: <BarChart2 size={18} color="#f59e0b" />,
+      img: imgHighScore,
+      icon: <Target size={18} color="#f59e0b" />,
       name: "High Score",
       requirement: "Reach 70%+ reputation score",
       unlocked: score >= 0.7,
@@ -232,21 +271,24 @@ export function buildBadges(
     // ── Referrals ──
     {
       id: "ref_5",
-      icon: <Users size={18} color="#22c55e" />,
+      img: imgConnector,
+      icon: <Target size={18} color="#22c55e" />,
       name: "Connector",
       requirement: "Refer 5 friends to Oro",
       unlocked: referrals >= 5,
     },
     {
       id: "ref_50",
-      icon: <Users size={18} color="#3b82f6" />,
+      img: imgAmbassador,
+      icon: <Target size={18} color="#3b82f6" />,
       name: "Ambassador",
       requirement: "Refer 50 friends to Oro",
       unlocked: referrals >= 50,
     },
     {
       id: "ref_100",
-      icon: <Crown size={18} color="#a855f7" />,
+      img: imgInfluencer,
+      icon: <Target size={18} color="#a855f7" />,
       name: "Influencer",
       requirement: "Refer 100 friends to Oro",
       unlocked: referrals >= 100,
@@ -254,7 +296,8 @@ export function buildBadges(
     // ── The impossible one ──
     {
       id: "ref_1000",
-      icon: <Gem size={20} color="#fff" />,
+      img: imgKingmaker,
+      icon: <Target size={20} color="#fff" />,
       name: "Kingmaker",
       requirement:
         "Refer 1,000 friends — unlocks an animated golden ring on your leaderboard profile",
@@ -264,6 +307,7 @@ export function buildBadges(
     // ── Duels ──
     {
       id: "duel_challenger",
+      img: imgChallenger,
       icon: <Swords size={18} color="#f59e0b" />,
       name: "Challenger",
       requirement: "Get your 1st correct prediction",
@@ -271,20 +315,23 @@ export function buildBadges(
     },
     {
       id: "duel_on_fire",
-      icon: <Flame size={18} color="#f97316" />,
+      img: imgOnFire,
+      icon: <Target size={18} color="#f97316" />,
       name: "On Fire",
       requirement: "Get 3 correct predictions",
       unlocked: correct >= 3,
     },
     {
       id: "duel_master",
-      icon: <Trophy size={18} color="#eab308" />,
+      img: imgDuelMaster,
+      icon: <Target size={18} color="#eab308" />,
       name: "Duel Master",
       requirement: "Get 5 correct predictions",
       unlocked: correct >= 5,
     },
     {
       id: "duel_sharp",
+      img: imgDeadEye,
       icon: <Target size={18} color="#22c55e" />,
       name: "Dead-Eye",
       requirement: "Get 10 correct predictions",
@@ -292,14 +339,16 @@ export function buildBadges(
     },
     {
       id: "duel_pack",
-      icon: <Users size={18} color="#3b82f6" />,
+      img: imgPackLeader,
+      icon: <Target size={18} color="#3b82f6" />,
       name: "Pack Leader",
       requirement: "Make 25 total predictions",
       unlocked: total >= 25,
     },
     {
       id: "duel_oracle",
-      icon: <Crown size={18} color="#a855f7" />,
+      img: imgDuelOracle,
+      icon: <Target size={18} color="#a855f7" />,
       name: "Duel Oracle",
       requirement: "Get 25 correct predictions",
       unlocked: correct >= 25,
@@ -474,6 +523,7 @@ export function BadgeGrid({
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
+                overflow: "hidden",
                 boxShadow:
                   b.legendary && b.unlocked
                     ? "0 0 16px rgba(255,215,0,0.5)"
@@ -489,7 +539,24 @@ export function BadgeGrid({
                     : "none",
               }}
             >
-              {b.unlocked ? b.icon : <Lock size={14} color="#6b7280" />}
+              {b.unlocked ? (
+                b.img ? (
+                  <img
+                    src={b.img}
+                    alt={b.name}
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                      display: "block",
+                    }}
+                  />
+                ) : (
+                  b.icon
+                )
+              ) : (
+                <Lock size={14} color="#6b7280" />
+              )}
             </div>
 
             {/* Name — always readable, not faded out */}
