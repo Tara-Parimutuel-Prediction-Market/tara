@@ -121,9 +121,10 @@ export class ParimutuelEngine implements OnModuleInit {
     try {
       lockToken = await this.redis.acquireLockWithRetry(
         `market:${marketId}`,
-        10,
-        3,
-        150,
+        15, // ttl: 15s (covers slow bets)
+        8, // retries: 8 attempts (was 3)
+        200, // delay: 200ms between retries (was 150ms)
+        // total wait: 8 × 200ms = 1.6s before giving up
       );
     } catch (e: any) {
       if (e?.message === "LOCK_CONTENDED") {

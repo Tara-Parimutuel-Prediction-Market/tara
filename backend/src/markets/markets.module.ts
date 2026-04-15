@@ -20,6 +20,7 @@ import { TelegramModule } from "../telegram/telegram.module";
 import { PaymentModule } from "../payment/payment.module";
 import { UsersModule } from "../users/users.module";
 import { ChallengesModule } from "../challenges/challenges.module";
+import { RedisModule } from "../redis/redis.module";
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { ChallengesModule } from "../challenges/challenges.module";
     TelegramModule,
     PaymentModule,
     UsersModule,
+    RedisModule,
     forwardRef(() => ChallengesModule),
   ],
   providers: [

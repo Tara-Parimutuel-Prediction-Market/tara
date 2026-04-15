@@ -35,20 +35,32 @@ export function useMarketSocket(
   useEffect(() => {
     if (!marketId) return;
 
-    // Derive WS origin from the API base URL (strip /api path if present)
     const socket = io(`${WS_URL}/markets`, {
       query: { marketId },
-      transports: ["websocket"],
+      transports: ["websocket", "polling"], // allow polling fallback
       reconnectionDelay: 2000,
-      reconnectionAttempts: 10,
+      reconnectionAttempts: 20,
     });
 
     socketRef.current = socket;
 
+    socket.on("connect", () => {
+      // Re-emit the marketId room subscription after reconnect
+      // (handshake query is resent automatically by socket.io on reconnect)
+      console.debug(
+        `[WS] connected to market:${marketId} socket id=${socket.id}`,
+      );
+    });
+
     socket.on("market_updated", (payload: MarketUpdate) => {
+      console.debug(`[WS] market_updated for ${payload.marketId}`, payload);
       if (payload.marketId === marketId) {
         setUpdate(payload);
       }
+    });
+
+    socket.on("connect_error", (err) => {
+      console.warn(`[WS] connect_error: ${err.message}`);
     });
 
     return () => {

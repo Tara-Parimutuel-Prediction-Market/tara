@@ -808,22 +808,20 @@ export const MarketDetailPage: FC = () => {
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               {m.outcomes.map((outcome, idx) => {
                 const totalBets = Number(m.totalPool);
+                // Priority:
+                // 1. lmsrProbability  — live WS-updated value (most accurate)
+                // 2. pool ratio       — raw parimutuel share (when LMSR not yet computed)
+                // 3. equal weight     — fallback before any bets
                 const pct =
-                  hasBet &&
-                  outcome.intelligenceProb != null &&
-                  outcome.intelligenceProb > 0
-                    ? outcome.intelligenceProb * 100
-                    : outcome.lmsrProbability != null &&
-                        outcome.lmsrProbability > 0
-                      ? outcome.lmsrProbability * 100
-                      : totalBets > 0
-                        ? (Number(outcome.totalBetAmount) / totalBets) * 100
-                        : 100 / m.outcomes.length;
-                // Raw LMSR for delta display (crowd money) — only relevant post-bet
+                  outcome.lmsrProbability != null && outcome.lmsrProbability > 0
+                    ? outcome.lmsrProbability * 100
+                    : totalBets > 0
+                      ? (Number(outcome.totalBetAmount) / totalBets) * 100
+                      : 100 / m.outcomes.length;
+
+                // Intelligence delta: show expert vs crowd gap (only when hasBet & both values exist)
                 const rawPct =
-                  hasBet &&
-                  outcome.lmsrProbability != null &&
-                  outcome.lmsrProbability > 0
+                  outcome.lmsrProbability != null && outcome.lmsrProbability > 0
                     ? outcome.lmsrProbability * 100
                     : null;
                 const delta =

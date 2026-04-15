@@ -51,6 +51,13 @@ export class MarketsGateway
 
   /** Called after every successful bet placement to push live data to viewers. */
   emitMarketUpdated(payload: MarketUpdatedPayload) {
+    if (!this.server) {
+      this.logger.warn("emitMarketUpdated called before server initialised");
+      return;
+    }
+    this.logger.debug(
+      `Broadcasting market_updated for market:${payload.marketId}`,
+    );
     this.server
       .to(`market:${payload.marketId}`)
       .emit("market_updated", payload);

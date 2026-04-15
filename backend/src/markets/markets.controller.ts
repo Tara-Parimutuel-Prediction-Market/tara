@@ -8,6 +8,9 @@ import {
   Query,
   UseGuards,
   Request,
+  HttpCode,
+  HttpStatus,
+  BadRequestException,
 } from "@nestjs/common";
 import {
   ApiBearerAuth,
@@ -27,6 +30,7 @@ import {
   UpdateMarketDto,
   SubmitDisputeDto,
 } from "./markets.service";
+import { RedisService } from "../redis/redis.service";
 
 @ApiTags("markets")
 @ApiBearerAuth()
@@ -36,6 +40,7 @@ export class MarketsController {
   constructor(
     private marketsService: MarketsService,
     @InjectRepository(User) private userRepo: Repository<User>,
+    private redis: RedisService,
   ) {}
 
   @Get()
@@ -141,11 +146,22 @@ export class MarketsController {
 
   @Post(":id/bets")
   @ApiOperation({ summary: "Place a bet on a market outcome" })
-  placeBet(
+  async placeBet(
     @Param("id") id: string,
     @Body() dto: OpenPositionDto,
     @Request() req: any,
   ) {
+    // Rate limit: max 5 bets per user per 60s across all markets
+    const { allowed } = await this.redis.rateLimit(
+      `bet:${req.user.userId}`,
+      5,
+      60,
+    );
+    if (!allowed) {
+      throw new BadRequestException(
+        "Too many bets placed. Please wait a moment before trying again.",
+      );
+    }
     return this.marketsService.placeBet(req.user.userId, id, dto);
   }
 
