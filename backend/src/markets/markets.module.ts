@@ -15,6 +15,7 @@ import { ParimutuelEngine } from "./parimutuel.engine";
 import { LMSRService } from "./lmsr.service";
 import { KeeperService } from "./keeper.service";
 import { ReputationService } from "./reputation.service";
+import { MarketsGateway } from "./markets.gateway";
 import { TelegramModule } from "../telegram/telegram.module";
 import { PaymentModule } from "../payment/payment.module";
 import { UsersModule } from "../users/users.module";
@@ -44,8 +45,9 @@ import { ChallengesModule } from "../challenges/challenges.module";
     LMSRService,
     KeeperService,
     ReputationService,
+    MarketsGateway,
   ],
   controllers: [MarketsController],
-  exports: [MarketsService, ParimutuelEngine, KeeperService],
+  exports: [MarketsService, ParimutuelEngine, KeeperService, MarketsGateway],
 })
 export class MarketsModule {}

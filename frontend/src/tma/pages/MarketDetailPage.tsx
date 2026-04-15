@@ -1,4 +1,4 @@
-import { FC, useEffect, useState } from "react";
+import { FC, useEffect, useState, useMemo } from "react";
 import { useParams } from "react-router-dom";
 import { Spinner, Placeholder } from "@telegram-apps/telegram-ui";
 import { Page } from "@/tma/components/Page";
@@ -15,6 +15,7 @@ import {
 } from "@/api/client";
 import { Link } from "@/tma/components/Link/Link";
 import { ShareCTA } from "@/tma/components/ShareCTA";
+import { useMarketSocket } from "@/tma/hooks/useMarketSocket";
 
 export const MarketDetailPage: FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -32,6 +33,33 @@ export const MarketDetailPage: FC = () => {
   const [disputeSuccess, setDisputeSuccess] = useState(false);
   const [hasBet, setHasBet] = useState(false);
   const [userBets, setUserBets] = useState<Bet[]>([]);
+
+  // ── Live WebSocket updates ─────────────────────────────────────────────────
+  const liveData = useMarketSocket(id);
+
+  /**
+   * Merge the latest WS snapshot on top of the REST-fetched market so that
+   * totalPool and per-outcome probabilities update in real time without
+   * a full page reload.
+   */
+  const liveMarket = useMemo<Market | null>(() => {
+    if (!market) return null;
+    if (!liveData) return market;
+    return {
+      ...market,
+      totalPool: String(liveData.totalPool),
+      outcomes: market.outcomes.map((o) => {
+        const live = liveData.outcomes.find((lo) => lo.id === o.id);
+        if (!live) return o;
+        return {
+          ...o,
+          totalBetAmount: String(live.totalBetAmount),
+          lmsrProbability: live.lmsrProbability ?? o.lmsrProbability,
+          currentOdds: String(live.currentOdds),
+        } as typeof o;
+      }),
+    };
+  }, [market, liveData]);
 
   useEffect(() => {
     async function load() {
@@ -115,35 +143,42 @@ export const MarketDetailPage: FC = () => {
     );
   }
 
-  const isResolving = market.status === "resolving";
+  const isResolving = (liveMarket ?? market).status === "resolving";
   const isResolved =
-    market.status === "resolved" || market.status === "settled";
+    (liveMarket ?? market).status === "resolved" ||
+    (liveMarket ?? market).status === "settled";
+  // Use liveMarket for all display — falls back to REST data until first WS event
+  const m = liveMarket ?? market;
   const resolvedOutcome =
-    isResolved && market.resolvedOutcomeId
-      ? market.outcomes.find((o) => o.id === market.resolvedOutcomeId)
+    isResolved && m.resolvedOutcomeId
+      ? m.outcomes.find((o) => o.id === m.resolvedOutcomeId)
       : null;
 
   const wonTotalPayout = userBets
-    .filter((b) => b.status === "won" || (isResolved && b.outcomeId === market.resolvedOutcomeId))
+    .filter(
+      (b) =>
+        b.status === "won" ||
+        (isResolved && b.outcomeId === m.resolvedOutcomeId),
+    )
     .reduce((sum, b) => sum + (b.payout || 0), 0);
-  
+
   const hasWon = wonTotalPayout > 0;
 
   const proposedOutcome =
-    isResolving && market.proposedOutcomeId
-      ? market.outcomes.find((o) => o.id === market.proposedOutcomeId)
+    isResolving && m.proposedOutcomeId
+      ? m.outcomes.find((o) => o.id === m.proposedOutcomeId)
       : null;
 
   const disputeTimeLeft = (() => {
-    if (!market.disputeDeadlineAt) return null;
-    const diff = new Date(market.disputeDeadlineAt).getTime() - Date.now();
+    if (!m.disputeDeadlineAt) return null;
+    const diff = new Date(m.disputeDeadlineAt).getTime() - Date.now();
     if (diff <= 0) return "Dispute window closed";
     const h = Math.floor(diff / 3600000);
-    const m = Math.floor((diff % 3600000) / 60000);
-    return `${h}h ${m}m remaining`;
+    const min = Math.floor((diff % 3600000) / 60000);
+    return `${h}h ${min}m remaining`;
   })();
 
-  const isOpen = market.status === "open";
+  const isOpen = m.status === "open";
 
   return (
     <Page back={true}>
@@ -198,7 +233,7 @@ export const MarketDetailPage: FC = () => {
                 fontFamily: "var(--font-display)",
               }}
             >
-              {market.title}
+              {m.title}
             </h1>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
               <div
@@ -215,7 +250,7 @@ export const MarketDetailPage: FC = () => {
                       : "var(--text-muted)",
                 }}
               >
-                {market.status.toUpperCase()}
+                {m.status.toUpperCase()}
               </div>
               <div
                 style={{
@@ -225,12 +260,29 @@ export const MarketDetailPage: FC = () => {
                   fontSize: "0.75rem",
                   fontWeight: 800,
                   color: "var(--text-main)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 5,
                 }}
               >
-                Nu {Number(market.totalPool).toLocaleString()}
+                {liveData && isOpen && (
+                  <span
+                    style={{
+                      width: 7,
+                      height: 7,
+                      borderRadius: "50%",
+                      background: "#22c55e",
+                      display: "inline-block",
+                      boxShadow: "0 0 0 2px rgba(34,197,94,0.3)",
+                      animation: "livePulse 1.5s ease-in-out infinite",
+                      flexShrink: 0,
+                    }}
+                  />
+                )}
+                Nu {Number(m.totalPool).toLocaleString()}
               </div>
             </div>
-            {market.description && (
+            {m.description && (
               <p
                 style={{
                   color: "var(--text-muted)",
@@ -240,7 +292,7 @@ export const MarketDetailPage: FC = () => {
                   fontWeight: 500,
                 }}
               >
-                {market.description}
+                {m.description}
               </p>
             )}
           </div>
@@ -269,11 +321,11 @@ export const MarketDetailPage: FC = () => {
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {[
-                { label: "Created", date: market.createdAt },
-                { label: "Opens", date: market.opensAt },
-                { label: "Closes", date: market.closesAt },
-                ...(market.resolvedAt
-                  ? [{ label: "Resolved", date: market.resolvedAt }]
+                { label: "Created", date: m.createdAt },
+                { label: "Opens", date: m.opensAt },
+                { label: "Closes", date: m.closesAt },
+                ...(m.resolvedAt
+                  ? [{ label: "Resolved", date: m.resolvedAt }]
                   : []),
               ].map(({ label, date }) =>
                 date ? (
@@ -317,7 +369,7 @@ export const MarketDetailPage: FC = () => {
           </div>
 
           {/* Resolution Criteria */}
-          {market.resolutionCriteria && (
+          {m.resolutionCriteria && (
             <div
               style={{
                 background: "var(--bg-card)",
@@ -348,7 +400,7 @@ export const MarketDetailPage: FC = () => {
                   margin: 0,
                 }}
               >
-                {market.resolutionCriteria}
+                {m.resolutionCriteria}
               </p>
             </div>
           )}
@@ -405,7 +457,11 @@ export const MarketDetailPage: FC = () => {
 
           {/* Share CTA for Winner */}
           {resolvedOutcome && hasWon && (
-            <ShareCTA type="win" amount={wonTotalPayout} marketTitle={market.title} />
+            <ShareCTA
+              type="win"
+              amount={wonTotalPayout}
+              marketTitle={m.title}
+            />
           )}
 
           {/* Dispute Section */}
@@ -672,6 +728,10 @@ export const MarketDetailPage: FC = () => {
                 0%   { transform: translateX(-100%); }
                 100% { transform: translateX(250%); }
               }
+              @keyframes livePulse {
+                0%, 100% { opacity: 1; box-shadow: 0 0 0 2px rgba(34,197,94,0.3); }
+                50% { opacity: 0.6; box-shadow: 0 0 0 4px rgba(34,197,94,0.1); }
+              }
             `}</style>
             <div
               style={{
@@ -693,7 +753,7 @@ export const MarketDetailPage: FC = () => {
                 Pick your outcome
               </div>
               {(() => {
-                const meta = (market as any).signalMeta;
+                const meta = (m as any).signalMeta;
                 if (!meta || meta.composite === 0) return null;
                 const c = meta.composite as number;
                 const pct = Math.round(c * 100);
@@ -746,11 +806,8 @@ export const MarketDetailPage: FC = () => {
               })()}
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              {market.outcomes.map((outcome, idx) => {
-                const totalBets = Number(market.totalPool);
-                // After betting: prefer intelligence-weighted prob, then LMSR.
-                // Before betting: use LMSR (avoids 0%/100% on single-bettor markets).
-                // Raw parimutuel ratio is only a last resort when no LMSR is stored.
+              {m.outcomes.map((outcome, idx) => {
+                const totalBets = Number(m.totalPool);
                 const pct =
                   hasBet &&
                   outcome.intelligenceProb != null &&
@@ -761,7 +818,7 @@ export const MarketDetailPage: FC = () => {
                       ? outcome.lmsrProbability * 100
                       : totalBets > 0
                         ? (Number(outcome.totalBetAmount) / totalBets) * 100
-                        : 100 / market.outcomes.length;
+                        : 100 / m.outcomes.length;
                 // Raw LMSR for delta display (crowd money) — only relevant post-bet
                 const rawPct =
                   hasBet &&
@@ -787,7 +844,11 @@ export const MarketDetailPage: FC = () => {
                 return (
                   <Link
                     key={outcome.id}
-                    to={isOpen ? `/dkbank-bet/${market.id}?outcomeId=${outcome.id}` : "#"}
+                    to={
+                      isOpen
+                        ? `/dkbank-bet/${m.id}?outcomeId=${outcome.id}`
+                        : "#"
+                    }
                     style={{ textDecoration: "none", display: "block" }}
                   >
                     <div
@@ -799,7 +860,8 @@ export const MarketDetailPage: FC = () => {
                         border: `1.5px solid ${color}30`,
                         boxShadow: `0 2px 8px rgba(0,0,0,0.18), inset 0 0 0 1px ${color}18`,
                         cursor: isOpen ? "pointer" : "default",
-                        transition: "transform 0.12s ease, box-shadow 0.15s ease",
+                        transition:
+                          "transform 0.12s ease, box-shadow 0.15s ease",
                       }}
                       onMouseDown={(e) => {
                         if (!isOpen) return;
@@ -819,69 +881,95 @@ export const MarketDetailPage: FC = () => {
                       }}
                     >
                       {/* probability fill */}
-                      <div style={{
-                        position: "absolute",
-                        top: 0,
-                        left: 0,
-                        bottom: 0,
-                        width: `${barWidth}%`,
-                        background: `linear-gradient(90deg, ${color}55 0%, ${color}28 60%, transparent 100%)`,
-                        borderRadius: "14px 0 0 14px",
-                        transition: "width 1s ease",
-                        pointerEvents: "none",
-                      }} />
+                      <div
+                        style={{
+                          position: "absolute",
+                          top: 0,
+                          left: 0,
+                          bottom: 0,
+                          width: `${barWidth}%`,
+                          background: `linear-gradient(90deg, ${color}55 0%, ${color}28 60%, transparent 100%)`,
+                          borderRadius: "14px 0 0 14px",
+                          transition: "width 1s ease",
+                          pointerEvents: "none",
+                        }}
+                      />
 
                       {/* shimmer sweep — only on open markets */}
                       {isOpen && (
-                        <div style={{
-                          position: "absolute",
-                          inset: 0,
-                          overflow: "hidden",
-                          borderRadius: 14,
-                          pointerEvents: "none",
-                        }}>
-                          <div style={{
+                        <div
+                          style={{
                             position: "absolute",
-                            top: 0,
-                            bottom: 0,
-                            width: "40%",
-                            background: `linear-gradient(90deg, transparent, ${color}18, transparent)`,
-                            animation: "shimmer-slide 2.4s ease-in-out infinite",
-                          }} />
+                            inset: 0,
+                            overflow: "hidden",
+                            borderRadius: 14,
+                            pointerEvents: "none",
+                          }}
+                        >
+                          <div
+                            style={{
+                              position: "absolute",
+                              top: 0,
+                              bottom: 0,
+                              width: "40%",
+                              background: `linear-gradient(90deg, transparent, ${color}18, transparent)`,
+                              animation:
+                                "shimmer-slide 2.4s ease-in-out infinite",
+                            }}
+                          />
                         </div>
                       )}
 
                       {/* content */}
-                      <div style={{
-                        position: "relative",
-                        padding: "13px 16px",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        gap: 8,
-                      }}>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
-                          <span style={{
-                            fontSize: "0.92rem",
-                            fontWeight: 800,
-                            color: "var(--text-main)",
-                            letterSpacing: "-0.01em",
-                            whiteSpace: "nowrap",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                          }}>
+                      <div
+                        style={{
+                          position: "relative",
+                          padding: "13px 16px",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          gap: 8,
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 3,
+                            minWidth: 0,
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontSize: "0.92rem",
+                              fontWeight: 800,
+                              color: "var(--text-main)",
+                              letterSpacing: "-0.01em",
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                            }}
+                          >
                             {outcome.label}
                           </span>
                           {signal != null && hasBet && (
-                            <span style={{
-                              fontSize: "0.65rem",
-                              fontWeight: 700,
-                              color: "#f59e0b",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 3,
-                            }}>
-                              <svg width="8" height="8" viewBox="0 0 24 24" fill="#f59e0b" stroke="none">
+                            <span
+                              style={{
+                                fontSize: "0.65rem",
+                                fontWeight: 700,
+                                color: "#f59e0b",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 3,
+                              }}
+                            >
+                              <svg
+                                width="8"
+                                height="8"
+                                viewBox="0 0 24 24"
+                                fill="#f59e0b"
+                                stroke="none"
+                              >
                                 <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
                               </svg>
                               Experts {Math.round(signal * 100)}%
@@ -889,39 +977,53 @@ export const MarketDetailPage: FC = () => {
                           )}
                         </div>
 
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                            flexShrink: 0,
+                          }}
+                        >
                           {delta !== null && delta !== 0 && (
-                            <span style={{
-                              fontSize: "0.65rem",
-                              fontWeight: 700,
-                              color: delta > 0 ? "#22c55e" : "#ef4444",
-                            }}>
-                              {delta > 0 ? "+" : ""}{delta}%
+                            <span
+                              style={{
+                                fontSize: "0.65rem",
+                                fontWeight: 700,
+                                color: delta > 0 ? "#22c55e" : "#ef4444",
+                              }}
+                            >
+                              {delta > 0 ? "+" : ""}
+                              {delta}%
                             </span>
                           )}
-                          <div style={{
-                            background: `${color}22`,
-                            border: `1.5px solid ${color}50`,
-                            color: color,
-                            fontSize: "1rem",
-                            fontWeight: 900,
-                            padding: "4px 14px",
-                            borderRadius: 99,
-                            letterSpacing: "-0.01em",
-                          }}>
+                          <div
+                            style={{
+                              background: `${color}22`,
+                              border: `1.5px solid ${color}50`,
+                              color: color,
+                              fontSize: "1rem",
+                              fontWeight: 900,
+                              padding: "4px 14px",
+                              borderRadius: 99,
+                              letterSpacing: "-0.01em",
+                            }}
+                          >
                             {pct.toFixed(0)}%
                           </div>
                           {isOpen && (
-                            <div style={{
-                              background: color,
-                              color: "#fff",
-                              fontSize: "0.65rem",
-                              fontWeight: 800,
-                              padding: "4px 10px",
-                              borderRadius: 99,
-                              letterSpacing: "0.06em",
-                              textTransform: "uppercase",
-                            }}>
+                            <div
+                              style={{
+                                background: color,
+                                color: "#fff",
+                                fontSize: "0.65rem",
+                                fontWeight: 800,
+                                padding: "4px 10px",
+                                borderRadius: 99,
+                                letterSpacing: "0.06em",
+                                textTransform: "uppercase",
+                              }}
+                            >
                               Predict
                             </div>
                           )}

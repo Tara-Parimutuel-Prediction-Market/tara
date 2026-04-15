@@ -40,6 +40,7 @@ describe("ParimutuelEngine.calcOdds", () => {
       bypassConfigService,
       null as any,
       null as any, // challengesService
+      null as any, // marketsGateway
     );
   });
 
@@ -144,6 +145,7 @@ describe("ParimutuelEngine.placePosition — pre-flight guards", () => {
       bypassConfigService,
       null as any,
       null as any, // challengesService
+      null as any, // marketsGateway
     );
     await expect(engine.placePosition("u1", "m1", "o1", 0)).rejects.toThrow(
       BadRequestException,
@@ -210,6 +212,7 @@ describe("ParimutuelEngine.placePosition — pre-flight guards", () => {
       bypassConfigService,
       null as any,
       null as any,
+      null as any, // marketsGateway
     );
 
     await expect(engine.placePosition("u1", "m1", "o1", 100)).rejects.toThrow(
@@ -274,6 +277,7 @@ describe("ParimutuelEngine.placePosition — pre-flight guards", () => {
       bypassConfigService,
       null as any,
       null as any,
+      null as any, // marketsGateway
     );
 
     await expect(engine.placePosition("u1", "m1", "o1", 100)).rejects.toThrow(
@@ -348,6 +352,7 @@ describe("ParimutuelEngine.placePosition — pre-flight guards", () => {
       bypassConfigService,
       null as any,
       null as any,
+      null as any, // marketsGateway
     );
 
     await expect(engine.placePosition("u1", "m1", "o1", 100)).rejects.toThrow(
@@ -422,6 +427,7 @@ describe("ParimutuelEngine.placePosition — pre-flight guards", () => {
       bypassConfigService,
       null as any,
       null as any,
+      null as any, // marketsGateway
     );
 
     await expect(engine.placePosition("u2", "m1", "o2", 100)).rejects.toThrow(
@@ -502,6 +508,7 @@ describe("ParimutuelEngine.placePosition — pre-flight guards", () => {
       bypassConfigService,
       null as any,
       null as any,
+      null as any, // marketsGateway
     );
 
     // Should NOT throw — duel is OPEN, not ACTIVE

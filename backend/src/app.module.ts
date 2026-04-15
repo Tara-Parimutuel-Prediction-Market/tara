@@ -49,6 +49,15 @@ import { LeaguesModule } from "./leagues/leagues.module";
             port: parseInt(parsed.port || "6379", 10),
             password: parsed.password || undefined,
           },
+          defaultJobOptions: {
+            attempts: 3,
+            backoff: {
+              type: "exponential",
+              delay: 5000, // 5s → 10s → 20s
+            },
+            removeOnComplete: 100, // keep last 100 completed jobs
+            removeOnFail: 200, // keep last 200 failed jobs for inspection
+          },
         };
       },
     }),

@@ -19,6 +19,7 @@ import { Challenge, ChallengeStatus } from "../entities/challenge.entity";
 import { User } from "../entities/user.entity";
 import { LMSRService } from "./lmsr.service";
 import { ReputationService } from "./reputation.service";
+import { MarketsGateway } from "./markets.gateway";
 import { TelegramSimpleService } from "../telegram/telegram.service.simple";
 import { DKGatewayService } from "../payment/services/dk-gateway/dk-gateway.service";
 import { StreakService, STREAK_BONUS_MULT } from "../users/streak.service";
@@ -64,6 +65,7 @@ export class ParimutuelEngine implements OnModuleInit {
     private configService: ConfigService,
     private streakService: StreakService,
     private challengesService: ChallengesService,
+    private marketsGateway: MarketsGateway,
   ) {}
 
   private async getCreditsBalance(
@@ -309,6 +311,28 @@ export class ParimutuelEngine implements OnModuleInit {
             `Failed to send bet placement notification: ${err.message}`,
           );
         });
+
+        // ── Broadcast live market update via WebSocket ──────────────────
+        try {
+          const updatedMarket = await this.marketRepo.findOne({
+            where: { id: marketId },
+            relations: ["outcomes"],
+          });
+          if (updatedMarket) {
+            this.marketsGateway.emitMarketUpdated({
+              marketId: updatedMarket.id,
+              totalPool: Number(updatedMarket.totalPool),
+              outcomes: updatedMarket.outcomes.map((o) => ({
+                id: o.id,
+                totalBetAmount: Number(o.totalBetAmount),
+                lmsrProbability: o.lmsrProbability ?? null,
+                currentOdds: Number(o.currentOdds),
+              })),
+            });
+          }
+        } catch (err: any) {
+          this.logger.warn(`WS broadcast failed: ${err.message}`);
+        }
       }
 
       // ── Update daily bet streak (non-blocking) ───────────────────────────
