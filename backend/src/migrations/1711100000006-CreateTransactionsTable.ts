@@ -5,7 +5,22 @@ export class CreateTransactionsTable1711100000006 implements MigrationInterface 
     await queryRunner.query(`
       DO $$ BEGIN
         CREATE TYPE "transactions_type_enum" AS ENUM (
-          'deposit', 'withdrawal', 'bet_placed', 'bet_payout', 'refund', 'dispute_bond', 'dispute_refund'
+          'deposit',
+          'withdrawal',
+          'bet_placed',
+          'bet_payout',
+          'refund',
+          'dispute_bond',
+          'dispute_refund',
+          'referral_bonus',
+          'free_credit',
+          'streak_bonus',
+          'referral_prize',
+          'duel_wager',
+          'duel_payout',
+          'dispute_bond_lock',
+          'dispute_bond_forfeit',
+          'dispute_bond_reward'
         );
       EXCEPTION
         WHEN duplicate_object THEN null;
@@ -14,16 +29,17 @@ export class CreateTransactionsTable1711100000006 implements MigrationInterface 
 
     await queryRunner.query(`
       CREATE TABLE IF NOT EXISTS "transactions" (
-        "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
-        "type" transactions_type_enum NOT NULL,
-        "amount" numeric(20,9) NOT NULL,
-        "balanceBefore" numeric(20,9) NOT NULL,
-        "balanceAfter" numeric(20,9) NOT NULL,
-        "paymentId" uuid,
-        "positionId" uuid,
-        "note" character varying,
-        "createdAt" TIMESTAMP NOT NULL DEFAULT now(),
-        "userId" uuid NOT NULL,
+        "id"            uuid                       NOT NULL DEFAULT uuid_generate_v4(),
+        "type"          transactions_type_enum     NOT NULL,
+        "amount"        numeric(20,9)              NOT NULL,
+        "balanceBefore" numeric(20,9)              NOT NULL,
+        "balanceAfter"  numeric(20,9)              NOT NULL,
+        "paymentId"     uuid,
+        "positionId"    uuid,
+        "isBonus"       boolean                    NOT NULL DEFAULT false,
+        "note"          character varying,
+        "createdAt"     TIMESTAMP                  NOT NULL DEFAULT now(),
+        "userId"        uuid                       NOT NULL,
         CONSTRAINT "PK_transactions" PRIMARY KEY ("id"),
         CONSTRAINT "FK_transactions_userId" FOREIGN KEY ("userId") REFERENCES "users" ("id") ON DELETE CASCADE
       )

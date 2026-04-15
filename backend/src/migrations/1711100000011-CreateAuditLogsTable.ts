@@ -2,23 +2,21 @@ import type { MigrationInterface, QueryRunner } from "typeorm";
 
 export class CreateAuditLogsTable1711100000011 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
-    // Create enum type for roleType
-    await queryRunner.query(`
-      CREATE TYPE "role_type_enum" AS ENUM ('admin', 'user')
-    `);
-
+    // roleType is a plain varchar (role_type_enum was introduced then dropped in
+    // migration 1775975312802-AddChallengesTable — created as varchar from the start
+    // to avoid that churn on fresh databases).
     await queryRunner.query(`
       CREATE TABLE IF NOT EXISTS "audit_logs" (
-        "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
-        "adminId" character varying NOT NULL,
-        "username" character varying,
-        "roleType" role_type_enum NOT NULL DEFAULT 'admin',
-        "action" character varying NOT NULL,
+        "id"         uuid              NOT NULL DEFAULT uuid_generate_v4(),
+        "adminId"    character varying NOT NULL,
+        "username"   character varying,
+        "roleType"   character varying NOT NULL DEFAULT 'admin',
+        "action"     character varying NOT NULL,
         "entityType" character varying,
-        "entityId" character varying,
-        "payload" jsonb,
-        "ipAddress" character varying,
-        "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+        "entityId"   character varying,
+        "payload"    jsonb,
+        "ipAddress"  character varying,
+        "createdAt"  TIMESTAMP         NOT NULL DEFAULT now(),
         CONSTRAINT "PK_audit_logs" PRIMARY KEY ("id")
       )
     `);
@@ -30,6 +28,5 @@ export class CreateAuditLogsTable1711100000011 implements MigrationInterface {
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`DROP TABLE IF EXISTS "audit_logs"`);
-    await queryRunner.query(`DROP TYPE IF EXISTS "role_type_enum"`);
   }
 }
