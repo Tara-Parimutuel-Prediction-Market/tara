@@ -25,7 +25,7 @@ export const AppDataSource = new DataSource({
   port: Number(process.env.DB_PORT) || 5433,
   username: process.env.DB_USERNAME || "postgres",
   password: process.env.DB_PASSWORD || "postgres",
-  database: process.env.DB_NAME || "tara_db",
+  database: process.env.DB_NAME || "oro_db",
   synchronize: false,
   logging: true,
   extra: {

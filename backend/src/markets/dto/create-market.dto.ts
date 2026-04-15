@@ -8,6 +8,7 @@ import {
   Min,
   Max,
 } from "class-validator";
+import { Transform } from "class-transformer";
 
 export class CreateMarketDto {
   @ApiProperty() @IsString() title: string;
@@ -35,6 +36,19 @@ export class CreateMarketDto {
   })
   @IsArray()
   @IsString({ each: true })
+  @Transform(({ value }) => {
+    // If outcomes is an array of objects with a 'label' property, extract the labels
+    if (
+      Array.isArray(value) &&
+      value.length > 0 &&
+      typeof value[0] === "object" &&
+      value[0].label
+    ) {
+      return value.map((item: any) => item.label);
+    }
+    // Otherwise, return as-is (should be array of strings)
+    return value;
+  })
   outcomes: string[];
 
   /** football-data.org match ID — set when creating a market from a fixture */

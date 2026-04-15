@@ -71,7 +71,7 @@ import { LeaguesModule } from "./leagues/leagues.module";
         port: config.get<number>("DB_PORT", 5432),
         username: config.get("DB_USERNAME", "postgres"),
         password: config.get("DB_PASSWORD", "postgres"),
-        database: config.get("DB_NAME", "tara_db"),
+        database: config.get("DB_NAME", "oro_db"),
         entities: [
           User,
           AuthMethod,

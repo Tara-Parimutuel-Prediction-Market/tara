@@ -375,7 +375,7 @@ export class UsersController {
         .createQueryBuilder("u")
         .where("u.totalPredictions > 0")
         .andWhere(
-          "(u.reputationScore > (SELECT reputationScore FROM users WHERE id = :myId) OR (u.reputationScore = (SELECT reputationScore FROM users WHERE id = :myId) AND u.correctPredictions > (SELECT correctPredictions FROM users WHERE id = :myId)))",
+          '(u.reputationScore > (SELECT "reputationScore" FROM users WHERE id = :myId) OR (u.reputationScore = (SELECT "reputationScore" FROM users WHERE id = :myId) AND u.correctPredictions > (SELECT "correctPredictions" FROM users WHERE id = :myId)))',
           { myId },
         )
         .getCount();

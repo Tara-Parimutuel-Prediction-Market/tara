@@ -157,7 +157,7 @@ export class AuthService {
             balanceAfter: 20,
             userId: user.id,
             isBonus: true,
-            note: "🎉 Welcome bonus — free Nu 20 to make your first prediction!",
+            note: "Welcome bonus — free Nu 20 to make your first prediction!",
           }),
         );
         await this.userRepo.update(user.id, {

@@ -278,11 +278,11 @@ export const BetShareCard: FC<BetShareCardProps> = (props) => {
     try {
       // Strategy 1: Native share with image file (works in Telegram mobile)
       if (blob && navigator.share && navigator.canShare) {
-        const file = new File([blob], "tara-bet.png", { type: "image/png" });
+        const file = new File([blob], "oro-bet.png", { type: "image/png" });
         if (navigator.canShare({ files: [file] })) {
           await navigator.share({
             files: [file],
-            title: "My Tara Bet",
+            title: "My Oro Bet",
             text: shareText,
           });
           return;
@@ -311,7 +311,7 @@ export const BetShareCard: FC<BetShareCardProps> = (props) => {
     if (!blobUrl) return;
     const a = document.createElement("a");
     a.href = blobUrl;
-    a.download = "tara-bet.png";
+    a.download = "oro-bet.png";
     a.click();
   };
 

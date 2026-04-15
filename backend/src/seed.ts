@@ -17,7 +17,7 @@ const ds = new DataSource({
   port: Number(process.env.DB_PORT) || 5432,
   username: process.env.DB_USERNAME || "postgres",
   password: process.env.DB_PASSWORD || "postgres",
-  database: process.env.DB_NAME || "tara_db",
+  database: process.env.DB_NAME || "oro_db",
   synchronize: false,
   entities: [__dirname + "/entities/*.entity.{ts,js}"],
 });
