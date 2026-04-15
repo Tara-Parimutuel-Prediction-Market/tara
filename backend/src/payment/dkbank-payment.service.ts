@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { randomBytes, timingSafeEqual } from "crypto";
-import { InjectRepository } from "@nestjs/typeorm";
+import { InjectRepository, InjectDataSource } from "@nestjs/typeorm";
 import { ConfigService } from "@nestjs/config";
 import { DataSource, Repository } from "typeorm";
 
@@ -82,7 +82,7 @@ export class DKBankPaymentService {
   private readonly logger = new Logger(DKBankPaymentService.name);
 
   constructor(
-    private readonly dataSource: DataSource,
+    @InjectDataSource() private readonly dataSource: DataSource,
     private readonly dkGateway: DKGatewayService,
     private readonly configService: ConfigService,
     private readonly redis: RedisService,
@@ -646,7 +646,9 @@ export class DKBankPaymentService {
         if (user?.referredByUserId) {
           const priorDepositCount = await em
             .getRepository(Transaction)
-            .count({ where: { userId: params.userId, type: TransactionType.DEPOSIT } });
+            .count({
+              where: { userId: params.userId, type: TransactionType.DEPOSIT },
+            });
 
           // priorDepositCount is now 1 (the one we just saved) — so 1 means first deposit
           if (priorDepositCount === 1) {

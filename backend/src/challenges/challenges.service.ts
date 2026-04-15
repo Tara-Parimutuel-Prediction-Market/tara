@@ -3,7 +3,7 @@ import {
   BadRequestException,
   NotFoundException,
 } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
+import { InjectRepository, InjectDataSource } from "@nestjs/typeorm";
 import { Repository, DataSource } from "typeorm";
 import {
   Challenge,
@@ -34,7 +34,7 @@ export class ChallengesService {
     private positionRepo: Repository<Position>,
     @InjectRepository(Market)
     private marketRepo: Repository<Market>,
-    private dataSource: DataSource,
+    @InjectDataSource() private dataSource: DataSource,
   ) {}
 
   // ── Balance helper ─────────────────────────────────────────────────────────

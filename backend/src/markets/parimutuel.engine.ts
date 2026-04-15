@@ -4,7 +4,7 @@ import {
   Logger,
   OnModuleInit,
 } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
+import { InjectRepository, InjectDataSource } from "@nestjs/typeorm";
 import { ConfigService } from "@nestjs/config";
 import { Repository, DataSource, In } from "typeorm";
 import { RedisService } from "../redis/redis.service";
@@ -56,7 +56,7 @@ export class ParimutuelEngine implements OnModuleInit {
     @InjectRepository(Settlement)
     private settlementRepo: Repository<Settlement>,
     @InjectRepository(Dispute) private disputeRepo: Repository<Dispute>,
-    private dataSource: DataSource,
+    @InjectDataSource() private dataSource: DataSource,
     private lmsrService: LMSRService,
     private redis: RedisService,
     private reputationService: ReputationService,

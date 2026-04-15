@@ -3,7 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
 } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
+import { InjectRepository, InjectDataSource } from "@nestjs/typeorm";
 import { Repository, DataSource } from "typeorm";
 import { RedisService } from "../redis/redis.service";
 import { CreateMarketDto } from "./dto/create-market.dto";
@@ -40,7 +40,7 @@ export class MarketsService {
     @InjectRepository(User) private userRepo: Repository<User>,
     private engine: ParimutuelEngine,
     private lmsrService: LMSRService,
-    private dataSource: DataSource,
+    @InjectDataSource() private dataSource: DataSource,
     private redis: RedisService,
     private reputationService: ReputationService,
     private telegram: TelegramSimpleService,

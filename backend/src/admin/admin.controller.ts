@@ -21,7 +21,7 @@ import {
   ApiQuery,
   ApiProperty,
 } from "@nestjs/swagger";
-import { InjectRepository } from "@nestjs/typeorm";
+import { InjectRepository, InjectDataSource } from "@nestjs/typeorm";
 import { IsNumber, IsOptional, IsString, Min } from "class-validator";
 import { Repository, DataSource } from "typeorm";
 import { JwtAuthGuard, AdminGuard } from "../auth/guards";
@@ -73,7 +73,7 @@ export class AdminController {
     private fixturesService: FixturesService,
     private auditService: AuditService,
     private telegramSimple: TelegramSimpleService,
-    private dataSource: DataSource,
+    @InjectDataSource() private dataSource: DataSource,
     private redis: RedisService,
     @InjectRepository(Settlement)
     private settlementRepo: Repository<Settlement>,

@@ -1,6 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { Cron, CronExpression } from "@nestjs/schedule";
-import { InjectRepository } from "@nestjs/typeorm";
+import { InjectRepository, InjectDataSource } from "@nestjs/typeorm";
 import { LessThan, Repository } from "typeorm";
 import { Market, MarketStatus } from "../entities/market.entity";
 import { Dispute } from "../entities/dispute.entity";
@@ -30,7 +30,7 @@ export class AutoResolveMarketsJob {
     @InjectRepository(Dispute) private disputeRepo: Repository<Dispute>,
     @InjectRepository(AuditLog) private auditRepo: Repository<AuditLog>,
     private engine: ParimutuelEngine,
-    private dataSource: DataSource,
+    @InjectDataSource() private dataSource: DataSource,
   ) {}
 
   /**

@@ -1,5 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
+import { InjectRepository, InjectDataSource } from "@nestjs/typeorm";
 import { Repository, DataSource } from "typeorm";
 import { User } from "../entities/user.entity";
 import { Transaction, TransactionType } from "../entities/transaction.entity";
@@ -23,7 +23,7 @@ export class StreakService {
     @InjectRepository(User) private userRepo: Repository<User>,
     @InjectRepository(Transaction)
     private transactionRepo: Repository<Transaction>,
-    private dataSource: DataSource,
+    @InjectDataSource() private dataSource: DataSource,
   ) {}
 
   /**
