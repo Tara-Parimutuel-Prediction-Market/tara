@@ -25,7 +25,8 @@ import {
   Target,
   BarChart2,
   Trophy,
-  Sword
+  Sword,
+  ClipboardList,
 } from "lucide-react";
 
 const BOT_USERNAME = "OroPredictBot";
@@ -75,7 +76,7 @@ function HowItWorksModal({ onClose }: { onClose: () => void }) {
       style={{
         position: "fixed",
         inset: 0,
-        zIndex: 200,
+        zIndex: 1100,
         background: "rgba(0,0,0,0.7)",
         display: "flex",
         flexDirection: "column",
@@ -90,7 +91,7 @@ function HowItWorksModal({ onClose }: { onClose: () => void }) {
           borderRadius: "20px 20px 0 0",
           maxHeight: "88vh",
           overflowY: "auto",
-          padding: "0 0 40px",
+          padding: "0 0 calc(env(safe-area-inset-bottom) + 80px)",
         }}
       >
         {/* Handle + header */}
@@ -810,6 +811,19 @@ export const TmaSettingsPage: FC = () => {
             label="How It Works"
             value="Quick guide to getting started"
             onClick={() => setShowHowItWorks(true)}
+          >
+            <ChevronLeft
+              size={15}
+              color="var(--text-subtle)"
+              style={{ transform: "rotate(180deg)" }}
+            />
+          </SettingsRow>
+
+          <SettingsRow
+            icon={<ClipboardList size={17} />}
+            label="Resolution Record"
+            value="All settled markets & outcomes"
+            onClick={() => navigate("/resolved")}
           >
             <ChevronLeft
               size={15}

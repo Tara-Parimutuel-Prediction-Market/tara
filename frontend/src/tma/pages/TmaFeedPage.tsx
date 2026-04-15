@@ -1,4 +1,4 @@
-import { FC, useState, useEffect } from "react";
+import { FC, useState, useEffect, useRef, useCallback } from "react";
 import { Spinner } from "@telegram-apps/telegram-ui";
 import { Page } from "@/tma/components/Page";
 import {
@@ -866,6 +866,8 @@ function MarketCard({
 
 // ── Feed page ─────────────────────────────────────────────────────────────────
 
+const PAGE_SIZE = 5;
+
 interface ActiveBet {
   marketId: string;
   outcomeId: string;
@@ -877,10 +879,36 @@ export const TmaFeedPage: FC = () => {
   const [loading, setLoading] = useState(true);
   const [activeBet, setActiveBet] = useState<ActiveBet | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   // Set of marketIds where the current user already has a position
   const [bettedMarketIds, setBettedMarketIds] = useState<Set<string>>(
     new Set(),
   );
+
+  const loadMore = useCallback(() => {
+    setVisibleCount((c) => c + PAGE_SIZE);
+  }, []);
+
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+
+  // IntersectionObserver: load next page when sentinel scrolls into view
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) loadMore();
+      },
+      { threshold: 0.1 },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }); // no dep array — re-runs every render so it always picks up the latest sentinel el
+
+  // Reset visible count whenever the search query changes
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [searchQuery]);
 
   useEffect(() => {
     getMarkets()
@@ -1002,6 +1030,11 @@ export const TmaFeedPage: FC = () => {
   );
   const filteredResolving = filterByQuery(resolvingMarkets);
   const filteredUpcoming = filterByQuery(upcomingMarkets);
+
+  // All cards in display order: resolving → open → upcoming
+  const allCards = [...filteredResolving, ...filteredOpen, ...filteredUpcoming];
+  const visibleCards = allCards.slice(0, visibleCount);
+  const hasMore = visibleCount < allCards.length;
 
   const HOT_THRESHOLD = 1000;
   const trendingMarkets = openMarkets
@@ -1247,146 +1280,148 @@ export const TmaFeedPage: FC = () => {
           </div>
         )}
 
+        {/* ── Section headers (shown once, above the lazy list) ── */}
         {filteredResolving.length > 0 && (
-          <div style={{ marginBottom: 28 }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              marginBottom: 12,
+              paddingLeft: 4,
+            }}
+          >
             <div
               style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                marginBottom: 12,
-                paddingLeft: 4,
+                width: 8,
+                height: 8,
+                borderRadius: "50%",
+                background: "#f59e0b",
+              }}
+            />
+            <div
+              style={{
+                fontSize: 12,
+                fontWeight: 800,
+                color: "var(--text-main)",
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
               }}
             >
-              <div
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: "50%",
-                  background: "#f59e0b",
-                }}
-              />
-              <div
-                style={{
-                  fontSize: 12,
-                  fontWeight: 800,
-                  color: "var(--text-main)",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.05em",
-                }}
-              >
-                WAITING
-              </div>
+              WAITING
             </div>
-            {filteredResolving.map((market) => (
-              <MarketCard
-                key={market.id}
-                market={market}
-                hasBet={bettedMarketIds.has(market.id)}
-                telegramId={user?.telegramId}
-                userName={
-                  user?.username
-                    ? `@${user.username}`
-                    : (user?.firstName ?? null)
-                }
-                userPhotoUrl={user?.photoUrl ?? null}
-                onBet={(outcomeId) =>
-                  setActiveBet({ marketId: market.id, outcomeId })
-                }
-              />
-            ))}
           </div>
         )}
 
-        {filteredOpen.length > 0 && (
-          <div style={{ marginBottom: 28 }}>
+        {filteredResolving.length === 0 && filteredOpen.length > 0 && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              marginBottom: 12,
+              paddingLeft: 4,
+              overflow: "hidden",
+            }}
+          >
             <div
               style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                marginBottom: 12,
-                paddingLeft: 4,
-                overflow: "hidden",
+                width: 8,
+                height: 8,
+                borderRadius: "50%",
+                background: "#22c55e",
+                animation: "heartbeat 2.4s ease-in-out infinite",
+              }}
+            />
+            <div
+              style={{
+                fontSize: 12,
+                fontWeight: 800,
+                color: "var(--text-main)",
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
               }}
             >
-              <div
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: "50%",
-                  background: "#22c55e",
-                  animation: "heartbeat 2.4s ease-in-out infinite",
-                }}
-              />
-              <div
-                style={{
-                  fontSize: 12,
-                  fontWeight: 800,
-                  color: "var(--text-main)",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.05em",
-                }}
-              >
-                LIVE
-              </div>
-              <LiveTicker />
+              LIVE
             </div>
-
-            {filteredOpen.map((market) => (
-              <MarketCard
-                key={market.id}
-                market={market}
-                hasBet={bettedMarketIds.has(market.id)}
-                telegramId={user?.telegramId}
-                userName={
-                  user?.username
-                    ? `@${user.username}`
-                    : (user?.firstName ?? null)
-                }
-                userPhotoUrl={user?.photoUrl ?? null}
-                onBet={(outcomeId) =>
-                  setActiveBet({ marketId: market.id, outcomeId })
-                }
-              />
-            ))}
+            <LiveTicker />
           </div>
         )}
 
-        {filteredUpcoming.length > 0 && (
-          <div style={{ marginBottom: 28 }}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                marginBottom: 12,
-                paddingLeft: 4,
-              }}
-            >
-              <div
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: "50%",
-                  background: "#94a3b8",
-                }}
-              />
-              <div
-                style={{
-                  fontSize: 12,
-                  fontWeight: 800,
-                  color: "var(--text-main)",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.05em",
-                }}
-              >
-                SOON
-              </div>
-            </div>
-            {filteredUpcoming.map((market) => (
+        {/* ── Lazy-rendered card list ── */}
+        {visibleCards.map((market) => {
+          // Insert section dividers between groups
+          const isFirstOpen =
+            market === filteredOpen[0] && filteredResolving.length > 0;
+          const isFirstUpcoming = market === filteredUpcoming[0];
+          return (
+            <div key={market.id}>
+              {isFirstOpen && (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    margin: "4px 0 12px",
+                    paddingLeft: 4,
+                    overflow: "hidden",
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: "50%",
+                      background: "#22c55e",
+                      animation: "heartbeat 2.4s ease-in-out infinite",
+                    }}
+                  />
+                  <div
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 800,
+                      color: "var(--text-main)",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                    }}
+                  >
+                    LIVE
+                  </div>
+                  <LiveTicker />
+                </div>
+              )}
+              {isFirstUpcoming && (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    margin: "4px 0 12px",
+                    paddingLeft: 4,
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: "50%",
+                      background: "#94a3b8",
+                    }}
+                  />
+                  <div
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 800,
+                      color: "var(--text-main)",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                    }}
+                  >
+                    SOON
+                  </div>
+                </div>
+              )}
               <MarketCard
-                key={market.id}
                 market={market}
                 hasBet={bettedMarketIds.has(market.id)}
                 telegramId={user?.telegramId}
@@ -1400,7 +1435,40 @@ export const TmaFeedPage: FC = () => {
                   setActiveBet({ marketId: market.id, outcomeId })
                 }
               />
-            ))}
+            </div>
+          );
+        })}
+
+        {/* ── Sentinel: triggers loading the next page when scrolled into view ── */}
+        {hasMore && (
+          <div
+            ref={sentinelRef}
+            style={{
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              padding: "24px 0",
+              gap: 8,
+              color: "var(--text-subtle)",
+              fontSize: 12,
+              fontWeight: 600,
+            }}
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              style={{ animation: "spin 1s linear infinite" }}
+            >
+              <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+            </svg>
+            Loading more…
+            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
           </div>
         )}
       </div>
