@@ -9,6 +9,7 @@ import { Repository } from "typeorm";
 import { ConfigService } from "@nestjs/config";
 import { TelegramSimpleService } from "../telegram/telegram.service.simple";
 import { TelegramVerificationService } from "../telegram/telegram-verification.service";
+import { LeaguesService } from "../leagues/leagues.service";
 import { User } from "../entities/user.entity";
 import { Market, MarketStatus } from "../entities/market.entity";
 import { Outcome } from "../entities/outcome.entity";
@@ -44,6 +45,7 @@ export class BotPollingService
     private readonly config: ConfigService,
     private readonly telegramSimple: TelegramSimpleService,
     private readonly telegramVerification: TelegramVerificationService,
+    private readonly leaguesService: LeaguesService,
     @InjectRepository(User) private readonly userRepo: Repository<User>,
     @InjectRepository(Market) private readonly marketRepo: Repository<Market>,
     @InjectRepository(Outcome)
@@ -143,7 +145,11 @@ export class BotPollingService
         const params = new URLSearchParams({
           offset: String(this.offset),
           timeout: "30",
-          allowed_updates: JSON.stringify(["message", "callback_query"]),
+          allowed_updates: JSON.stringify([
+            "message",
+            "callback_query",
+            "my_chat_member",
+          ]),
         });
         const res = await fetch(
           `https://api.telegram.org/bot${this.botToken}/getUpdates?${params}`,
@@ -183,6 +189,9 @@ export class BotPollingService
   // ── Shared dispatcher (same logic as BotController.handleWebhook) ─────────
 
   async dispatch(update: any) {
+    if (update.my_chat_member) {
+      await this.handleMyChatMember(update.my_chat_member);
+    }
     if (update.message) {
       await this.handleMessage(update.message);
     }
@@ -269,14 +278,24 @@ export class BotPollingService
           await this.handlePredictCommand(chatId, message.from.id);
           break;
 
+        case "/standings":
+          await this.handleStandingsCommand(chatId, message.from?.id);
+          break;
+
+        case "/mystats":
+          await this.handleMyStatsCommand(chatId, message.from?.id);
+          break;
+
         case "/help":
           await this.telegramSimple.sendMessage(
             chatId,
             "🔧 <b>Available commands:</b>\n" +
-              "/start   - Welcome message\n" +
-              "/verify  - Link your DK Bank phone for secure payments\n" +
-              "/predict - View active markets\n" +
-              "/help    - Show this message",
+              "/start      - Welcome message\n" +
+              "/verify     - Link your DK Bank phone for secure payments\n" +
+              "/predict    - View active markets\n" +
+              "/standings  - Group prediction leaderboard\n" +
+              "/mystats    - Your rank in this group\n" +
+              "/help       - Show this message",
           );
           break;
 
@@ -286,6 +305,126 @@ export class BotPollingService
             "❓ Unknown command. Use /help to see available commands.",
           );
       }
+    }
+  }
+
+  // ── Group standings/stats commands ──────────────────────────────────────
+
+  /** Guard: returns true if the user is an Oro member of this group chat. */
+  private async assertGroupMember(
+    chatId: number,
+    telegramUserId?: number,
+  ): Promise<boolean> {
+    if (!telegramUserId) return false;
+    const chatType = "group"; // these commands only make sense in groups — always check
+    const isMember = await this.leaguesService.isGroupMember(
+      String(chatId),
+      String(telegramUserId),
+    );
+    if (!isMember) {
+      await this.telegramSimple.sendMessage(
+        chatId,
+        "🔒 <b>Oro members only</b>\n\n" +
+          "This command is available to users who have made at least one prediction on Oro.\n\n" +
+          "👉 Open the Oro mini app, make a prediction, then try again!",
+      );
+    }
+    return isMember;
+  }
+
+  private async handleStandingsCommand(
+    chatId: number,
+    telegramUserId?: number,
+  ): Promise<void> {
+    if (!(await this.assertGroupMember(chatId, telegramUserId))) return;
+    await this.leaguesService.postStandingsToGroup(String(chatId));
+  }
+
+  private async handleMyStatsCommand(
+    chatId: number,
+    telegramUserId?: number,
+  ): Promise<void> {
+    if (!(await this.assertGroupMember(chatId, telegramUserId))) return;
+
+    const board = await this.leaguesService.getGroupLeaderboard(String(chatId));
+    const user = await this.userRepo.findOne({
+      where: { telegramId: String(telegramUserId) },
+      select: [
+        "id",
+        "reputationTier",
+        "reputationScore",
+        "totalPredictions",
+        "correctPredictions",
+      ],
+    });
+
+    if (!user || (user.totalPredictions ?? 0) === 0) {
+      await this.telegramSimple.sendMessage(
+        chatId,
+        "You haven't made any predictions yet. Open the Oro mini app to get started!",
+      );
+      return;
+    }
+
+    const myEntry = board.find((e) => e.userId === user.id);
+    if (!myEntry) {
+      await this.telegramSimple.sendMessage(
+        chatId,
+        "You're not on the group leaderboard yet. Send a message in the group after making predictions!",
+      );
+      return;
+    }
+
+    const tierLabel =
+      user.reputationTier === "legend"
+        ? "Legend"
+        : user.reputationTier === "hot_hand"
+          ? "Hot Hand"
+          : user.reputationTier === "sharpshooter"
+            ? "Sharpshooter"
+            : "Rookie";
+    const score =
+      user.reputationScore != null
+        ? `${Math.round(user.reputationScore * 100)}%`
+        : "—";
+    const winRate =
+      (user.totalPredictions ?? 0) > 0
+        ? Math.round(
+            ((user.correctPredictions ?? 0) / (user.totalPredictions ?? 1)) *
+              100,
+          )
+        : 0;
+
+    await this.telegramSimple.sendMessage(
+      chatId,
+      `🎯 <b>Your group rank: #${myEntry.rank}</b>\n\n` +
+        `Tier: ${tierLabel}\n` +
+        `Accuracy: ${score}\n` +
+        `Win rate: ${winRate}%\n` +
+        `Predictions: ${user.totalPredictions}`,
+    );
+  }
+
+  /** Called when the bot's membership status in a chat changes. */
+  private async handleMyChatMember(update: any): Promise<void> {
+    const chat = update.chat;
+    if (!chat || (chat.type !== "group" && chat.type !== "supergroup")) return;
+
+    const chatId = String(chat.id);
+    const newStatus: string = update.new_chat_member?.status;
+
+    if (newStatus === "member" || newStatus === "administrator") {
+      await this.leaguesService.upsertGroup(chatId, chat.title ?? null);
+      await this.telegramSimple.sendMessage(
+        chat.id,
+        "👋 <b>Oro is here!</b>\n\n" +
+          "I'll track predictions for everyone in this group.\n\n" +
+          "📊 /standings — see the top predictors in this group\n" +
+          "🎯 /mystats — check your own rank here\n\n" +
+          "Rankings update every Sunday. Make your predictions in the Oro mini app!",
+      );
+    } else if (newStatus === "left" || newStatus === "kicked") {
+      await this.leaguesService.deactivateGroup(chatId);
     }
   }
 

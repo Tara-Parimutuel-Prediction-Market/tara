@@ -32,14 +32,32 @@ export class LeaguesService {
     private readonly telegramService: TelegramSimpleService,
   ) {}
 
+  /** Returns true if the telegramId user is a registered member of the given chatId group. */
+  async isGroupMember(chatId: string, telegramId: string): Promise<boolean> {
+    const user = await this.userRepo.findOne({
+      where: { telegramId },
+      select: ["id"],
+    });
+    if (!user) return false;
+    const count = await this.membershipRepo.count({
+      where: { chatId, userId: user.id },
+    });
+    return count > 0;
+  }
+
   /** Called when the bot is added to a group. Creates or reactivates the record. */
   async upsertGroup(chatId: string, title: string | null): Promise<void> {
     const existing = await this.groupRepo.findOne({ where: { chatId } });
     if (existing) {
-      await this.groupRepo.update(existing.id, { isActive: true, title: title ?? existing.title });
+      await this.groupRepo.update(existing.id, {
+        isActive: true,
+        title: title ?? existing.title,
+      });
       this.logger.log(`[Leagues] Group ${chatId} reactivated`);
     } else {
-      await this.groupRepo.save(this.groupRepo.create({ chatId, title, isActive: true }));
+      await this.groupRepo.save(
+        this.groupRepo.create({ chatId, title, isActive: true }),
+      );
       this.logger.log(`[Leagues] Group ${chatId} registered (${title})`);
     }
   }
@@ -70,7 +88,9 @@ export class LeaguesService {
       await this.membershipRepo.save(
         this.membershipRepo.create({ chatId, userId: user.id }),
       );
-      this.logger.debug(`[Leagues] Registered user ${user.id} in group ${chatId}`);
+      this.logger.debug(
+        `[Leagues] Registered user ${user.id} in group ${chatId}`,
+      );
     }
   }
 
@@ -100,12 +120,16 @@ export class LeaguesService {
       userId: r.u_id,
       firstName: r.u_firstName,
       username: r.u_username,
-      reputationScore: r.u_reputationScore != null ? Number(r.u_reputationScore) : null,
+      reputationScore:
+        r.u_reputationScore != null ? Number(r.u_reputationScore) : null,
       reputationTier: r.u_reputationTier,
       totalPredictions: Number(r.u_totalPredictions),
       winRate:
         Number(r.u_totalPredictions) > 0
-          ? Math.round((Number(r.u_correctPredictions) / Number(r.u_totalPredictions)) * 100)
+          ? Math.round(
+              (Number(r.u_correctPredictions) / Number(r.u_totalPredictions)) *
+                100,
+            )
           : 0,
     }));
   }
@@ -129,10 +153,17 @@ export class LeaguesService {
       const medal = medals[e.rank - 1] ?? `${e.rank}.`;
       const name = e.username ? `@${e.username}` : (e.firstName ?? "Unknown");
       const tierLabel =
-        e.reputationTier === "legend" ? "Legend" :
-        e.reputationTier === "hot_hand" ? "Hot Hand" :
-        e.reputationTier === "sharpshooter" ? "Sharpshooter" : "Rookie";
-      const score = e.reputationScore != null ? `${Math.round(e.reputationScore * 100)}%` : "—";
+        e.reputationTier === "legend"
+          ? "Legend"
+          : e.reputationTier === "hot_hand"
+            ? "Hot Hand"
+            : e.reputationTier === "sharpshooter"
+              ? "Sharpshooter"
+              : "Rookie";
+      const score =
+        e.reputationScore != null
+          ? `${Math.round(e.reputationScore * 100)}%`
+          : "—";
       return `${medal} <b>${name}</b> · ${tierLabel} · ${score} accuracy · ${e.winRate}% win rate`;
     });
 
@@ -140,7 +171,9 @@ export class LeaguesService {
     const text =
       `🏆 <b>Group Standings — ${group.title ?? "this group"}</b>\n\n` +
       lines.join("\n") +
-      (miniAppUrl ? `\n\n👉 <a href="${miniAppUrl}">Make your predictions</a>` : "");
+      (miniAppUrl
+        ? `\n\n👉 <a href="${miniAppUrl}">Make your predictions</a>`
+        : "");
 
     await this.telegramService.sendMessage(Number(chatId), text);
   }
@@ -154,9 +187,13 @@ export class LeaguesService {
       try {
         await this.postStandingsToGroup(group.chatId);
       } catch (err: any) {
-        this.logger.error(`[Leagues] Failed to post standings to group ${group.chatId}: ${err.message}`);
+        this.logger.error(
+          `[Leagues] Failed to post standings to group ${group.chatId}: ${err.message}`,
+        );
       }
     }
-    this.logger.log(`[Leagues] Weekly standings posted to ${groups.length} group(s)`);
+    this.logger.log(
+      `[Leagues] Weekly standings posted to ${groups.length} group(s)`,
+    );
   }
 }

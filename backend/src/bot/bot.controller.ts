@@ -1,4 +1,12 @@
-import { Controller, Get, Post, Body, Headers, UnauthorizedException, UseGuards } from "@nestjs/common";
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Headers,
+  UnauthorizedException,
+  UseGuards,
+} from "@nestjs/common";
 import { timingSafeEqual } from "crypto";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
@@ -76,8 +84,13 @@ export class BotController {
     const chatType: string = message.chat.type ?? "private";
 
     // Auto-register Oro users who send messages in group chats
-    if ((chatType === "group" || chatType === "supergroup") && message.from?.id) {
-      await this.leaguesService.registerMember(String(chatId), String(message.from.id)).catch(() => {});
+    if (
+      (chatType === "group" || chatType === "supergroup") &&
+      message.from?.id
+    ) {
+      await this.leaguesService
+        .registerMember(String(chatId), String(message.from.id))
+        .catch(() => {});
     }
 
     // Handle shared contact (phone verification)
@@ -126,18 +139,25 @@ export class BotController {
             parse_mode: "HTML",
           };
           const buttons: { text: string; url: string }[] = [];
-          if (miniAppUrl) buttons.push({ text: "🚀 Open Oro", url: miniAppUrl });
-          if (channelUrl) buttons.push({ text: "📢 Join Channel", url: channelUrl });
+          if (miniAppUrl)
+            buttons.push({ text: "🚀 Open Oro", url: miniAppUrl });
+          if (channelUrl)
+            buttons.push({ text: "📢 Join Channel", url: channelUrl });
           if (buttons.length) {
             payload.reply_markup = { inline_keyboard: [buttons] };
           }
-          const startRes = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          });
+          const startRes = await fetch(
+            `https://api.telegram.org/bot${botToken}/sendMessage`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            },
+          );
           if (!startRes.ok) {
-            console.error(`[Bot] /start sendMessage failed: ${await startRes.text()}`);
+            console.error(
+              `[Bot] /start sendMessage failed: ${await startRes.text()}`,
+            );
           }
           break;
         }
@@ -151,16 +171,26 @@ export class BotController {
           break;
 
         case "/standings":
+          if (!(await this.assertGroupMember(chatId, message.from?.id))) break;
           await this.leaguesService.postStandingsToGroup(String(chatId));
           break;
 
         case "/mystats": {
           if (!message.from?.id) break;
-          const board = await this.leaguesService.getGroupLeaderboard(String(chatId));
+          if (!(await this.assertGroupMember(chatId, message.from.id))) break;
+          const board = await this.leaguesService.getGroupLeaderboard(
+            String(chatId),
+          );
           const myTelegramId = String(message.from.id);
           const user = await this.userRepo.findOne({
             where: { telegramId: myTelegramId },
-            select: ["id", "reputationTier", "reputationScore", "totalPredictions", "correctPredictions"],
+            select: [
+              "id",
+              "reputationTier",
+              "reputationScore",
+              "totalPredictions",
+              "correctPredictions",
+            ],
           });
           if (!user || (user.totalPredictions ?? 0) === 0) {
             await this.telegramSimpleService.sendMessage(
@@ -178,13 +208,25 @@ export class BotController {
             break;
           }
           const tierLabel =
-            user.reputationTier === "legend" ? "Legend" :
-            user.reputationTier === "hot_hand" ? "Hot Hand" :
-            user.reputationTier === "sharpshooter" ? "Sharpshooter" : "Rookie";
-          const score = user.reputationScore != null ? `${Math.round(user.reputationScore * 100)}%` : "—";
-          const winRate = (user.totalPredictions ?? 0) > 0
-            ? Math.round(((user.correctPredictions ?? 0) / (user.totalPredictions ?? 1)) * 100)
-            : 0;
+            user.reputationTier === "legend"
+              ? "Legend"
+              : user.reputationTier === "hot_hand"
+                ? "Hot Hand"
+                : user.reputationTier === "sharpshooter"
+                  ? "Sharpshooter"
+                  : "Rookie";
+          const score =
+            user.reputationScore != null
+              ? `${Math.round(user.reputationScore * 100)}%`
+              : "—";
+          const winRate =
+            (user.totalPredictions ?? 0) > 0
+              ? Math.round(
+                  ((user.correctPredictions ?? 0) /
+                    (user.totalPredictions ?? 1)) *
+                    100,
+                )
+              : 0;
           await this.telegramSimpleService.sendMessage(
             chatId,
             `🎯 <b>Your group rank: #${myEntry.rank}</b>\n\n` +
@@ -221,21 +263,53 @@ export class BotController {
     }
   }
 
+  /** Guard: returns true if the user is a registered Oro member of this group. */
+  private async assertGroupMember(
+    chatId: number,
+    telegramUserId?: number,
+  ): Promise<boolean> {
+    if (!telegramUserId) return false;
+    const isMember = await this.leaguesService.isGroupMember(
+      String(chatId),
+      String(telegramUserId),
+    );
+    if (!isMember) {
+      await this.telegramSimpleService.sendMessage(
+        chatId,
+        "🔒 <b>Oro members only</b>\n\n" +
+          "This command is available to users who have made at least one prediction on Oro.\n\n" +
+          "👉 Open the Oro mini app, make a prediction, then try again!",
+      );
+    }
+    return isMember;
+  }
+
   private async handlePredictCommand(chatId: number, telegramUserId?: number) {
     const markets = await this.marketRepo.find({
-      where: [{ status: MarketStatus.OPEN }, { status: MarketStatus.RESOLVING }],
+      where: [
+        { status: MarketStatus.OPEN },
+        { status: MarketStatus.RESOLVING },
+      ],
       order: { closesAt: "ASC" },
       take: 5,
     });
 
     if (!markets.length) {
-      await this.telegramSimpleService.sendMessage(chatId, "📊 No active markets right now. Check back soon!");
+      await this.telegramSimpleService.sendMessage(
+        chatId,
+        "📊 No active markets right now. Check back soon!",
+      );
       return;
     }
 
     const miniAppUrl = process.env.TELEGRAM_MINI_APP_URL || "";
     const lines = markets.map((m) => {
-      const closes = m.closesAt ? new Date(m.closesAt).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" }) : "TBD";
+      const closes = m.closesAt
+        ? new Date(m.closesAt).toLocaleString("en-US", {
+            dateStyle: "medium",
+            timeStyle: "short",
+          })
+        : "TBD";
       const statusIcon = m.status === MarketStatus.RESOLVING ? "⚖️" : "🟢";
       return `${statusIcon} <b>${m.title}</b>\n⏰ ${closes}`;
     });
@@ -252,12 +326,17 @@ export class BotController {
           "\n\n⭐ <i>Make your first prediction to start building your reputation score. Top predictors carry more weight in market probabilities.</i>";
       } else {
         const tierLabel =
-          user.reputationTier === "legend" ? "Legend" :
-          user.reputationTier === "hot_hand" ? "Hot Hand" :
-          user.reputationTier === "sharpshooter" ? "Sharpshooter" : "Rookie";
-        const pct = user.reputationScore != null
-          ? ` · ${Math.round(user.reputationScore * 100)}% accuracy`
-          : "";
+          user.reputationTier === "legend"
+            ? "Legend"
+            : user.reputationTier === "hot_hand"
+              ? "Hot Hand"
+              : user.reputationTier === "sharpshooter"
+                ? "Sharpshooter"
+                : "Rookie";
+        const pct =
+          user.reputationScore != null
+            ? ` · ${Math.round(user.reputationScore * 100)}% accuracy`
+            : "";
         reputationLine = `\n\n⭐ Your tier: <b>${tierLabel}</b>${pct} (${user.totalPredictions} predictions)`;
       }
     }
@@ -340,13 +419,18 @@ export class BotController {
     });
 
     try {
-      const res = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body,
-      });
+      const res = await fetch(
+        `https://api.telegram.org/bot${botToken}/sendMessage`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body,
+        },
+      );
       if (!res.ok) {
-        console.error(`[Bot] sendPhoneRequest failed ${res.status}: ${await res.text()}`);
+        console.error(
+          `[Bot] sendPhoneRequest failed ${res.status}: ${await res.text()}`,
+        );
       }
     } catch (err: any) {
       console.error("Failed to send phone request keyboard:", err.message);
