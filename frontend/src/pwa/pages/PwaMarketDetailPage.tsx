@@ -3,6 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { getMarket, getDisputes, submitDispute, Market, Dispute } from "@/api/client";
 import { PwaBetForm } from "../components/PwaBetForm";
 import { useBreakpoint } from "../hooks/useBreakpoint";
+import { getCategoryVisual } from "@/helpers/visuals";
 
 export function PwaMarketDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -15,6 +16,7 @@ export function PwaMarketDetailPage() {
   const [disputeSubmitting, setDisputeSubmitting] = useState(false);
   const [disputeError, setDisputeError] = useState<string | null>(null);
   const [disputeSuccess, setDisputeSuccess] = useState(false);
+  const [imgError, setImgError] = useState(false);
 
   const refreshMarket = useCallback((updatedMarket?: Market) => {
     if (updatedMarket) {
@@ -264,11 +266,77 @@ export function PwaMarketDetailPage() {
                 const colors = ["#22c55e", "#ef4444", "#f59e0b", "#3b82f6", "#8b5cf6"];
                 const color = colors[idx % colors.length];
                 
+                // Match TMA's avatar fallbacks
+                const avatarUrl = !imgError
+                  ? (outcome as any).imageUrl ||
+                    (idx === 0
+                      ? market.imageUrl
+                      : idx === 1
+                        ? market.imageUrlAlt || market.imageUrl
+                        : null)
+                  : null;
+                const vis = getCategoryVisual(market.category);
+
                 return (
                   <div key={outcome.id}>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.9rem", marginBottom: "8px" }}>
-                      <span style={{ fontWeight: 700, color: "var(--text-main)" }}>{outcome.label}</span>
-                      <span style={{ fontWeight: 800, color: color }}>{pct.toFixed(0)}%</span>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "0.92rem", marginBottom: "8px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+                        <div
+                          style={{
+                            flexShrink: 0,
+                            width: 32,
+                            height: 32,
+                            borderRadius: "50%",
+                            overflow: "hidden",
+                            background: vis.gradient,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }}
+                        >
+                          {avatarUrl ? (
+                            <img
+                              src={avatarUrl}
+                              alt=""
+                              onError={() => setImgError(true)}
+                              style={{
+                                width: "100%",
+                                height: "100%",
+                                objectFit: "cover",
+                                display: "block",
+                              }}
+                            />
+                          ) : (
+                            <span
+                              style={{
+                                fontSize: 13,
+                                fontWeight: 900,
+                                color: "#fff",
+                                opacity: 0.95,
+                              }}
+                            >
+                              {outcome.label.charAt(0).toUpperCase()}
+                            </span>
+                          )}
+                        </div>
+                        <span style={{ fontWeight: 700, color: "var(--text-main)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                          {outcome.label}
+                        </span>
+                      </div>
+                      <div
+                        style={{
+                          background: `${color}18`,
+                          border: `1px solid ${color}40`,
+                          color: color,
+                          fontSize: "0.75rem",
+                          fontWeight: 900,
+                          padding: "2px 10px",
+                          borderRadius: 99,
+                          flexShrink: 0,
+                        }}
+                      >
+                        {pct.toFixed(0)}%
+                      </div>
                     </div>
                     <div style={{ background: "var(--bg-main)", borderRadius: "10px", height: "8px", overflow: "hidden" }}>
                       <div style={{ 

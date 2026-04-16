@@ -1,6 +1,7 @@
 import { useState, useEffect, type FC } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Market } from "@/api/client";
+import { getCategoryVisual } from "@/helpers/visuals";
 
 function outcomeColor(rank: number, total: number): string {
   if (rank === 0) return "#22c55e";
@@ -42,6 +43,7 @@ interface PwaMarketCardProps {
 
 export const PwaMarketCard: FC<PwaMarketCardProps> = ({ market, onBet }) => {
   const [showAll, setShowAll] = useState(false);
+  const [imgError, setImgError] = useState(false);
   const navigate = useNavigate();
   const isUpcoming = market.status === "upcoming";
   const isResolving = market.status === "resolving";
@@ -211,8 +213,18 @@ export const PwaMarketCard: FC<PwaMarketCardProps> = ({ market, onBet }) => {
             <div
               style={{ display: "flex", flexDirection: "column", gap: 8 }}
             >
-              {displayOutcomes.map((s) => {
+              {displayOutcomes.map((s, idx) => {
                 const barWidth = Math.max(4, Math.min(100, s.pct));
+                // Match TMA's avatar fallbacks
+                const avatarUrl = !imgError
+                  ? (s as any).imageUrl ||
+                    (idx === 0
+                      ? market.imageUrl
+                      : idx === 1
+                        ? market.imageUrlAlt || market.imageUrl
+                        : null)
+                  : null;
+                const vis = getCategoryVisual(market.category);
                 return (
                   <button
                     key={s.id}
@@ -225,14 +237,14 @@ export const PwaMarketCard: FC<PwaMarketCardProps> = ({ market, onBet }) => {
                       padding: "0",
                       borderRadius: 16,
                       background: "var(--bg-card)",
-                      border: "none",
+                      border: "1.5px solid var(--glass-border)",
                       cursor: "pointer",
                       overflow: "hidden",
-                      boxShadow: `4px 4px 10px rgba(0,0,0,0.25), -2px -2px 8px rgba(255,255,255,0.04), inset 0 0 0 1px ${s.color}30`,
                       transition: "all 0.15s ease",
                       display: "block",
                       textAlign: "left",
                       position: "relative",
+                      boxShadow: "var(--shadow-sm)",
                     }}
                   >
                     {/* Pool fill */}
@@ -243,7 +255,7 @@ export const PwaMarketCard: FC<PwaMarketCardProps> = ({ market, onBet }) => {
                         left: 0,
                         bottom: 0,
                         width: `${barWidth}%`,
-                        background: `linear-gradient(90deg, ${s.color}44 0%, ${s.color}22 60%, transparent 100%)`,
+                        background: `linear-gradient(90deg, ${s.color}22 0%, ${s.color}11 60%, transparent 100%)`,
                         borderRadius: "16px 0 0 16px",
                         transition: "width 1s ease",
                         pointerEvents: "none",
@@ -274,36 +286,79 @@ export const PwaMarketCard: FC<PwaMarketCardProps> = ({ market, onBet }) => {
                     <div
                       style={{
                         position: "relative",
-                        padding: "10px 14px",
+                        padding: "8px 12px",
                         display: "flex",
                         alignItems: "center",
-                        justifyContent: "space-between",
-                        gap: 8,
+                        gap: 12,
+                        minHeight: 48,
                       }}
                     >
+                      {/* Circle avatar (Clean Style) */}
+                      <div
+                        style={{
+                          flexShrink: 0,
+                          width: 32,
+                          height: 32,
+                          borderRadius: "50%",
+                          overflow: "hidden",
+                          background: vis.gradient,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        {avatarUrl ? (
+                          <img
+                            src={avatarUrl}
+                            alt=""
+                            onError={() => setImgError(true)}
+                            style={{
+                              width: "100%",
+                              height: "100%",
+                              objectFit: "cover",
+                              display: "block",
+                            }}
+                          />
+                        ) : (
+                          <span
+                            style={{
+                              fontSize: 13,
+                              fontWeight: 900,
+                              color: "#fff",
+                              opacity: 0.95,
+                            }}
+                          >
+                            {s.label.charAt(0).toUpperCase()}
+                          </span>
+                        )}
+                      </div>
+
                       <span
                         style={{
-                          fontSize: "0.75rem",
+                          fontSize: "0.82rem",
                           fontWeight: 700,
                           color: "var(--text-main)",
                           letterSpacing: "-0.01em",
                           whiteSpace: "nowrap",
                           overflow: "hidden",
                           textOverflow: "ellipsis",
+                          flex: 1,
                         }}
                       >
                         {s.label}
                       </span>
+
                       <div
                         style={{
-                          background: `${s.color}12`,
-                          border: `1px solid ${s.color}30`,
+                          background: `${s.color}18`,
+                          border: `1px solid ${s.color}40`,
                           color: s.color,
-                          fontSize: "0.72rem",
-                          fontWeight: 800,
-                          padding: "2px 8px",
+                          fontSize: "0.75rem",
+                          fontWeight: 900,
+                          padding: "2px 10px",
                           borderRadius: 99,
                           flexShrink: 0,
+                          marginLeft: "auto",
                         }}
                       >
                         {s.pct.toFixed(0)}%
