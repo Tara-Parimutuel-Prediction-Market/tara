@@ -481,9 +481,9 @@ export class KeeperService {
    * Resolve a short propose key — delegates to TelegramSimpleService
    * so BotPollingService can also call it without a circular dep.
    */
-  resolveProposeKey(
+  async resolveProposeKey(
     key: number,
-  ): { marketId: string; outcomeId: string } | undefined {
+  ): Promise<{ marketId: string; outcomeId: string } | undefined> {
     return this.telegram.resolveProposeKey(key);
   }
 
@@ -508,10 +508,12 @@ export class KeeperService {
       `👇 <b>Tap the winning outcome</b> to open the 24h dispute window:`;
 
     // Register each outcome as a short key — well under 64 bytes
-    const buttons = (market.outcomes ?? []).map((o) => {
-      const key = this.telegram.registerProposeKey(market.id, o.id);
-      return [{ text: o.label, callbackData: `p:${key}` }];
-    });
+    const buttons = await Promise.all(
+      (market.outcomes ?? []).map(async (o) => {
+        const key = await this.telegram.registerProposeKey(market.id, o.id);
+        return [{ text: o.label, callbackData: `p:${key}` }];
+      }),
+    );
 
     try {
       await this.telegram.sendMessageWithButtons(

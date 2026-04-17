@@ -5,37 +5,45 @@ import { Repository } from "typeorm";
 import { User } from "../entities/user.entity";
 import { Market } from "../entities/market.entity";
 import { Position, PositionStatus } from "../entities/position.entity";
+import { RedisService } from "../redis/redis.service";
 
 @Injectable()
 export class TelegramSimpleService {
   private readonly logger = new Logger(TelegramSimpleService.name);
   private readonly botToken: string;
 
-  // Short-key store for propose callbacks (avoids 64-byte Telegram limit on UUIDs)
-  private proposeKeyCounter = 1;
-  private readonly proposeKeyMap = new Map<
-    number,
-    { marketId: string; outcomeId: string }
-  >();
+  // TTL for propose keys stored in Redis (48 hours)
+  private readonly PROPOSE_KEY_TTL_SEC = 48 * 60 * 60;
 
-  /** Register a market+outcome pair and return a short callback key. */
-  registerProposeKey(marketId: string, outcomeId: string): number {
-    const key = this.proposeKeyCounter++;
-    this.proposeKeyMap.set(key, { marketId, outcomeId });
-    // Auto-expire after 48 h
-    setTimeout(() => this.proposeKeyMap.delete(key), 48 * 60 * 60 * 1000);
+  /**
+   * Register a market+outcome pair in Redis and return a short callback key.
+   * The key is a millisecond timestamp which fits comfortably within Telegram's
+   * 64-byte callback_data limit (13 digits + "p:" prefix = 15 bytes).
+   * Persisted in Redis so server restarts don't invalidate pending buttons.
+   */
+  async registerProposeKey(marketId: string, outcomeId: string): Promise<number> {
+    const key = Date.now();
+    await this.redis.setJsonEx(
+      `oro:propose:${key}`,
+      this.PROPOSE_KEY_TTL_SEC,
+      { marketId, outcomeId },
+    );
     return key;
   }
 
-  /** Resolve a short key back to {marketId, outcomeId}, or undefined if expired. */
-  resolveProposeKey(
+  /** Resolve a short key back to {marketId, outcomeId}, or undefined if expired/missing. */
+  async resolveProposeKey(
     key: number,
-  ): { marketId: string; outcomeId: string } | undefined {
-    return this.proposeKeyMap.get(key);
+  ): Promise<{ marketId: string; outcomeId: string } | undefined> {
+    const val = await this.redis.getJson<{ marketId: string; outcomeId: string }>(
+      `oro:propose:${key}`,
+    );
+    return val ?? undefined;
   }
 
   constructor(
     private readonly configService: ConfigService,
+    private readonly redis: RedisService,
     @InjectRepository(User) private readonly userRepository: Repository<User>,
   ) {
     this.botToken = this.configService.getOrThrow<string>("TELEGRAM_BOT_TOKEN");

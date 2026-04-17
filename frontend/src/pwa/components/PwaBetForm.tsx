@@ -68,59 +68,63 @@ export const PwaBetForm: FC<PwaBetFormProps> = ({ market, onBetPlaced }) => {
       <div
         style={{
           background: "var(--bg-card)",
-          border: "1.5px solid var(--glass-border)",
+          border: "2px solid var(--color-success)",
           borderRadius: "var(--radius-lg)",
-          padding: "40px 20px",
+          padding: "48px 24px",
           textAlign: "center",
-          boxShadow: "var(--shadow-premium)",
+          boxShadow: "var(--shadow-lg)",
+          animation: "tickerSlideUp 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)",
         }}
       >
-        <div style={{ fontSize: 60, marginBottom: 16 }}>✨</div>
+        <div style={{ fontSize: 64, marginBottom: 20 }}>🌌</div>
         <div
           style={{
             fontWeight: 900,
-            fontSize: "1.4rem",
-            color: "#22c55e",
-            marginBottom: 8,
+            fontSize: "1.6rem",
+            color: "var(--color-success)",
+            marginBottom: 12,
             fontFamily: "var(--font-display)",
+            letterSpacing: "-0.04em",
           }}
         >
-          Position Opened!
+          Prophecy Cast!
         </div>
         <div
           style={{
-            fontSize: "0.95rem",
+            fontSize: "1rem",
             color: "var(--text-muted)",
-            fontWeight: 500,
+            fontWeight: 600,
+            lineHeight: 1.5,
           }}
         >
-          Your contract is now live in the pool.
+          Your position is now active in the pool.<br />
+          The oracles are tracking your fate.
         </div>
       </div>
     );
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-lg)" }}>
       {/* Outcome buttons */}
       <div>
         <div
           style={{
-            fontSize: "0.7rem",
-            fontWeight: 800,
-            letterSpacing: "0.08em",
+            fontSize: "0.75rem",
+            fontWeight: 900,
+            letterSpacing: "0.1em",
             color: "var(--text-subtle)",
-            marginBottom: 12,
+            marginBottom: "var(--space-md)",
             textTransform: "uppercase",
           }}
         >
-          PICK AN OUTCOME
+          Cast Your Vote
         </div>
         <div
           style={{
             display: "grid",
             gridTemplateColumns: show2Outcomes ? "1fr 1fr" : "1fr",
-            gap: 12,
+            gap: "var(--space-sm)",
           }}
         >
           {market.outcomes.map((outcome, idx) => {
@@ -141,20 +145,24 @@ export const PwaBetForm: FC<PwaBetFormProps> = ({ market, onBetPlaced }) => {
                   setSelectedOutcomeId(isSelected ? null : outcome.id)
                 }
                 style={{
-                  padding: "20px 12px",
-                  borderRadius: "14px",
+                  padding: "var(--space-md)",
+                  borderRadius: "var(--radius-md)",
                   border: isSelected
                     ? `2.5px solid ${baseColor}`
-                    : "2.5px solid var(--glass-border)",
-                  background: isSelected ? `${baseColor}10` : "var(--bg-main)",
+                    : "1.5px solid var(--border)",
+                  background: isSelected ? `${baseColor}10` : "var(--bg-secondary)",
                   color: isSelected ? baseColor : "var(--text-main)",
-                  fontWeight: 800,
-                  fontSize: "1rem",
+                  fontWeight: 900,
+                  fontSize: "1.05rem",
                   cursor: "pointer",
-                  transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
-                  lineHeight: 1.2,
-                  boxShadow: isSelected ? `0 4px 12px ${baseColor}20` : "none",
+                  transition: "all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)",
+                  lineHeight: 1.1,
+                  boxShadow: isSelected ? `0 8px 16px -4px ${baseColor}40` : "none",
                   transform: isSelected ? "translateY(-2px)" : "none",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  textAlign: "center",
                 }}
               >
                 {outcome.label}
@@ -168,14 +176,14 @@ export const PwaBetForm: FC<PwaBetFormProps> = ({ market, onBetPlaced }) => {
       {selectedOutcomeId && (
         <div
           style={{
-            background: "var(--bg-card)",
-            border: "1.5px solid var(--glass-border)",
+            background: "var(--bg-secondary)",
+            border: "1px solid var(--border)",
             borderRadius: "var(--radius-md)",
-            padding: "20px",
+            padding: "var(--space-md)",
             display: "flex",
             flexDirection: "column",
-            gap: 16,
-            boxShadow: "var(--shadow-sm)",
+            gap: "var(--space-md)",
+            boxShadow: "inset 0 2px 4px rgba(0,0,0,0.05)",
           }}
         >
           <div
@@ -188,22 +196,24 @@ export const PwaBetForm: FC<PwaBetFormProps> = ({ market, onBetPlaced }) => {
             <div>
               <div
                 style={{
-                  fontSize: "0.65rem",
-                  fontWeight: 800,
-                  color: "var(--text-subtle)",
-                  marginBottom: 4,
+                  fontSize: "0.68rem",
+                  fontWeight: 900,
+                  color: "var(--text-muted)",
+                  marginBottom: 6,
                   textTransform: "uppercase",
+                  letterSpacing: "0.05em",
                 }}
               >
-                Potential Win
+                Potential Return
               </div>
               <div
                 style={{
-                  fontSize: "2rem",
+                  fontSize: "2.2rem",
                   fontWeight: 900,
-                  color: winAmount > 0 ? "#22c55e" : "var(--text-muted)",
-                  lineHeight: 1,
+                  color: winAmount > 0 ? "var(--color-success)" : "var(--text-muted)",
+                  lineHeight: 0.9,
                   fontFamily: "var(--font-display)",
+                  letterSpacing: "-0.04em",
                 }}
               >
                 {winAmount > 0 ? `Nu ${Math.floor(winAmount)}` : "—"}
@@ -212,20 +222,22 @@ export const PwaBetForm: FC<PwaBetFormProps> = ({ market, onBetPlaced }) => {
             <div style={{ textAlign: "right" }}>
               <div
                 style={{
-                  fontSize: "0.65rem",
-                  fontWeight: 800,
-                  color: "var(--text-subtle)",
-                  marginBottom: 4,
+                  fontSize: "0.68rem",
+                  fontWeight: 900,
+                  color: "var(--text-muted)",
+                  marginBottom: 6,
                   textTransform: "uppercase",
+                  letterSpacing: "0.05em",
                 }}
               >
-                Amount
+                Input
               </div>
               <div
                 style={{
-                  fontSize: "1.1rem",
-                  fontWeight: 800,
+                  fontSize: "1.2rem",
+                  fontWeight: 900,
                   color: "var(--text-main)",
+                  letterSpacing: "-0.02em",
                 }}
               >
                 Nu {amount}
@@ -233,23 +245,36 @@ export const PwaBetForm: FC<PwaBetFormProps> = ({ market, onBetPlaced }) => {
             </div>
           </div>
 
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
             {QUICK_AMOUNTS.map((q) => (
               <button
                 key={q}
                 onClick={() => setAmount(q.toString())}
                 style={{
                   flex: 1,
-                  padding: "8px",
-                  borderRadius: "10px",
-                  border: "1.5px solid var(--glass-border)",
+                  padding: "10px",
+                  borderRadius: "var(--radius-sm)",
+                  border: "1px solid var(--border)",
                   background:
-                    amount === q.toString() ? "#3b82f6" : "var(--bg-main)",
+                    amount === q.toString() ? "var(--color-primary)" : "var(--bg-card)",
                   color: amount === q.toString() ? "#fff" : "var(--text-muted)",
-                  fontSize: "0.8rem",
+                  fontSize: "0.85rem",
                   fontWeight: 800,
                   cursor: "pointer",
-                  transition: "all 0.15s",
+                  transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+                  boxShadow: amount === q.toString() ? "0 4px 10px rgba(39, 117, 208, 0.2)" : "none",
+                }}
+                onMouseEnter={(e) => {
+                  if (amount !== q.toString()) {
+                    e.currentTarget.style.borderColor = "var(--text-subtle)";
+                    e.currentTarget.style.color = "var(--text-main)";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (amount !== q.toString()) {
+                    e.currentTarget.style.borderColor = "var(--border)";
+                    e.currentTarget.style.color = "var(--text-muted)";
+                  }
                 }}
               >
                 {q}
@@ -265,32 +290,32 @@ export const PwaBetForm: FC<PwaBetFormProps> = ({ market, onBetPlaced }) => {
         onClick={() => setShowPaymentModal(true)}
         style={{
           width: "100%",
-          padding: "18px",
-          borderRadius: "14px",
+          padding: "20px",
+          borderRadius: "var(--radius-md)",
           border: "none",
           background: isReady
-            ? "linear-gradient(135deg, #3b82f6, #1d4ed8)"
-            : "var(--bg-card)",
+            ? "var(--grad-primary)"
+            : "var(--bg-secondary)",
           color: isReady ? "#fff" : "var(--text-subtle)",
-          fontSize: "1rem",
+          fontSize: "1.05rem",
           fontWeight: 900,
           cursor: isReady ? "pointer" : "not-allowed",
-          transition: "all 0.2s",
-          boxShadow: isReady ? "0 8px 20px rgba(59,130,246,0.3)" : "none",
+          transition: "all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)",
+          boxShadow: isReady ? "0 12px 28px -8px rgba(39, 117, 208, 0.5)" : "none",
           letterSpacing: "0.02em",
         }}
         onMouseEnter={(e) =>
-          isReady && (e.currentTarget.style.transform = "translateY(-2px)")
+          isReady && (e.currentTarget.style.transform = "translateY(-3px)")
         }
         onMouseLeave={(e) =>
           isReady && (e.currentTarget.style.transform = "translateY(0)")
         }
       >
         {isReady
-          ? `CONFIRM Nu ${amount} POSITION`
+          ? `Cast Nu ${amount} Prophecy`
           : selectedOutcomeId
-            ? `MINIMUM Nu ${MIN_BET} REQUIRED`
-            : "SELECT AN OPTION"}
+            ? `Minimum Nu ${MIN_BET} Required`
+            : "Select an Outcome"}
       </button>
 
       <div
@@ -298,13 +323,13 @@ export const PwaBetForm: FC<PwaBetFormProps> = ({ market, onBetPlaced }) => {
           fontSize: "0.7rem",
           color: "var(--text-subtle)",
           textAlign: "center",
-          fontWeight: 600,
-          lineHeight: 1.4,
+          fontWeight: 700,
+          lineHeight: 1.6,
+          opacity: 0.8,
         }}
       >
-        By placing a bet, you agree to the parimutuel rules.
-        <br />
-        Final payouts depend on total pool size at close.
+        By casting this prophecy, you agree to the parimutuel pool rules.<br />
+        Final rewards are determined by the oracle at market close.
       </div>
 
       <PwaPaymentModal

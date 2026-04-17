@@ -4,68 +4,92 @@
   --font-primary: 'Inter', system-ui, -apple-system, sans-serif;
   --font-display: 'Outfit', 'Inter', system-ui, sans-serif;
   
-  /* Modern Color Palette */
-  --bg-main: #f8fafc;
+  /* Modern Color Palette - Light Mode (Clean & Professional) */
+  --bg-main: #fcfdfe;
   --bg-card: #ffffff;
+  --bg-secondary: #f3f7fa;
   --text-main: #0f172a;
   --text-muted: #64748b;
   --text-subtle: #94a3b8;
-  --bg-secondary: #f1f5f9;
   --border: #e2e8f0;
-  --balance-card-bg: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
-  --deposit-btn-bg: linear-gradient(135deg, #60a5fa, #3b82f6);
-  --balance-card-shadow: 0 16px 32px -8px rgba(39,117,208,0.35);
+  
+  /* TMA-Aligned Action Colors */
+  --color-primary: #2775d0;
+  --color-primary-dark: #1a5bb5;
+  --color-success: #22c55e;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+  --color-info: #3b82f6;
   
   /* Gradients */
-  --grad-primary: linear-gradient(135deg, #3ecf6e 0%, #2b7fdb 100%);
-  --grad-surface: linear-gradient(180deg, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0.4) 100%);
+  --grad-primary: linear-gradient(135deg, #2775d0 0%, #1a5bb5 100%);
+  --grad-success: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  --grad-surface: linear-gradient(180deg, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.7) 100%);
   
   /* Glassmorphism */
-  --glass-bg: rgba(255, 255, 255, 0.7);
-  --glass-border: rgba(255, 255, 255, 0.3);
-  --glass-blur: blur(12px);
+  --glass-bg: rgba(255, 255, 255, 0.75);
+  --glass-border: rgba(255, 255, 255, 0.4);
+  --glass-blur: blur(16px);
   
   /* Shadows */
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-  --shadow-premium: 0 20px 25px -5px rgb(0 0 0 / 0.05), 0 8px 10px -6px rgb(0 0 0 / 0.05);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.05);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+  --shadow-lg: 0 12px 24px -8px rgba(0,0,0,0.12);
+  --shadow-premium: 0 20px 40px -12px rgba(0,0,0,0.15);
   
-  /* Borders */
+  /* Spacing & Radius (8px Base) */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  
   --radius-sm: 8px;
   --radius-md: 12px;
-  --radius-lg: 18px;
-  --radius-xl: 24px;
+  --radius-lg: 20px;
+  --radius-xl: 32px;
+  --radius-full: 9999px;
+  
+  --header-height: 80px;
+
+  /* TMA Wallet & Profile Specifics */
+  --balance-card-bg: var(--grad-primary);
+  --balance-card-shadow: 0 10px 25px -5px rgba(39, 117, 208, 0.4);
+  --deposit-btn-bg: var(--color-primary);
 }
 
 html.dark {
   color-scheme: dark;
 
-  /* Modern Color Palette */
-  --bg-main: #0f172a;
-  --bg-card: #1e293b;
+  /* Modern Color Palette - Dark Mode (Deep & Premium) */
+  --bg-main: #0a0f1d;
+  --bg-card: #161c2d;
+  --bg-secondary: #21293e;
   --text-main: #f8fafc;
   --text-muted: #94a3b8;
   --text-subtle: #64748b;
-  --bg-secondary: #1e2d45;
-  --border: #334155;
-  --balance-card-bg: #1a5bb5;
-  --deposit-btn-bg: linear-gradient(135deg, #2775d0, #1a5bb5);
-  --balance-card-shadow: 0 16px 32px -8px rgba(10,30,70,0.5);
+  --border: rgba(255, 255, 255, 0.08);
+  
+  --color-primary: #3b82f6;
+  --color-primary-dark: #2563eb;
   
   /* Gradients */
-  --grad-primary: linear-gradient(135deg, #3ecf6e 0%, #2b7fdb 100%);
-  --grad-surface: linear-gradient(180deg, rgba(30, 41, 59, 0.8) 0%, rgba(30, 41, 59, 0.4) 100%);
+  --grad-surface: linear-gradient(180deg, rgba(22, 28, 45, 0.8) 0%, rgba(22, 28, 45, 0.4) 100%);
   
   /* Glassmorphism */
-  --glass-bg: rgba(15, 23, 42, 0.7);
+  --glass-bg: rgba(10, 15, 29, 0.8);
   --glass-border: rgba(255, 255, 255, 0.1);
   
-  /* Shadows (less harsh in dark mode usually) */
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.4), 0 2px 4px -2px rgb(0 0 0 / 0.4);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.4), 0 4px 6px -4px rgb(0 0 0 / 0.4);
-  --shadow-premium: 0 20px 25px -5px rgb(0 0 0 / 0.5), 0 8px 10px -6px rgb(0 0 0 / 0.5);
+  /* Shadows */
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.3);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
+  --shadow-lg: 0 12px 24px -8px rgba(0,0,0,0.5);
+  --shadow-premium: 0 20px 40px -12px rgba(0,0,0,0.6);
+
+  /* TMA Wallet & Profile Specifics - Dark Mode */
+  --balance-card-bg: linear-gradient(135deg, #1d4ed8 0%, #172554 100%);
+  --balance-card-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+  --deposit-btn-bg: var(--color-primary);
 }
 
 html {
@@ -97,10 +121,10 @@ body {
   z-index: -1;
   background-color: var(--bg-main);
   background-image: 
-    radial-gradient(at 0% 0%, rgba(62, 207, 110, 0.05) 0px, transparent 50%),
-    radial-gradient(at 100% 0%, rgba(43, 127, 219, 0.05) 0px, transparent 50%),
-    radial-gradient(at 100% 100%, rgba(62, 207, 110, 0.05) 0px, transparent 50%),
-    radial-gradient(at 0% 100%, rgba(43, 127, 219, 0.05) 0px, transparent 50%);
+    radial-gradient(at 0% 0%, rgba(39, 117, 208, 0.03) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(62, 207, 110, 0.03) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(39, 117, 208, 0.03) 0px, transparent 50%),
+    radial-gradient(at 0% 100%, rgba(62, 207, 110, 0.03) 0px, transparent 50%);
   transition: background-color 0.3s;
 }
 .tma-outcome-btn {

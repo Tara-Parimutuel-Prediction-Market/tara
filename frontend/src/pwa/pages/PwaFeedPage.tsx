@@ -79,52 +79,51 @@ function LiveTicker() {
     <>
       <style>{`
         @keyframes tickerSlideUp {
-          from { opacity: 0; transform: translateY(6px); }
+          from { opacity: 0; transform: translateY(8px); }
           to { opacity: 1; transform: translateY(0); }
         }
       `}</style>
       <div
         style={{
           width: 1,
-          height: 14,
+          height: 16,
           background: "var(--glass-border)",
           flexShrink: 0,
-          margin: "0 4px",
+          margin: "0 8px",
         }}
-      />
-      <Flame
-        size={12}
-        color="#ff6b00"
-        fill="#ff9500"
-        style={{ flexShrink: 0 }}
       />
       <div
         style={{
           flex: 1,
           minWidth: 0,
-          animation: visible ? "tickerSlideUp 0.4s ease-out forwards" : "none",
+          animation: visible ? "tickerSlideUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards" : "none",
           opacity: visible ? 1 : 0,
           display: "flex",
           alignItems: "center",
-          gap: 4,
+          gap: 6,
           overflow: "hidden",
         }}
       >
+        <Flame
+          size={14}
+          style={{ flexShrink: 0, color: "var(--color-warning)", fill: "#f59e0b40" }}
+        />
         <span
           style={{
-            fontSize: 11,
-            fontWeight: 700,
+            fontSize: "0.8rem",
+            fontWeight: 800,
             color: "var(--text-main)",
             whiteSpace: "nowrap",
             flexShrink: 0,
+            letterSpacing: "-0.01em",
           }}
         >
           {current.userName}
         </span>
         <span
           style={{
-            fontSize: 11,
-            fontWeight: 500,
+            fontSize: "0.75rem",
+            fontWeight: 700,
             color: "var(--text-muted)",
             whiteSpace: "nowrap",
             flexShrink: 0,
@@ -134,9 +133,9 @@ function LiveTicker() {
         </span>
         <span
           style={{
-            fontSize: 11,
-            fontWeight: 800,
-            color: current.type === "win" ? "#22c55e" : "#3b82f6",
+            fontSize: "0.8rem",
+            fontWeight: 900,
+            color: current.type === "win" ? "var(--color-success)" : "var(--color-primary)",
             whiteSpace: "nowrap",
             flexShrink: 0,
           }}
@@ -145,11 +144,12 @@ function LiveTicker() {
         </span>
         <span
           style={{
-            fontSize: 11,
+            fontSize: "0.75rem",
             color: "var(--text-subtle)",
             whiteSpace: "nowrap",
             overflow: "hidden",
             textOverflow: "ellipsis",
+            fontWeight: 600,
           }}
         >
           · {current.outcome}
@@ -264,8 +264,8 @@ export function PwaFeedPage() {
           >
             🔮
           </div>
-          <div style={{ fontSize: 16, fontWeight: 600 }}>
-            Syncing predictions…
+          <div style={{ fontSize: 16, fontWeight: 900, color: "var(--text-main)", letterSpacing: "-0.01em" }}>
+            Reading the Oracles…
           </div>
         </div>
       </div>
@@ -285,21 +285,22 @@ export function PwaFeedPage() {
         }}
       >
         <div className="mesh-bg" />
-        <div style={{ fontSize: 64 }}>🔮</div>
+        <div style={{ fontSize: 64, filter: "drop-shadow(0 10px 20px rgba(0,0,0,0.2))" }}>🔮</div>
         <div
           style={{
-            fontSize: 24,
-            fontWeight: 800,
+            fontSize: "1.5rem",
+            fontWeight: 900,
             color: "var(--text-main)",
             fontFamily: "var(--font-display)",
+            letterSpacing: "-0.02em",
           }}
         >
-          No open predictions
+          The Oracles are Quiet
         </div>
         <div
-          style={{ fontSize: 15, color: "var(--text-muted)", maxWidth: 300 }}
+          style={{ fontSize: "1rem", color: "var(--text-muted)", maxWidth: 350, lineHeight: 1.6, fontWeight: 500 }}
         >
-          The oracle is quiet. Check back later for new markets.
+          Check back soon for new prophecy opportunities and community predictions.
         </div>
       </div>
     );
@@ -336,8 +337,8 @@ export function PwaFeedPage() {
   return (
     <div
       style={{
-        padding: "32px 16px 100px",
-        maxWidth: 1200,
+        padding: "var(--space-xl) var(--space-md) 100px",
+        maxWidth: 1240,
         margin: "0 auto",
         position: "relative",
       }}
@@ -345,44 +346,39 @@ export function PwaFeedPage() {
       <style>{`
         @keyframes heartbeat {
           0%   { transform: scale(1);    opacity: 1; }
-          14%  { transform: scale(1.2);  opacity: 1; }
+          14%  { transform: scale(1.3);  opacity: 1; }
           28%  { transform: scale(1);    opacity: 0.9; }
-          42%  { transform: scale(1.12); opacity: 1; }
+          42%  { transform: scale(1.2);  opacity: 1; }
           70%  { transform: scale(1);    opacity: 0.8; }
           100% { transform: scale(1);    opacity: 1; }
-        }
-        @keyframes liveBadgePulse {
-          0%, 70%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); }
-          14%            { box-shadow: 0 0 0 4px rgba(239,68,68,0.25); }
-          42%            { box-shadow: 0 0 0 3px rgba(239,68,68,0.15); }
         }
       `}</style>
       <div className="mesh-bg" />
 
-
       {openMarkets.length > 0 && (
-        <section style={{ marginBottom: 48 }}>
+        <section style={{ marginBottom: "var(--space-xl)" }}>
           <div
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 10,
-              marginBottom: 20,
+              gap: 12,
+              marginBottom: "var(--space-md)",
             }}
           >
             <div
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 5,
-                padding: "4px 10px",
-                borderRadius: 8,
-                background: "rgba(34, 197, 94, 0.15)",
-                color: "#22c55e",
-                fontSize: 10,
+                gap: 6,
+                padding: "6px 12px",
+                borderRadius: "var(--radius-sm)",
+                background: "rgba(34, 197, 94, 0.1)",
+                color: "var(--color-success)",
+                fontSize: "0.65rem",
                 fontWeight: 900,
-                letterSpacing: "0.05em",
+                letterSpacing: "0.08em",
                 textTransform: "uppercase",
+                boxShadow: "0 4px 12px rgba(34, 197, 94, 0.1)",
               }}
             >
               <div
@@ -390,7 +386,7 @@ export function PwaFeedPage() {
                   width: 6,
                   height: 6,
                   borderRadius: "50%",
-                  background: "#22c55e",
+                  background: "var(--color-success)",
                   animation: "heartbeat 2.4s ease-in-out infinite",
                 }}
               />
@@ -398,15 +394,15 @@ export function PwaFeedPage() {
             </div>
             <h2
               style={{
-                fontSize: 16,
-                fontWeight: 800,
+                fontSize: "1.25rem",
+                fontWeight: 900,
                 color: "var(--text-main)",
                 margin: 0,
                 fontFamily: "var(--font-display)",
-
+                letterSpacing: "-0.03em",
               }}
             >
-              Active Markets
+              Featured Feed
             </h2>
             <LiveTicker />
           </div>
@@ -415,39 +411,40 @@ export function PwaFeedPage() {
       )}
 
       {resolvingMarkets.length > 0 && (
-        <section style={{ marginBottom: 48 }}>
+        <section style={{ marginBottom: "var(--space-xl)" }}>
           <div
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 10,
-              marginBottom: 20,
+              gap: 12,
+              marginBottom: "var(--space-md)",
             }}
           >
             <div
               style={{
-                padding: "4px 10px",
-                borderRadius: 8,
-                background: "rgba(245, 158, 11, 0.15)",
-                color: "#f59e0b",
-                fontSize: 10,
+                padding: "6px 12px",
+                borderRadius: "var(--radius-sm)",
+                background: "rgba(245, 158, 11, 0.1)",
+                color: "var(--color-warning)",
+                fontSize: "0.65rem",
                 fontWeight: 900,
-                letterSpacing: "0.05em",
+                letterSpacing: "0.08em",
                 textTransform: "uppercase",
               }}
             >
-              Wait
+              Resolving
             </div>
             <h2
               style={{
-                fontSize: 18,
-                fontWeight: 800,
+                fontSize: "1.25rem",
+                fontWeight: 900,
                 color: "var(--text-main)",
                 margin: 0,
                 fontFamily: "var(--font-display)",
+                letterSpacing: "-0.03em",
               }}
             >
-              Resolving
+              Oracle Verification
             </h2>
           </div>
           {renderGrid(resolvingMarkets)}
@@ -455,39 +452,40 @@ export function PwaFeedPage() {
       )}
 
       {upcomingMarkets.length > 0 && (
-        <section style={{ marginBottom: 48 }}>
+        <section style={{ marginBottom: "var(--space-xl)" }}>
           <div
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 10,
-              marginBottom: 20,
+              gap: 12,
+              marginBottom: "var(--space-md)",
             }}
           >
             <div
               style={{
-                padding: "4px 10px",
-                borderRadius: 8,
-                background: "rgba(100, 116, 139, 0.15)",
-                color: "var(--text-subtle)",
-                fontSize: 10,
+                padding: "6px 12px",
+                borderRadius: "var(--radius-sm)",
+                background: "rgba(59, 130, 246, 0.1)",
+                color: "var(--color-info)",
+                fontSize: "0.65rem",
                 fontWeight: 900,
-                letterSpacing: "0.05em",
+                letterSpacing: "0.08em",
                 textTransform: "uppercase",
               }}
             >
-              Soon
+              SOON
             </div>
             <h2
               style={{
-                fontSize: 18,
-                fontWeight: 800,
+                fontSize: "1.25rem",
+                fontWeight: 900,
                 color: "var(--text-main)",
                 margin: 0,
                 fontFamily: "var(--font-display)",
+                letterSpacing: "-0.03em",
               }}
             >
-              Upcoming
+              Coming Up
             </h2>
           </div>
           {renderGrid(upcomingMarkets)}

@@ -598,7 +598,7 @@ export class BotPollingService
     }
   }
 
-  private async handleCallbackQuery(callback: any) {
+  async handleCallbackQuery(callback: any) {
     const chatId: number = callback.message?.chat?.id;
     const data: string = callback.data ?? "";
     const callbackQueryId: string = callback.id;
@@ -606,26 +606,28 @@ export class BotPollingService
     // ── p:<key>  — short propose key registered by KeeperService ─────────
     if (data.startsWith("p:")) {
       const key = Number(data.slice(2));
+      this.logger.log(`[Bot] propose callback received — key=${key} from=${callback.from?.id} chatId=${chatId}`);
+
+      // Always answer the callback query immediately to dismiss the spinner.
+      // Telegram only allows ONE answer per callback_query_id, so we must NOT
+      // call answerCallbackQuery again inside the try/catch below.
+      await this.telegramSimple.answerCallbackQuery(callbackQueryId, "⏳ Processing…");
 
       // Security: only the configured admin may trigger this
       const adminTelegramId = this.config.get<string>("ADMIN_TELEGRAM_ID");
-      if (
-        !adminTelegramId ||
-        String(callback.from?.id) !== String(adminTelegramId)
-      ) {
-        await this.telegramSimple.answerCallbackQuery(
-          callbackQueryId,
-          "⛔ Not authorised.",
+      if (!adminTelegramId || String(callback.from?.id) !== String(adminTelegramId)) {
+        this.logger.warn(
+          `[Bot] Unauthorised propose attempt — from=${callback.from?.id} expected=${adminTelegramId}`,
         );
+        await this.telegramSimple.sendMessage(chatId, "⛔ <b>Not authorised.</b>");
         return;
       }
 
-      const resolved = this.telegramSimple.resolveProposeKey(key);
+      // Resolve the short key back to {marketId, outcomeId} from Redis
+      this.logger.log(`[Bot] resolving propose key ${key} from Redis…`);
+      const resolved = await this.telegramSimple.resolveProposeKey(key);
       if (!resolved) {
-        await this.telegramSimple.answerCallbackQuery(
-          callbackQueryId,
-          "⏰ Expired.",
-        );
+        this.logger.warn(`[Bot] propose key ${key} not found in Redis (expired or Redis down)`);
         await this.telegramSimple.sendMessage(
           chatId,
           "⏰ <b>Button expired.</b> Please use the admin panel to propose a resolution.",
@@ -634,53 +636,58 @@ export class BotPollingService
       }
 
       const { marketId, outcomeId } = resolved;
+      this.logger.log(`[Bot] resolved key ${key} → marketId=${marketId} outcomeId=${outcomeId}`);
 
       try {
-        await this.telegramSimple.answerCallbackQuery(
-          callbackQueryId,
-          "⏳ Opening dispute window…",
-        );
-
-        // Load market + outcomes directly — avoids circular module dependency
+        // Load market — use update() later to avoid cascade-save on eager outcomes
         const market = await this.marketRepo.findOne({
           where: { id: marketId },
           relations: ["outcomes"],
         });
-        if (!market) throw new Error("Market not found");
-        if (market.status !== MarketStatus.CLOSED)
-          throw new Error(`Market is ${market.status}, expected CLOSED`);
+        if (!market) throw new Error(`Market ${marketId} not found`);
+
+        this.logger.log(`[Bot] market "${market.title}" status=${market.status}`);
+
+        if (market.status !== MarketStatus.CLOSED) {
+          throw new Error(
+            `Market is "${market.status}", expected "closed". ` +
+            `It may have already been proposed or cancelled.`,
+          );
+        }
 
         const outcome = (market.outcomes ?? []).find((o) => o.id === outcomeId);
-        if (!outcome) throw new Error("Outcome not found in market");
+        if (!outcome) throw new Error(`Outcome ${outcomeId} not found in market`);
 
-        market.proposedOutcomeId = outcomeId;
-        market.disputeDeadlineAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-        market.status = MarketStatus.RESOLVING;
-        await this.marketRepo.save(market);
+        // Use update() instead of save() to avoid TypeORM cascading to outcomes
+        const BOT_PROPOSE_WINDOW_MINS = 24 * 60; // 24 h in minutes
+        const disputeDeadlineAt = new Date(Date.now() + BOT_PROPOSE_WINDOW_MINS * 60 * 1000);
+        await this.marketRepo.update(
+          { id: marketId },
+          {
+            proposedOutcomeId: outcomeId,
+            windowMinutes: BOT_PROPOSE_WINDOW_MINS,
+            disputeDeadlineAt,
+            status: MarketStatus.RESOLVING,
+          },
+        );
         await this.redis.del("oro:cache:markets:all", `oro:cache:market:${marketId}`);
 
-        const deadline = market.disputeDeadlineAt.toLocaleString();
+        this.logger.log(`[Bot] market "${market.title}" transitioned to RESOLVING via bot propose`);
+
         await this.telegramSimple.sendMessage(
           chatId,
           `⚖️ <b>Dispute Window Opened</b>\n\n` +
             `📊 <b>${market.title}</b>\n` +
             `🏆 Proposed winner: <b>${outcome.label}</b>\n` +
-            `⏳ Dispute deadline: ${deadline}\n\n` +
+            `⏳ Dispute deadline: ${disputeDeadlineAt.toLocaleString()}\n\n` +
             `The keeper will auto-settle when the window expires with no valid disputes.`,
         );
-        this.logger.log(
-          `[Bot] Admin proposed "${outcome.label}" for market "${market.title}"`,
-        );
       } catch (err: any) {
-        await this.telegramSimple.answerCallbackQuery(
-          callbackQueryId,
-          "❌ Failed",
-        );
+        this.logger.error(`[Bot] propose callback failed: ${err.message}`, err.stack);
         await this.telegramSimple.sendMessage(
           chatId,
           `❌ <b>Could not open dispute window</b>\n\nError: ${err.message}\n\nPlease use the admin panel instead.`,
         );
-        this.logger.error(`[Bot] propose callback failed: ${err.message}`);
       }
       return;
     }
@@ -690,65 +697,54 @@ export class BotPollingService
       const [, marketId, outcomeId] = data.split(":");
 
       // Security: only the configured admin may trigger this
+      await this.telegramSimple.answerCallbackQuery(callbackQueryId, "⏳ Processing…");
+
       const adminTelegramId = this.config.get<string>("ADMIN_TELEGRAM_ID");
-      if (
-        !adminTelegramId ||
-        String(callback.from?.id) !== String(adminTelegramId)
-      ) {
-        await this.telegramSimple.answerCallbackQuery(
-          callbackQueryId,
-          "⛔ Not authorised.",
-        );
+      if (!adminTelegramId || String(callback.from?.id) !== String(adminTelegramId)) {
+        await this.telegramSimple.sendMessage(chatId, "⛔ <b>Not authorised.</b>");
         return;
       }
 
       try {
-        await this.telegramSimple.answerCallbackQuery(
-          callbackQueryId,
-          "⏳ Opening dispute window…",
-        );
-
-        // Load market + outcomes directly — avoids circular module dependency
         const market = await this.marketRepo.findOne({
           where: { id: marketId },
           relations: ["outcomes"],
         });
         if (!market) throw new Error("Market not found");
         if (market.status !== MarketStatus.CLOSED)
-          throw new Error(`Market is ${market.status}, expected CLOSED`);
+          throw new Error(`Market is "${market.status}", expected "closed"`);
 
         const outcome = (market.outcomes ?? []).find((o) => o.id === outcomeId);
         if (!outcome) throw new Error("Outcome not found in market");
 
-        // Set proposed outcome + open 24h dispute window
-        market.proposedOutcomeId = outcomeId;
-        market.disputeDeadlineAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-        market.status = MarketStatus.RESOLVING;
-        await this.marketRepo.save(market);
+        const BOT_PROPOSE_WINDOW_MINS = 24 * 60;
+        const disputeDeadlineAt = new Date(Date.now() + BOT_PROPOSE_WINDOW_MINS * 60 * 1000);
+        await this.marketRepo.update(
+          { id: marketId },
+          {
+            proposedOutcomeId: outcomeId,
+            windowMinutes: BOT_PROPOSE_WINDOW_MINS,
+            disputeDeadlineAt,
+            status: MarketStatus.RESOLVING,
+          },
+        );
         await this.redis.del("oro:cache:markets:all", `oro:cache:market:${marketId}`);
+        this.logger.log(`[Bot][legacy] Admin proposed "${outcome.label}" for "${market.title}"`);
 
-        const deadline = market.disputeDeadlineAt.toLocaleString();
         await this.telegramSimple.sendMessage(
           chatId,
           `⚖️ <b>Dispute Window Opened</b>\n\n` +
             `📊 <b>${market.title}</b>\n` +
             `🏆 Proposed winner: <b>${outcome.label}</b>\n` +
-            `⏳ Dispute deadline: ${deadline}\n\n` +
+            `⏳ Dispute deadline: ${disputeDeadlineAt.toLocaleString()}\n\n` +
             `The keeper will auto-settle when the window expires with no valid disputes.`,
         );
-        this.logger.log(
-          `[Bot] Admin proposed "${outcome.label}" for market "${market.title}"`,
-        );
       } catch (err: any) {
-        await this.telegramSimple.answerCallbackQuery(
-          callbackQueryId,
-          "❌ Failed",
-        );
+        this.logger.error(`[Bot][legacy] propose callback failed: ${err.message}`);
         await this.telegramSimple.sendMessage(
           chatId,
           `❌ <b>Could not open dispute window</b>\n\nError: ${err.message}\n\nPlease use the admin panel instead.`,
         );
-        this.logger.error(`[Bot] propose callback failed: ${err.message}`);
       }
       return;
     }

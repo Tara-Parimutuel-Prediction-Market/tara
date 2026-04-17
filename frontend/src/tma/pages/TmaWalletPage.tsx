@@ -233,8 +233,8 @@ function Step({ n, done, text }: { n: number; done: boolean; text: string }) {
           fontSize: 13,
           fontWeight: 700,
           flexShrink: 0,
-          background: done ? "#2775d0" : "#e5e7eb",
-          color: done ? "#fff" : "#6b7280",
+          background: done ? "var(--color-primary)" : "var(--bg-secondary)",
+          color: done ? "#fff" : "var(--text-subtle)",
         }}
       >
         {done ? <CheckCircle2 size={14} /> : n}
@@ -243,7 +243,7 @@ function Step({ n, done, text }: { n: number; done: boolean; text: string }) {
         style={{
           fontSize: 14,
           lineHeight: 1.4,
-          color: done ? "#111" : "#6b7280",
+          color: done ? "var(--text-main)" : "var(--text-muted)",
         }}
       >
         {text}
@@ -620,7 +620,7 @@ export const TmaWalletPage: FC = () => {
           padding: "0 0 100px",
           display: "flex",
           flexDirection: "column",
-          gap: 16,
+          gap: "var(--space-md)",
         }}
       >
         {/* ── Balance Hero Card ─────────────────────────────── */}
@@ -758,8 +758,8 @@ export const TmaWalletPage: FC = () => {
           style={{
             display: "grid",
             gridTemplateColumns: "1fr 1fr",
-            gap: 12,
-            padding: "0 16px",
+            gap: "var(--space-sm)",
+            padding: "0 var(--space-md)",
           }}
         >
           <button
@@ -1215,7 +1215,7 @@ export const TmaWalletPage: FC = () => {
                   padding: "14px",
                   fontSize: 15,
                   fontWeight: 700,
-                  background: "linear-gradient(135deg, #00499cff, #1a5bb5)",
+                  background: "var(--grad-primary)",
                   color: "#fff",
                   border: "none",
                   borderRadius: 12,
@@ -1283,7 +1283,7 @@ export const TmaWalletPage: FC = () => {
               }}
             >
               <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <Smartphone size={16} color="#2775d0" />
+                <Smartphone size={16} color="var(--color-primary)" />
                 Verify Your Phone
               </span>
             </h3>
@@ -2521,12 +2521,13 @@ const spinner: React.CSSProperties = {
 
 const balanceCard: React.CSSProperties = {
   background: "var(--balance-card-bg)",
-  borderRadius: "0 0 28px 28px",
-  padding: "16px 20px 24px",
+  borderRadius: "0 0 var(--radius-xl) var(--radius-xl)",
+  padding: "var(--space-md) var(--space-md) var(--space-lg)",
   color: "#fff",
   position: "relative",
   overflow: "hidden",
   boxShadow: "var(--balance-card-shadow)",
+  borderBottom: "1px solid rgba(255,255,255,0.1)",
 };
 
 const actionBtnPrimary: React.CSSProperties = {
@@ -2534,14 +2535,16 @@ const actionBtnPrimary: React.CSSProperties = {
   alignItems: "center",
   justifyContent: "center",
   gap: 8,
-  padding: "13px",
-  borderRadius: 12,
+  padding: "14px 20px",
+  borderRadius: "var(--radius-md)",
   border: "none",
-  background: "var(--deposit-btn-bg)",
+  background: "var(--grad-primary)",
   color: "#fff",
-  fontWeight: 700,
-  fontSize: "0.9rem",
+  fontWeight: 800,
+  fontSize: "0.95rem",
   cursor: "pointer",
+  boxShadow: "0 8px 20px -6px rgba(39, 117, 208, 0.5)",
+  transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
 };
 
 const actionBtnSecondary: React.CSSProperties = {
@@ -2549,14 +2552,16 @@ const actionBtnSecondary: React.CSSProperties = {
   alignItems: "center",
   justifyContent: "center",
   gap: 8,
-  padding: "13px",
-  borderRadius: 12,
-  border: "1.5px solid var(--glass-border)",
+  padding: "14px 20px",
+  borderRadius: "var(--radius-md)",
+  border: "1.5px solid var(--border)",
   background: "var(--bg-card)",
   color: "var(--text-main)",
-  fontWeight: 700,
-  fontSize: "0.9rem",
+  fontWeight: 800,
+  fontSize: "0.95rem",
   cursor: "pointer",
+  transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+  boxShadow: "var(--shadow-sm)",
 };
 
 const card: React.CSSProperties = {

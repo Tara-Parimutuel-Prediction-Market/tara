@@ -13,7 +13,7 @@ export const PwaMarketGrid: FC<PwaMarketGridProps> = ({ children }) => {
     <div style={{ 
       display: "grid", 
       gridTemplateColumns: gridCols, 
-      gap: 20, 
+      gap: "var(--space-lg)", 
       alignItems: "stretch" 
     }}>
       {children}

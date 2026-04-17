@@ -367,7 +367,7 @@ function CardInventoryStrip({ inventory }: { inventory: CardInventory }) {
       <div style={{ display: "flex", gap: 8 }}>
         {(["doubleDown", "shield", "ghost"] as CardType[]).map((key) => {
           const cfg = CARD_CONFIG[key];
-          const count = inventory[key];
+          const count = inventory[key] ?? 0;
           const locked = count === 0;
           return (
             <div
@@ -536,7 +536,7 @@ function CardPicker({
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         {(["doubleDown", "shield", "ghost"] as CardType[]).map((key) => {
           const cfg = CARD_CONFIG[key];
-          const count = inventory[key];
+          const count = inventory[key] ?? 0;
           const locked = count === 0;
           const selected = value === key;
           return (

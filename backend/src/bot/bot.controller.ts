@@ -15,6 +15,7 @@ import { JwtAuthGuard, AdminGuard } from "../auth/guards";
 import { TelegramSimpleService } from "../telegram/telegram.service.simple";
 import { TelegramVerificationService } from "../telegram/telegram-verification.service";
 import { LeaguesService } from "../leagues/leagues.service";
+import { BotPollingService } from "./bot-polling.service";
 import { User } from "../entities/user.entity";
 import { Market, MarketStatus } from "../entities/market.entity";
 
@@ -25,6 +26,7 @@ export class BotController {
     private readonly telegramSimpleService: TelegramSimpleService,
     private readonly telegramVerificationService: TelegramVerificationService,
     private readonly leaguesService: LeaguesService,
+    private readonly botPollingService: BotPollingService,
     @InjectRepository(User) private readonly userRepo: Repository<User>,
     @InjectRepository(Market) private readonly marketRepo: Repository<Market>,
   ) {}
@@ -461,11 +463,6 @@ export class BotController {
   }
 
   private async handleCallbackQuery(callback: any) {
-    if (callback.data) {
-      await this.telegramSimpleService.sendMessage(
-        callback.message.chat.id,
-        `🎯 You selected: ${callback.data}`,
-      );
-    }
+    await this.botPollingService.handleCallbackQuery(callback);
   }
 }

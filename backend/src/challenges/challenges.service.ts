@@ -176,6 +176,22 @@ export class ChallengesService {
 
   // ── Card helpers ───────────────────────────────────────────────────────────
 
+  /**
+   * Normalize raw cardInventory from DB.
+   * The original CreateUsersTable migration set DEFAULT '[]' (an array) instead
+   * of an object, so existing rows may have [] instead of null. Treat both as zeros.
+   */
+  private normalizeInventory(
+    raw: { doubleDown: number; shield: number; ghost: number } | null,
+  ): { doubleDown: number; shield: number; ghost: number } {
+    if (!raw || Array.isArray(raw)) return { doubleDown: 0, shield: 0, ghost: 0 };
+    return {
+      doubleDown: raw.doubleDown ?? 0,
+      shield: raw.shield ?? 0,
+      ghost: raw.ghost ?? 0,
+    };
+  }
+
   /** Return the caller's current card inventory (zeros if never earned any). */
   async getCardInventory(
     userId: string,
@@ -184,7 +200,7 @@ export class ChallengesService {
       .getRepository(User)
       .findOne({ where: { id: userId } });
     if (!user) throw new NotFoundException("User not found");
-    return user.cardInventory ?? { doubleDown: 0, shield: 0, ghost: 0 };
+    return this.normalizeInventory(user.cardInventory);
   }
 
   /** Decrement one card of the given type from the user's inventory, or throw. */
@@ -193,7 +209,7 @@ export class ChallengesService {
     const user = await userRepo.findOne({ where: { id: userId } });
     if (!user) throw new NotFoundException("User not found");
 
-    const inv = user.cardInventory ?? { doubleDown: 0, shield: 0, ghost: 0 };
+    const inv = this.normalizeInventory(user.cardInventory);
     if ((inv[card] ?? 0) < 1) {
       throw new BadRequestException(
         `You don't have a ${card} card in your inventory`,
@@ -228,11 +244,7 @@ export class ChallengesService {
       const userRepo = this.dataSource.getRepository(User);
       const user = await userRepo.findOne({ where: { id: userId } });
       if (user) {
-        const inv = user.cardInventory ?? {
-          doubleDown: 0,
-          shield: 0,
-          ghost: 0,
-        };
+        const inv = this.normalizeInventory(user.cardInventory);
         inv[awarded] = (inv[awarded] ?? 0) + 1;
         user.cardInventory = inv;
         await userRepo.save(user);

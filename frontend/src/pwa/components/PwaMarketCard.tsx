@@ -76,21 +76,31 @@ export const PwaMarketCard: FC<PwaMarketCardProps> = ({ market, onBet }) => {
     <div
       style={{
         background: "var(--bg-card)",
-        border: "none",
-        borderRadius: 20,
-        padding: "18px 16px",
+        border: "1px solid var(--border)",
+        borderRadius: "var(--radius-lg)",
+        padding: "var(--space-md)",
         display: "flex",
         flexDirection: "column",
         height: "100%",
         boxSizing: "border-box",
-        gap: 12,
+        gap: "var(--space-md)",
         position: "relative",
-        boxShadow:
-          "6px 6px 16px rgba(0,0,0,0.35), -3px -3px 10px rgba(255,255,255,0.04)",
-        transition: "all 0.2s ease",
+        boxShadow: "var(--shadow-md)",
+        transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
         cursor: "pointer",
+        overflow: "hidden",
       }}
       onClick={() => navigate(`/market/${market.id}`)}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.transform = "translateY(-4px)";
+        e.currentTarget.style.boxShadow = "var(--shadow-lg)";
+        e.currentTarget.style.borderColor = "rgba(39, 117, 208, 0.3)";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.transform = "translateY(0)";
+        e.currentTarget.style.boxShadow = "var(--shadow-md)";
+        e.currentTarget.style.borderColor = "var(--border)";
+      }}
     >
       <style>{`@keyframes shimmer-slide{0%{transform:translateX(-100%)}100%{transform:translateX(250%)}}`}</style>
 
@@ -100,122 +110,105 @@ export const PwaMarketCard: FC<PwaMarketCardProps> = ({ market, onBet }) => {
             position: "absolute",
             top: 12,
             right: 12,
-            background: isUpcoming ? "#3b82f6" : "#22c55e",
+            background: isUpcoming ? "var(--color-info)" : "var(--color-success)",
             color: "#fff",
-            padding: "2px 8px",
-            fontSize: "0.6rem",
-            fontWeight: 800,
-            borderRadius: 4,
+            padding: "4px 10px",
+            fontSize: "0.65rem",
+            fontWeight: 900,
+            borderRadius: "var(--radius-sm)",
             textTransform: "uppercase",
             zIndex: 1,
+            letterSpacing: "0.05em",
+            boxShadow: "0 4px 10px rgba(0,0,0,0.2)",
           }}
         >
-          {isUpcoming ? "Soon" : "Wait"}
+          {isUpcoming ? "Soon" : "Resolved"}
         </div>
       )}
 
       <h3
         style={{
-          fontSize: "0.95rem",
-          fontWeight: 700,
-          lineHeight: 1.4,
+          fontSize: "1.05rem",
+          fontWeight: 800,
+          lineHeight: 1.3,
           color: "var(--text-main)",
           margin: 0,
-          minHeight: "2.8em",
+          minHeight: "2.6em",
           overflow: "hidden",
           display: "-webkit-box",
           WebkitLineClamp: 2,
           WebkitBoxOrient: "vertical",
           fontFamily: "var(--font-display)",
-          paddingRight: isUpcoming || isResolving ? 45 : 0,
+          paddingRight: isUpcoming || isResolving ? 60 : 0,
+          letterSpacing: "-0.01em",
         }}
       >
         {market.title}
       </h3>
 
-      {/* ── Outcomes / Interactive Area ── */}
+      {/* ── Outcomes Area ── */}
       <div
         style={{
           display: "flex",
           flexDirection: "column",
-          gap: 10,
+          gap: "var(--space-sm)",
           marginTop: "auto",
-          minHeight: 124, // Standardize vertical space for outcome controls
+          minHeight: 120,
           justifyContent: isUpcoming || isResolving ? "center" : "flex-start",
         }}
       >
         {isResolving ? (
           <div
             style={{
-              padding: "16px",
-              borderRadius: 14,
-              background: "rgba(34,197,94,0.06)",
-              border: "1.5px dashed rgba(34,197,94,0.3)",
-              fontSize: "0.8rem",
-              color: "#22c55e",
+              padding: "20px",
+              borderRadius: "var(--radius-md)",
+              background: "rgba(34,197,94,0.08)",
+              border: "1.5px dashed var(--color-success)",
+              fontSize: "0.85rem",
+              color: "var(--color-success)",
               fontWeight: 800,
               textAlign: "center",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              gap: 8,
+              gap: 10,
             }}
           >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <circle cx="12" cy="12" r="10" />
-              <polyline points="12 6 12 12 16 14" />
+             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+              <polyline points="22 4 12 14.01 9 11.01" />
             </svg>
-            Resolving soon
+            Resolving...
           </div>
         ) : isUpcoming ? (
           <div
             style={{
-              padding: "16px",
-              borderRadius: 14,
-              background: "rgba(59,130,246,0.06)",
+              padding: "20px",
+              borderRadius: "var(--radius-md)",
+              background: "rgba(59,130,246,0.08)",
               border: "1.5px solid rgba(59,130,246,0.2)",
-              fontSize: "0.8rem",
-              color: "#3b82f6",
+              fontSize: "0.85rem",
+              color: "var(--color-info)",
               fontWeight: 800,
               textAlign: "center",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              gap: 8,
+              gap: 10,
             }}
           >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <circle cx="12" cy="12" r="10" />
-              <polyline points="12 6 12 12 16 14" />
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
             </svg>
             Opens {countdown}
           </div>
         ) : (
           <>
             <div
-              style={{ display: "flex", flexDirection: "column", gap: 8 }}
+              style={{ display: "flex", flexDirection: "column", gap: "var(--space-sm)" }}
             >
               {displayOutcomes.map((s, idx) => {
                 const barWidth = Math.max(4, Math.min(100, s.pct));
-                // Match TMA's avatar fallbacks
                 const avatarUrl = !imgError
                   ? (s as any).imageUrl ||
                     (idx === 0
@@ -235,19 +228,28 @@ export const PwaMarketCard: FC<PwaMarketCardProps> = ({ market, onBet }) => {
                     style={{
                       width: "100%",
                       padding: "0",
-                      borderRadius: 16,
-                      background: "var(--bg-card)",
-                      border: "1.5px solid var(--glass-border)",
+                      borderRadius: "var(--radius-md)",
+                      background: "var(--bg-secondary)",
+                      border: "1px solid var(--border)",
                       cursor: "pointer",
                       overflow: "hidden",
-                      transition: "all 0.15s ease",
+                      transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
                       display: "block",
                       textAlign: "left",
                       position: "relative",
-                      boxShadow: "var(--shadow-sm)",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = "var(--text-subtle)";
+                      e.currentTarget.style.background = "var(--bg-card)";
+                      e.currentTarget.style.transform = "scale(1.01)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = "var(--border)";
+                      e.currentTarget.style.background = "var(--bg-secondary)";
+                      e.currentTarget.style.transform = "scale(1)";
                     }}
                   >
-                    {/* Pool fill */}
+                    {/* Pool fill - Cleaner gradient */}
                     <div
                       style={{
                         position: "absolute",
@@ -255,56 +257,38 @@ export const PwaMarketCard: FC<PwaMarketCardProps> = ({ market, onBet }) => {
                         left: 0,
                         bottom: 0,
                         width: `${barWidth}%`,
-                        background: `linear-gradient(90deg, ${s.color}22 0%, ${s.color}11 60%, transparent 100%)`,
-                        borderRadius: "16px 0 0 16px",
-                        transition: "width 1s ease",
+                        background: `${s.color}15`,
+                        borderRadius: "var(--radius-md) 0 0 var(--radius-md)",
+                        transition: "width 1s cubic-bezier(0.4, 0, 0.2, 1)",
                         pointerEvents: "none",
                       }}
                     />
-                    {/* Shimmer sweep */}
-                    <div
-                      style={{
-                        position: "absolute",
-                        inset: 0,
-                        overflow: "hidden",
-                        borderRadius: 16,
-                        pointerEvents: "none",
-                      }}
-                    >
-                      <div
-                        style={{
-                          position: "absolute",
-                          top: 0,
-                          bottom: 0,
-                          width: "40%",
-                          background: `linear-gradient(90deg, transparent, ${s.color}15, transparent)`,
-                          animation: "shimmer-slide 2.4s ease-in-out infinite",
-                        }}
-                      />
-                    </div>
+                    
                     {/* Content */}
                     <div
                       style={{
                         position: "relative",
-                        padding: "8px 12px",
+                        padding: "10px 14px",
                         display: "flex",
                         alignItems: "center",
                         gap: 12,
-                        minHeight: 48,
+                        minHeight: 52,
                       }}
                     >
-                      {/* Circle avatar (Clean Style) */}
+                      {/* TMA-Style Circular Avatar */}
                       <div
                         style={{
                           flexShrink: 0,
-                          width: 32,
-                          height: 32,
-                          borderRadius: "50%",
+                          width: 34,
+                          height: 34,
+                          borderRadius: "var(--radius-full)",
                           overflow: "hidden",
                           background: vis.gradient,
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
+                          border: "1.5px solid #fff",
+                          boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
                         }}
                       >
                         {avatarUrl ? (
@@ -322,10 +306,10 @@ export const PwaMarketCard: FC<PwaMarketCardProps> = ({ market, onBet }) => {
                         ) : (
                           <span
                             style={{
-                              fontSize: 13,
+                              fontSize: 14,
                               fontWeight: 900,
                               color: "#fff",
-                              opacity: 0.95,
+                              textShadow: "0 1px 2px rgba(0,0,0,0.2)",
                             }}
                           >
                             {s.label.charAt(0).toUpperCase()}
@@ -335,7 +319,7 @@ export const PwaMarketCard: FC<PwaMarketCardProps> = ({ market, onBet }) => {
 
                       <span
                         style={{
-                          fontSize: "0.82rem",
+                          fontSize: "0.9rem",
                           fontWeight: 700,
                           color: "var(--text-main)",
                           letterSpacing: "-0.01em",
@@ -350,15 +334,15 @@ export const PwaMarketCard: FC<PwaMarketCardProps> = ({ market, onBet }) => {
 
                       <div
                         style={{
-                          background: `${s.color}18`,
-                          border: `1px solid ${s.color}40`,
+                          background: `${s.color}20`,
                           color: s.color,
                           fontSize: "0.75rem",
                           fontWeight: 900,
-                          padding: "2px 10px",
-                          borderRadius: 99,
+                          padding: "4px 10px",
+                          borderRadius: "var(--radius-full)",
                           flexShrink: 0,
                           marginLeft: "auto",
+                          boxShadow: `inset 0 0 0 1px ${s.color}30`,
                         }}
                       >
                         {s.pct.toFixed(0)}%
@@ -377,20 +361,23 @@ export const PwaMarketCard: FC<PwaMarketCardProps> = ({ market, onBet }) => {
                 }}
                 style={{
                   background: "transparent",
-                  border: "1.5px solid var(--glass-border)",
-                  padding: "7px 10px",
-                  borderRadius: 10,
-                  fontSize: "0.7rem",
+                  border: "1px solid var(--border)",
+                  padding: "8px 12px",
+                  borderRadius: "var(--radius-md)",
+                  fontSize: "0.75rem",
                   color: "var(--text-muted)",
                   fontWeight: 700,
                   cursor: "pointer",
                   textAlign: "center",
                   width: "100%",
+                  transition: "all 0.2s",
                 }}
+                onMouseEnter={(e) => (e.currentTarget.style.borderColor = "var(--text-subtle)")}
+                onMouseLeave={(e) => (e.currentTarget.style.borderColor = "var(--border)")}
               >
                 {showAll
-                  ? "Show Less ▲"
-                  : `+${market.outcomes.length - 2} more options`}
+                  ? "Show Less"
+                  : `+ ${market.outcomes.length - 2} outcomes`}
               </button>
             )}
           </>
@@ -402,99 +389,72 @@ export const PwaMarketCard: FC<PwaMarketCardProps> = ({ market, onBet }) => {
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          fontSize: "0.65rem",
+          fontSize: "0.7rem",
           color: "var(--text-subtle)",
           fontWeight: 800,
-          paddingTop: 10,
-          borderTop: "1px solid var(--glass-border)",
-          marginTop: 4,
+          paddingTop: "var(--space-md)",
+          borderTop: "1px solid var(--border)",
+          marginTop: "var(--space-xs)",
         }}
       >
         <div
           style={{
-            color: "#22c55e",
+            color: "var(--color-success)",
             display: "flex",
             alignItems: "center",
-            gap: 4,
+            gap: 6,
           }}
         >
-          <span>Nu {Number(market.totalPool).toLocaleString()}</span>
-          <span style={{ fontSize: "0.6rem", opacity: 0.7 }}>Pool</span>
+          <span style={{ fontSize: "0.85rem", fontWeight: 900 }}>Nu {Number(market.totalPool).toLocaleString()}</span>
+          <span style={{ fontSize: "0.6rem", opacity: 0.8, textTransform: "uppercase", letterSpacing: "0.05em" }}>Pool</span>
         </div>
+        
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <div
             style={{
               display: "flex",
               alignItems: "center",
               gap: 4,
-              opacity: 0.8,
             }}
           >
-            <svg
-              width="10"
-              height="10"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="3"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <circle cx="12" cy="12" r="10" />
-              <polyline points="12 6 12 12 16 14" />
+             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
             </svg>
             {!isUpcoming && !isResolving ? countdown : "Closed"}
           </div>
+          
           <button
             onClick={(e) => {
               e.stopPropagation();
               const url = `${window.location.origin}/market/${market.id}`;
               const text = `Check out this prediction market: ${market.title}`;
               if (navigator.share) {
-                navigator
-                  .share({ title: market.title, text, url })
-                  .catch(() => {});
+                navigator.share({ title: market.title, text, url }).catch(() => {});
               } else {
                 navigator.clipboard.writeText(url);
                 alert("Link copied to clipboard!");
               }
             }}
             style={{
-              background: "none",
-              border: "1px solid var(--glass-border)",
-              borderRadius: 8,
-              padding: "4px 8px",
+              background: "var(--bg-secondary)",
+              border: "none",
+              borderRadius: "var(--radius-sm)",
+              padding: "6px 12px",
               cursor: "pointer",
               display: "flex",
               alignItems: "center",
-              gap: 4,
-              color: "var(--text-subtle)",
-              fontSize: "0.65rem",
+              gap: 6,
+              color: "var(--text-muted)",
+              fontSize: "0.7rem",
               fontWeight: 800,
               transition: "all 0.2s",
             }}
-            onMouseEnter={(e) =>
-              (e.currentTarget.style.borderColor = "var(--text-muted)")
-            }
-            onMouseLeave={(e) =>
-              (e.currentTarget.style.borderColor = "var(--glass-border)")
-            }
+            onMouseEnter={(e) => { e.currentTarget.style.background = "var(--bg-main)"; e.currentTarget.style.color = "var(--text-main)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "var(--bg-secondary)"; e.currentTarget.style.color = "var(--text-muted)"; }}
           >
-            <svg
-              width="10"
-              height="10"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <circle cx="18" cy="5" r="3" />
-              <circle cx="6" cy="12" r="3" />
-              <circle cx="18" cy="19" r="3" />
-              <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
-              <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+              <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
             </svg>
             Share
           </button>

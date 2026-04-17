@@ -31,7 +31,7 @@ function NavbarControls({ isMobile, onShowHowItWorks }: { isMobile: boolean, onS
         display: "flex",
         alignItems: "center",
         justifyContent: "flex-end",
-        gap: 16,
+        gap: "var(--space-md)",
         flex: 1,
       }}
     >
@@ -39,15 +39,15 @@ function NavbarControls({ isMobile, onShowHowItWorks }: { isMobile: boolean, onS
         style={{
           display: "flex",
           alignItems: "center",
-          gap: 6,
+          gap: "var(--space-xs)",
           background: "none",
           border: "none",
           color: "var(--text-muted)",
           fontSize: "0.85rem",
           fontWeight: 700,
           cursor: "pointer",
-          padding: "8px 0",
-          transition: "color 0.2s",
+          padding: "var(--space-sm) 0",
+          transition: "all 0.2s ease",
         }}
         onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text-main)")}
         onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-muted)")}
@@ -65,16 +65,19 @@ function NavbarControls({ isMobile, onShowHowItWorks }: { isMobile: boolean, onS
             appearance: "none",
             background: "var(--bg-card)",
             border: "1px solid var(--glass-border)",
-            borderRadius: 12,
-            padding: "8px 36px 8px 14px",
+            borderRadius: "var(--radius-md)",
+            padding: "10px 36px 10px 14px",
             color: "var(--text-main)",
             fontSize: "0.85rem",
             fontWeight: 700,
             outline: "none",
             cursor: "pointer",
-            minWidth: 120,
+            minWidth: 140,
             boxShadow: "var(--shadow-sm)",
+            transition: "all 0.2s ease",
           }}
+          onMouseEnter={(e) => (e.currentTarget.style.borderColor = "var(--text-subtle)")}
+          onMouseLeave={(e) => (e.currentTarget.style.borderColor = "var(--glass-border)")}
         >
           {availableCategories.map((cat) => (
             <option key={cat} value={cat}>
@@ -102,20 +105,22 @@ function NavbarControls({ isMobile, onShowHowItWorks }: { isMobile: boolean, onS
         style={{
           display: "flex",
           alignItems: "center",
-          gap: 6,
-          background: "linear-gradient(135deg, #229ed9, #1a7abf)",
+          gap: 8,
+          background: "var(--grad-primary)",
           color: "#fff",
-          padding: "7px 14px",
-          borderRadius: 20,
+          padding: "10px 20px",
+          borderRadius: "var(--radius-full)",
           textDecoration: "none",
-          fontSize: "0.75rem",
-          fontWeight: 700,
-          boxShadow: "0 2px 8px rgba(34,158,217,0.3)",
-          letterSpacing: "0.01em",
+          fontSize: "0.85rem",
+          fontWeight: 800,
+          boxShadow: "0 8px 20px -6px rgba(39, 117, 208, 0.5)",
+          transition: "all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)",
           flexShrink: 0,
         }}
+        onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = "0 12px 24px -6px rgba(39, 117, 208, 0.6)"; }}
+        onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "0 8px 20px -6px rgba(39, 117, 208, 0.5)"; }}
       >
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
           <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z" />
         </svg>
         Telegram
@@ -137,7 +142,7 @@ function PwaSearch() {
         flex: 2,
         maxWidth: 500,
         margin: "0 auto",
-        transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+        transition: "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
         transform: isFocused ? "scale(1.02)" : "scale(1)",
       }}
     >
@@ -145,10 +150,10 @@ function PwaSearch() {
         size={18}
         style={{
           position: "absolute",
-          left: 16,
+          left: 18,
           top: "50%",
           transform: "translateY(-50%)",
-          color: isFocused ? "var(--text-main)" : "var(--text-subtle)",
+          color: isFocused ? "var(--color-primary)" : "var(--text-subtle)",
           transition: "color 0.3s",
           pointerEvents: "none",
           zIndex: 1,
@@ -163,19 +168,18 @@ function PwaSearch() {
         onBlur={() => setIsFocused(false)}
         style={{
           width: "100%",
-          background: isFocused ? "rgba(255,255,255,0.06)" : "var(--bg-card)",
-          border: "1px solid var(--glass-border)",
-          borderRadius: 24,
-          padding: "12px 20px 12px 48px",
+          background: isFocused ? "var(--bg-card)" : "var(--bg-secondary)",
+          border: isFocused ? "1.5px solid var(--color-primary)" : "1px solid var(--glass-border)",
+          borderRadius: "var(--radius-full)",
+          padding: "14px 20px 14px 52px",
           color: "var(--text-main)",
-          fontSize: "0.9rem",
+          fontSize: "0.95rem",
           fontWeight: 600,
           outline: "none",
-          transition: "all 0.3s",
+          transition: "all 0.3s ease",
           boxShadow: isFocused 
-            ? "0 8px 24px rgba(0,0,0,0.3), 0 0 0 1px #3b82f640" 
+            ? "0 12px 24px -8px rgba(39, 117, 208, 0.25)" 
             : "var(--shadow-sm)",
-          backdropFilter: "blur(12px)",
         }}
       />
     </div>
@@ -218,24 +222,24 @@ function PwaLayout() {
       >
         <div
           style={{
-            maxWidth: 1200,
+            maxWidth: 1240,
             margin: "0 auto",
-            padding: "0 16px",
-            height: 90,
+            padding: "0 var(--space-md)",
+            height: "var(--header-height)",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            gap: 20,
+            gap: "var(--space-md)",
           }}
         >
           {/* Section 1: Branding (Flex 1) */}
-          <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 12 }}>
-            <OroLogo size={65} />
-            <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.1 }}>
-              <span style={{ fontWeight: 900, fontSize: "1.45rem", color: "var(--text-main)", letterSpacing: "-0.03em", fontFamily: "var(--font-display)" }}>
+          <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 14 }}>
+            <OroLogo size={58} />
+            <div style={{ display: "flex", flexDirection: "column", lineHeight: 1 }}>
+              <span style={{ fontWeight: 900, fontSize: "1.6rem", color: "var(--text-main)", letterSpacing: "-0.04em", fontFamily: "var(--font-display)" }}>
                 Oro
               </span>
-              <span style={{ fontSize: "0.7rem", color: "var(--text-muted)", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" }}>
+              <span style={{ fontSize: "0.68rem", color: "var(--text-muted)", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", marginTop: 2 }}>
                 Parimutuel Predictions
               </span>
             </div>

@@ -113,116 +113,124 @@ export function PwaMarketsPage() {
   );
 
   return (
-    <div style={{ padding: "32px 16px 100px", maxWidth: 1200, margin: "0 auto", position: "relative" }}>
+    <div style={{ padding: "0 0 100px", maxWidth: 1240, margin: "0 auto", position: "relative" }}>
       <div className="mesh-bg" />
 
-      {/* ── Search bar ── */}
-      <div style={{ position: "relative", marginBottom: 40 }}>
-        <svg
-          style={{
-            position: "absolute",
-            left: 14,
-            top: "50%",
-            transform: "translateY(-50%)",
-            color: "var(--text-subtle)",
-            pointerEvents: "none",
-          }}
-          width="18"
-          height="18"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <circle cx="11" cy="11" r="8" />
-          <line x1="21" y1="21" x2="16.65" y2="16.65" />
-        </svg>
-        <input
-          type="text"
-          placeholder="Search markets…"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          style={{
-            width: "100%",
-            boxSizing: "border-box",
-            padding: "14px 40px 14px 44px",
-            borderRadius: 16,
-            border: "1px solid var(--glass-border)",
-            background: "var(--bg-card)",
-            boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
-            fontSize: 15,
-            color: "var(--text-main)",
-            outline: "none",
-            fontFamily: "var(--font-primary)",
-          }}
-        />
-        {searchQuery && (
-          <button
-            onClick={() => setSearchQuery("")}
+      {/* ── Page Hero/Header ── */}
+      <div style={{ padding: "var(--space-xl) var(--space-md) var(--space-lg)" }}>
+        {/* Search bar */}
+        <div style={{ position: "relative", marginBottom: "var(--space-xl)", maxWidth: 600 }}>
+          <svg
             style={{
               position: "absolute",
-              right: 12,
+              left: 14,
               top: "50%",
               transform: "translateY(-50%)",
-              background: "rgba(0,0,0,0.05)",
-              border: "none",
-              cursor: "pointer",
               color: "var(--text-subtle)",
-              fontSize: 12,
-              borderRadius: "50%",
-              width: 20,
-              height: 20,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: 0,
+              pointerEvents: "none",
             }}
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
           >
-            ✕
-          </button>
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+          <input
+            type="text"
+            placeholder="Search markets..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            style={{
+              width: "100%",
+              boxSizing: "border-box",
+              padding: "14px 40px 14px 44px",
+              borderRadius: "var(--radius-md)",
+              border: "1px solid var(--glass-border)",
+              background: "var(--bg-card)",
+              boxShadow: "var(--shadow-sm)",
+              fontSize: "1rem",
+              color: "var(--text-main)",
+              outline: "none",
+              fontFamily: "var(--font-primary)",
+              fontWeight: 600,
+              transition: "all 0.2s",
+            }}
+            onFocus={(e) => (e.currentTarget.style.borderColor = "var(--color-primary)")}
+            onBlur={(e) => (e.currentTarget.style.borderColor = "var(--glass-border)")}
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              style={{
+                position: "absolute",
+                right: 12,
+                top: "50%",
+                transform: "translateY(-50%)",
+                background: "var(--bg-secondary)",
+                border: "none",
+                cursor: "pointer",
+                color: "var(--text-muted)",
+                fontSize: 10,
+                borderRadius: "50%",
+                width: 22,
+                height: 22,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: 0,
+                fontWeight: 900,
+              }}
+            >
+              ✕
+            </button>
+          )}
+        </div>
+
+        {/* No results */}
+        {!hasResults && searchQuery.trim() && (
+          <div style={{ textAlign: "center", padding: "80px 0", color: "var(--text-subtle)" }}>
+            <div style={{ fontSize: 48, marginBottom: 16 }}>🔍</div>
+            <div style={{ fontSize: 20, fontWeight: 900, color: "var(--text-main)", fontFamily: "var(--font-display)", letterSpacing: "-0.02em" }}>No markets found</div>
+            <div style={{ fontSize: "1rem", marginTop: 8, fontWeight: 500 }}>Try a different search term.</div>
+          </div>
+        )}
+
+        {openMarkets.length > 0 && (
+          <section style={{ marginBottom: "var(--space-xl)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: "var(--space-md)" }}>
+              <div style={{ padding: "4px 10px", borderRadius: "var(--radius-sm)", background: "rgba(34, 197, 94, 0.1)", color: "var(--color-success)", fontSize: "0.65rem", fontWeight: 900, letterSpacing: "0.08em", textTransform: "uppercase" }}>Live</div>
+              <h2 style={{ fontSize: "1.25rem", fontWeight: 900, color: "var(--text-main)", margin: 0, fontFamily: "var(--font-display)", letterSpacing: "-0.03em" }}>Active Markets</h2>
+            </div>
+            {renderGrid(openMarkets)}
+          </section>
+        )}
+
+        {upcomingMarkets.length > 0 && (
+          <section style={{ marginBottom: "var(--space-xl)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: "var(--space-md)" }}>
+              <div style={{ padding: "4px 10px", borderRadius: "var(--radius-sm)", background: "rgba(59, 130, 246, 0.1)", color: "var(--color-info)", fontSize: "0.65rem", fontWeight: 900, letterSpacing: "0.08em", textTransform: "uppercase" }}>Soon</div>
+              <h2 style={{ fontSize: "1.25rem", fontWeight: 900, color: "var(--text-main)", margin: 0, fontFamily: "var(--font-display)", letterSpacing: "-0.03em" }}>Coming Up</h2>
+            </div>
+            {renderGrid(upcomingMarkets)}
+          </section>
+        )}
+
+        {settledMarkets.length > 0 && (
+          <section style={{ marginBottom: "var(--space-xl)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: "var(--space-md)" }}>
+              <div style={{ padding: "4px 10px", borderRadius: "var(--radius-sm)", background: "rgba(148, 163, 184, 0.1)", color: "var(--text-subtle)", fontSize: "0.65rem", fontWeight: 900, letterSpacing: "0.08em", textTransform: "uppercase" }}>Past</div>
+              <h2 style={{ fontSize: "1.25rem", fontWeight: 900, color: "var(--text-main)", margin: 0, fontFamily: "var(--font-display)", letterSpacing: "-0.03em" }}>Market History</h2>
+            </div>
+            {renderGrid(settledMarkets)}
+          </section>
         )}
       </div>
-
-      {/* No results */}
-      {!hasResults && searchQuery.trim() && (
-        <div style={{ textAlign: "center", padding: "80px 0", color: "var(--text-subtle)" }}>
-          <div style={{ fontSize: 48, marginBottom: 16 }}>🔍</div>
-          <div style={{ fontSize: 20, fontWeight: 800, color: "var(--text-main)", fontFamily: "var(--font-display)" }}>No markets found</div>
-          <div style={{ fontSize: 14, marginTop: 8 }}>Try a different search term.</div>
-        </div>
-      )}
-
-      {openMarkets.length > 0 && (
-        <section style={{ marginBottom: 48 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
-            <div style={{ padding: "4px 10px", borderRadius: 8, background: "rgba(34, 197, 94, 0.15)", color: "#22c55e", fontSize: 10, fontWeight: 900, letterSpacing: "0.05em", textTransform: "uppercase" }}>Live</div>
-            <h2 style={{ fontSize: 18, fontWeight: 800, color: "var(--text-main)", margin: 0, fontFamily: "var(--font-display)" }}>Active Markets</h2>
-          </div>
-          {renderGrid(openMarkets)}
-        </section>
-      )}
-
-      {upcomingMarkets.length > 0 && (
-        <section style={{ marginBottom: 48 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
-            <div style={{ padding: "4px 10px", borderRadius: 8, background: "rgba(59, 130, 246, 0.15)", color: "#3b82f6", fontSize: 10, fontWeight: 900, letterSpacing: "0.05em", textTransform: "uppercase" }}>Soon</div>
-            <h2 style={{ fontSize: 18, fontWeight: 800, color: "var(--text-main)", margin: 0, fontFamily: "var(--font-display)" }}>Coming Up</h2>
-          </div>
-          {renderGrid(upcomingMarkets)}
-        </section>
-      )}
-
-      {settledMarkets.length > 0 && (
-        <section style={{ marginBottom: 48 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
-            <div style={{ padding: "4px 10px", borderRadius: 8, background: "rgba(100, 116, 139, 0.15)", color: "var(--text-subtle)", fontSize: 10, fontWeight: 900, letterSpacing: "0.05em", textTransform: "uppercase" }}>Settled</div>
-            <h2 style={{ fontSize: 18, fontWeight: 800, color: "var(--text-main)", margin: 0, fontFamily: "var(--font-display)" }}>Market History</h2>
-          </div>
-          {renderGrid(settledMarkets)}
-        </section>
-      )}
 
       {activeMarket && activeBet && (
         <PwaPaymentModal

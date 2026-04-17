@@ -1313,10 +1313,11 @@ const spinner: React.CSSProperties = {
 
 const heroCard: React.CSSProperties = {
   background: "var(--balance-card-bg)",
-  borderRadius: "0 0 28px 28px",
-  padding: "16px 20px 24px",
+  borderRadius: "0 0 var(--radius-xl) var(--radius-xl)",
+  padding: "var(--space-md) var(--space-md) var(--space-lg)",
   color: "#fff",
   position: "relative",
   overflow: "hidden",
   boxShadow: "var(--balance-card-shadow)",
+  borderBottom: "1px solid rgba(255,255,255,0.1)",
 };
