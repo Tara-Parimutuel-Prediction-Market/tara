@@ -358,6 +358,11 @@ export function PwaFeedPage() {
           70%  { transform: scale(2.2); opacity: 0; }
           100% { transform: scale(2.2); opacity: 0; }
         }
+        @keyframes liveTextGlow {
+          0%, 100% { opacity: 1; text-shadow: 0 0 6px rgba(34,197,94,0.6); }
+          50%       { opacity: 0.7; text-shadow: 0 0 14px rgba(34,197,94,1); }
+        }
+        @media (max-width: 767px) { .section-title { display: none; } }
       `}</style>
       <div className="mesh-bg" />
 
@@ -404,9 +409,10 @@ export function PwaFeedPage() {
                   background: "var(--color-success)",
                 }} />
               </div>
-              Live
+              <span style={{ animation: "liveTextGlow 1.8s ease-in-out infinite" }}>Live</span>
             </div>
-            <h2
+            {/* <h2
+              className="section-title"
               style={{
                 fontSize: "1.25rem",
                 fontWeight: 900,
@@ -416,8 +422,8 @@ export function PwaFeedPage() {
                 letterSpacing: "-0.03em",
               }}
             >
-            Active Markets
-            </h2>
+              Active Markets
+            </h2> */}
             <LiveTicker />
           </div>
           {renderGrid(openMarkets)}

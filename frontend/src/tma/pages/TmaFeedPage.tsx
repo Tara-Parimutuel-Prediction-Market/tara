@@ -1071,7 +1071,7 @@ export const TmaFeedPage: FC = () => {
           </svg>
           <input
             type="text"
-            placeholder="Search predictions…"
+            placeholder="Search markets…"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{

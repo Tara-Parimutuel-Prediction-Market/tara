@@ -2,13 +2,81 @@ import { useState, useEffect } from "react";
 import {
   getMarkets,
   placeBet,
-  type Market
+  getRecentActivity,
+  type Market,
+  type ActivityEvent,
 } from "@/api/client";
 import { PwaPaymentModal } from "../components/PwaPaymentModal";
 import type { PaymentResponse } from "@/types/payment";
 import { PwaMarketCard } from "../components/PwaMarketCard";
 import { PwaMarketGrid } from "../components/PwaMarketGrid";
 import { useFilter } from "@/contexts/FilterContext";
+import { Flame } from "lucide-react";
+
+// ── Live Activity Ticker ──────────────────────────────────────────────────────
+
+interface FormattedEvent {
+  userName: string;
+  action: string;
+  outcome: string;
+  amount: string;
+  type: "bet" | "win";
+}
+
+function parseEvent(e: ActivityEvent): FormattedEvent {
+  const rawName = e.userName || "";
+  return {
+    userName: rawName.startsWith("@") ? rawName.substring(1) : rawName,
+    action: e.type === "win" ? "won" : "just bet",
+    outcome: e.outomeLabel,
+    amount: `Nu ${Number(e.amount).toLocaleString()}`,
+    type: e.type,
+  };
+}
+
+function LiveTicker() {
+  const [events, setEvents] = useState<FormattedEvent[]>([]);
+  const [idx, setIdx] = useState(0);
+  const [visible, setVisible] = useState(true);
+
+  useEffect(() => {
+    getRecentActivity()
+      .then((data) => { if (data.length > 0) setEvents(data.map(parseEvent)); })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (events.length < 2) return;
+    const cycle = setInterval(() => {
+      setVisible(false);
+      setTimeout(() => { setIdx((i) => (i + 1) % events.length); setVisible(true); }, 400);
+    }, 4500);
+    return () => clearInterval(cycle);
+  }, [events.length]);
+
+  if (!events.length) return null;
+  const cur = events[idx];
+
+  return (
+    <>
+      <div style={{ width: 1, height: 16, background: "var(--glass-border)", flexShrink: 0, margin: "0 4px" }} />
+      <div style={{
+        flex: 1, minWidth: 0,
+        animation: visible ? "tickerSlideUp 0.4s cubic-bezier(0.34,1.56,0.64,1) forwards" : "none",
+        opacity: visible ? 1 : 0,
+        display: "flex", alignItems: "center", gap: 6, overflow: "hidden",
+      }}>
+        <Flame size={14} style={{ flexShrink: 0, color: "var(--color-warning)", fill: "#f59e0b40" }} />
+        <span style={{ fontSize: "0.8rem", fontWeight: 800, color: "var(--text-main)", whiteSpace: "nowrap", flexShrink: 0 }}>{cur.userName}</span>
+        <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--text-muted)", whiteSpace: "nowrap", flexShrink: 0 }}>{cur.action}</span>
+        <span style={{ fontSize: "0.8rem", fontWeight: 900, color: cur.type === "win" ? "var(--color-success)" : "var(--color-primary)", whiteSpace: "nowrap", flexShrink: 0 }}>{cur.amount}</span>
+        <span style={{ fontSize: "0.75rem", color: "var(--text-subtle)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontWeight: 600 }}>· {cur.outcome}</span>
+      </div>
+    </>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export function PwaMarketsPage() {
   const [markets, setMarkets] = useState<Market[]>([]);
@@ -17,7 +85,7 @@ export function PwaMarketsPage() {
     marketId: string;
     outcomeId: string;
   } | null>(null);
-  const { searchQuery } = useFilter();
+  const { searchQuery, setAvailableCategories, selectedCategory } = useFilter();
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
   // Debounce the global search query → 400 ms before hitting the server
@@ -30,7 +98,12 @@ export function PwaMarketsPage() {
   useEffect(() => {
     setLoading(true);
     getMarkets(debouncedSearch.trim() || undefined)
-      .then(setMarkets)
+      .then((data) => {
+        const active = data.filter((m) => m.status === "open" || m.status === "upcoming");
+        setMarkets(active);
+        const cats = ["All", ...Array.from(new Set(active.map((m) => m.category).filter(Boolean))) as string[]];
+        setAvailableCategories(cats);
+      })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [debouncedSearch]);
@@ -39,7 +112,6 @@ export function PwaMarketsPage() {
     if (!activeBet) return;
     const betAmt = _payment?.amount ?? 0;
 
-    // Snapshot before optimistic update so we can roll back on failure
     const prevMarkets = markets;
 
     setMarkets((prev) =>
@@ -50,10 +122,7 @@ export function PwaMarketsPage() {
           totalPool: String(Number(m.totalPool) + betAmt),
           outcomes: m.outcomes.map((o) =>
             o.id === activeBet.outcomeId
-              ? {
-                  ...o,
-                  totalBetAmount: String(Number(o.totalBetAmount) + betAmt),
-                }
+              ? { ...o, totalBetAmount: String(Number(o.totalBetAmount) + betAmt) }
               : o,
           ),
         };
@@ -64,17 +133,12 @@ export function PwaMarketsPage() {
     const market = prevMarkets.find((m) => m.id === activeBet.marketId);
     if (market) {
       try {
-        await placeBet(market.id, {
-          outcomeId: activeBet.outcomeId,
-          amount: betAmt,
-        });
+        await placeBet(market.id, { outcomeId: activeBet.outcomeId, amount: betAmt });
       } catch (e: any) {
-        // Bet failed — roll back the optimistic update
         setMarkets(prevMarkets);
         console.warn("Bet placement failed, rolled back:", e.message);
       }
     }
-    // Sync with server to get authoritative pool numbers
     getMarkets(debouncedSearch.trim() || undefined).then(setMarkets).catch(console.error);
   };
 
@@ -88,15 +152,13 @@ export function PwaMarketsPage() {
       </div>
     );
 
-  const openMarkets = markets.filter((m) => m.status === "open");
-  const upcomingMarkets = markets.filter((m) => m.status === "upcoming");
-  const settledMarkets = markets.filter(
-    (m) => !["open", "upcoming"].includes(m.status),
-  );
-  const activeMarket = activeBet
-    ? markets.find((m) => m.id === activeBet.marketId)
-    : null;
+  const byCat = (m: Market) =>
+    selectedCategory === "All" ||
+    (m.category ?? "").toLowerCase() === selectedCategory.toLowerCase();
 
+  const openMarkets = markets.filter((m) => m.status === "open" && byCat(m));
+  const upcomingMarkets = markets.filter((m) => m.status === "upcoming" && byCat(m));
+  const activeMarket = activeBet ? markets.find((m) => m.id === activeBet.marketId) : null;
   const hasResults = markets.length > 0;
 
   const renderGrid = (items: Market[]) => (
@@ -105,9 +167,7 @@ export function PwaMarketsPage() {
         <PwaMarketCard
           key={market.id}
           market={market}
-          onBet={(outcomeId) =>
-            setActiveBet({ marketId: market.id, outcomeId })
-          }
+          onBet={(outcomeId) => setActiveBet({ marketId: market.id, outcomeId })}
         />
       ))}
     </PwaMarketGrid>
@@ -115,9 +175,24 @@ export function PwaMarketsPage() {
 
   return (
     <div style={{ padding: "0 0 100px", maxWidth: 1240, margin: "0 auto", position: "relative" }}>
+      <style>{`
+        @keyframes livePing {
+          0%   { transform: scale(1);   opacity: 0.8; }
+          70%  { transform: scale(2.2); opacity: 0; }
+          100% { transform: scale(2.2); opacity: 0; }
+        }
+        @keyframes liveTextGlow {
+          0%, 100% { opacity: 1; text-shadow: 0 0 6px rgba(34,197,94,0.6); }
+          50%       { opacity: 0.7; text-shadow: 0 0 14px rgba(34,197,94,1); }
+        }
+        @keyframes tickerSlideUp {
+          from { opacity: 0; transform: translateY(8px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        @media (max-width: 767px) { .section-title { display: none; } }
+      `}</style>
       <div className="mesh-bg" />
 
-      {/* ── Page Hero/Header ── */}
       <div style={{ padding: "var(--space-xl) var(--space-md) var(--space-lg)" }}>
 
         {/* No results */}
@@ -132,8 +207,23 @@ export function PwaMarketsPage() {
         {openMarkets.length > 0 && (
           <section style={{ marginBottom: "var(--space-xl)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: "var(--space-md)" }}>
-              <div style={{ padding: "4px 10px", borderRadius: "var(--radius-sm)", background: "rgba(34, 197, 94, 0.1)", color: "var(--color-success)", fontSize: "0.65rem", fontWeight: 900, letterSpacing: "0.08em", textTransform: "uppercase" }}>Live</div>
-              <h2 style={{ fontSize: "1.25rem", fontWeight: 900, color: "var(--text-main)", margin: 0, fontFamily: "var(--font-display)", letterSpacing: "-0.03em" }}>Active Markets</h2>
+              {/* Live badge with ping dot */}
+              <div style={{
+                display: "flex", alignItems: "center", gap: 6,
+                padding: "6px 12px", borderRadius: "var(--radius-sm)",
+                background: "rgba(34, 197, 94, 0.1)", color: "var(--color-success)",
+                fontSize: "0.65rem", fontWeight: 900, letterSpacing: "0.08em",
+                textTransform: "uppercase", boxShadow: "0 4px 12px rgba(34, 197, 94, 0.1)",
+                flexShrink: 0,
+              }}>
+                <div style={{ position: "relative", width: 8, height: 8, flexShrink: 0 }}>
+                  <div style={{ position: "absolute", inset: 0, borderRadius: "50%", background: "var(--color-success)", animation: "livePing 1.5s ease-out infinite" }} />
+                  <div style={{ position: "absolute", inset: 0, borderRadius: "50%", background: "var(--color-success)" }} />
+                </div>
+                <span style={{ animation: "liveTextGlow 1.8s ease-in-out infinite" }}>Live</span>
+              </div>
+              <h2 className="section-title" style={{ fontSize: "1.25rem", fontWeight: 900, color: "var(--text-main)", margin: 0, fontFamily: "var(--font-display)", letterSpacing: "-0.03em" }}>Active Markets</h2>
+              <LiveTicker />
             </div>
             {renderGrid(openMarkets)}
           </section>
@@ -143,21 +233,12 @@ export function PwaMarketsPage() {
           <section style={{ marginBottom: "var(--space-xl)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: "var(--space-md)" }}>
               <div style={{ padding: "4px 10px", borderRadius: "var(--radius-sm)", background: "rgba(59, 130, 246, 0.1)", color: "var(--color-info)", fontSize: "0.65rem", fontWeight: 900, letterSpacing: "0.08em", textTransform: "uppercase" }}>Soon</div>
-              <h2 style={{ fontSize: "1.25rem", fontWeight: 900, color: "var(--text-main)", margin: 0, fontFamily: "var(--font-display)", letterSpacing: "-0.03em" }}>Coming Up</h2>
+              <h2 className="section-title" style={{ fontSize: "1.25rem", fontWeight: 900, color: "var(--text-main)", margin: 0, fontFamily: "var(--font-display)", letterSpacing: "-0.03em" }}>Coming Up</h2>
             </div>
             {renderGrid(upcomingMarkets)}
           </section>
         )}
 
-        {settledMarkets.length > 0 && (
-          <section style={{ marginBottom: "var(--space-xl)" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: "var(--space-md)" }}>
-              <div style={{ padding: "4px 10px", borderRadius: "var(--radius-sm)", background: "rgba(148, 163, 184, 0.1)", color: "var(--text-subtle)", fontSize: "0.65rem", fontWeight: 900, letterSpacing: "0.08em", textTransform: "uppercase" }}>Past</div>
-              <h2 style={{ fontSize: "1.25rem", fontWeight: 900, color: "var(--text-main)", margin: 0, fontFamily: "var(--font-display)", letterSpacing: "-0.03em" }}>Market History</h2>
-            </div>
-            {renderGrid(settledMarkets)}
-          </section>
-        )}
       </div>
 
       {activeMarket && activeBet && (

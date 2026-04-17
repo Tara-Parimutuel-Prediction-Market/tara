@@ -82,19 +82,19 @@ export const PwaMarketCard: FC<PwaMarketCardProps> = ({ market, onBet }) => {
         height: "100%",
         boxSizing: "border-box",
         position: "relative",
-        boxShadow: "var(--shadow-md)",
-        transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+        boxShadow: "6px 6px 16px rgba(0,0,0,0.3), -3px -3px 10px rgba(255,255,255,0.04)",
+        transition: "box-shadow 0.2s ease, transform 0.2s ease",
         cursor: "pointer",
         overflow: "hidden",
       }}
       onClick={() => navigate(`/market/${market.id}`)}
       onMouseEnter={(e) => {
-        e.currentTarget.style.transform = "translateY(-3px)";
-        e.currentTarget.style.boxShadow = "var(--shadow-lg)";
+        e.currentTarget.style.transform = "translateY(-2px)";
+        e.currentTarget.style.boxShadow = "8px 8px 20px rgba(0,0,0,0.35), -4px -4px 12px rgba(255,255,255,0.05)";
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.transform = "translateY(0)";
-        e.currentTarget.style.boxShadow = "var(--shadow-md)";
+        e.currentTarget.style.boxShadow = "6px 6px 16px rgba(0,0,0,0.3), -3px -3px 10px rgba(255,255,255,0.04)";
       }}
     >
       <style>{`@keyframes shimmer-slide{0%{transform:translateX(-100%)}100%{transform:translateX(250%)}}`}</style>
@@ -103,45 +103,58 @@ export const PwaMarketCard: FC<PwaMarketCardProps> = ({ market, onBet }) => {
       {/* Card body */}
       <div style={{ padding: "10px 14px 12px", display: "flex", flexDirection: "column", gap: 10, flex: 1 }}>
 
-        {/* Header row: status badge + title */}
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
-          {(isUpcoming || isResolving) && (
-            <div
-              style={{
-                flexShrink: 0,
-                marginTop: 2,
-                background: isUpcoming ? "rgba(59,130,246,0.12)" : "rgba(34,197,94,0.12)",
-                color: isUpcoming ? "var(--color-info)" : "var(--color-success)",
-                padding: "2px 7px",
+        {/* Header row: category badge + status badge */}
+        <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: 2 }}>
+          {market.category && (() => {
+            const vis = getCategoryVisual(market.category);
+            return (
+              <span style={{
                 fontSize: "0.58rem",
-                fontWeight: 900,
-                borderRadius: "var(--radius-sm)",
+                fontWeight: 800,
+                color: vis.accentColor,
+                background: `${vis.accentColor}18`,
+                border: `1px solid ${vis.accentColor}40`,
+                padding: "1px 7px",
+                borderRadius: 99,
                 textTransform: "uppercase",
-                letterSpacing: "0.07em",
-              }}
-            >
-              {isUpcoming ? "Soon" : "Resolving"}
-            </div>
-          )}
-          <h3
-            style={{
-              fontSize: "0.95rem",
+                letterSpacing: "0.06em",
+              }}>
+                {market.category}
+              </span>
+            );
+          })()}
+          {(isUpcoming || isResolving) && (
+            <span style={{
+              fontSize: "0.58rem",
               fontWeight: 800,
-              lineHeight: 1.35,
-              color: "var(--text-main)",
-              margin: 0,
-              overflow: "hidden",
-              display: "-webkit-box",
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: "vertical",
-              fontFamily: "var(--font-display)",
-              letterSpacing: "-0.01em",
-              flex: 1,
-            }}
-          >
-            {market.title}
-          </h3>
+              color: "#fff",
+              background: isUpcoming ? "#3b82f6" : "#f59e0b",
+              padding: "1px 7px",
+              borderRadius: 4,
+            }}>
+              {isUpcoming ? "SOON" : "WAIT"}
+            </span>
+          )}
         </div>
+
+        {/* Title */}
+        <h3
+          style={{
+            fontSize: "0.95rem",
+            fontWeight: 800,
+            lineHeight: 1.35,
+            color: "var(--text-main)",
+            margin: 0,
+            overflow: "hidden",
+            display: "-webkit-box",
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: "vertical",
+            fontFamily: "var(--font-display)",
+            letterSpacing: "-0.01em",
+          }}
+        >
+          {market.title}
+        </h3>
 
       {/* ── Outcomes Area ── */}
       <div
@@ -224,27 +237,33 @@ export const PwaMarketCard: FC<PwaMarketCardProps> = ({ market, onBet }) => {
                       width: "100%",
                       padding: "0",
                       borderRadius: "var(--radius-md)",
-                      background: "var(--bg-secondary)",
-                      border: "1px solid var(--border)",
+                      background: "var(--bg-card)",
+                      border: "none",
                       cursor: "pointer",
                       overflow: "hidden",
-                      transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
                       display: "block",
                       textAlign: "left",
                       position: "relative",
+                      boxShadow: `4px 4px 10px rgba(0,0,0,0.25), -2px -2px 8px rgba(255,255,255,0.04), inset 0 0 0 1px ${s.color}30`,
+                      transition: "box-shadow 0.15s ease, transform 0.12s ease",
                     }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.borderColor = "var(--text-subtle)";
-                      e.currentTarget.style.background = "var(--bg-card)";
-                      e.currentTarget.style.transform = "scale(1.01)";
+                    onMouseDown={(e) => {
+                      const el = e.currentTarget;
+                      el.style.boxShadow = `inset 3px 3px 8px rgba(0,0,0,0.3), inset -1px -1px 4px rgba(255,255,255,0.03), inset 0 0 0 1px ${s.color}50`;
+                      el.style.transform = "scale(0.985)";
+                    }}
+                    onMouseUp={(e) => {
+                      const el = e.currentTarget;
+                      el.style.boxShadow = `4px 4px 10px rgba(0,0,0,0.25), -2px -2px 8px rgba(255,255,255,0.04), inset 0 0 0 1px ${s.color}30`;
+                      el.style.transform = "scale(1)";
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.borderColor = "var(--border)";
-                      e.currentTarget.style.background = "var(--bg-secondary)";
-                      e.currentTarget.style.transform = "scale(1)";
+                      const el = e.currentTarget;
+                      el.style.boxShadow = `4px 4px 10px rgba(0,0,0,0.25), -2px -2px 8px rgba(255,255,255,0.04), inset 0 0 0 1px ${s.color}30`;
+                      el.style.transform = "scale(1)";
                     }}
                   >
-                    {/* Pool fill - Cleaner gradient */}
+                    {/* Pool fill gradient */}
                     <div
                       style={{
                         position: "absolute",
@@ -252,12 +271,23 @@ export const PwaMarketCard: FC<PwaMarketCardProps> = ({ market, onBet }) => {
                         left: 0,
                         bottom: 0,
                         width: `${barWidth}%`,
-                        background: `${s.color}15`,
+                        background: `linear-gradient(90deg, ${s.color}55 0%, ${s.color}28 60%, transparent 100%)`,
                         borderRadius: "var(--radius-md) 0 0 var(--radius-md)",
-                        transition: "width 1s cubic-bezier(0.4, 0, 0.2, 1)",
+                        transition: "width 1s ease",
                         pointerEvents: "none",
                       }}
                     />
+                    {/* Shimmer sweep */}
+                    <div style={{ position: "absolute", inset: 0, overflow: "hidden", borderRadius: "var(--radius-md)", pointerEvents: "none" }}>
+                      <div style={{
+                        position: "absolute",
+                        top: 0,
+                        bottom: 0,
+                        width: "40%",
+                        background: `linear-gradient(90deg, transparent, ${s.color}18, transparent)`,
+                        animation: "shimmer-slide 2.4s ease-in-out infinite",
+                      }} />
+                    </div>
                     
                     {/* Content */}
                     <div

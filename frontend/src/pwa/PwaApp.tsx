@@ -2,7 +2,6 @@ import { HashRouter, Routes, Route, Navigate, NavLink } from "react-router-dom";
 import { useEffect, useState, lazy, Suspense } from "react";
 import { AppRoot } from "@telegram-apps/telegram-ui";
 import { PwaFeedPage } from "./pages/PwaFeedPage";
-import { PwaMarketsPage } from "./pages/PwaMarketsPage";
 import { PwaMarketDetailPage } from "./pages/PwaMarketDetailPage";
 import { PwaPaymentTestPage } from "./pages/PwaPaymentTestPage";
 import { PwaMyBetsPage } from "./pages/PwaMyBetsPage";
@@ -251,7 +250,7 @@ function HamburgerMenu({ isMobile }: { isMobile: boolean }) {
               </button>
             </div>
           ) : (
-            /* Mobile full-screen drawer */
+            /* Mobile drawer — only actions (nav is in bottom bar) */
             <div
               style={{
                 position: "fixed",
@@ -264,57 +263,13 @@ function HamburgerMenu({ isMobile }: { isMobile: boolean }) {
                 WebkitBackdropFilter: "var(--glass-blur)",
                 borderBottom: "1px solid var(--glass-border)",
                 boxShadow: "0 12px 32px rgba(0,0,0,0.18)",
-                padding: "12px 0 20px",
+                padding: "16px 16px 20px",
+                display: "flex",
+                flexDirection: "column",
+                gap: 10,
                 animation: "drawerIn 0.2s ease-out forwards",
               }}
             >
-              {NAV_ITEMS.map(({ to, label, icon: Icon }) => (
-                <NavLink
-                  key={to}
-                  to={to}
-                  onClick={() => setOpen(false)}
-                  style={({ isActive }) => ({
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 14,
-                    padding: "13px 24px",
-                    textDecoration: "none",
-                    color: isActive
-                      ? "var(--color-primary)"
-                      : "var(--text-main)",
-                    background: isActive
-                      ? "rgba(39,117,208,0.07)"
-                      : "transparent",
-                    fontSize: "1rem",
-                    fontWeight: isActive ? 800 : 600,
-                    borderLeft: isActive
-                      ? "3px solid var(--color-primary)"
-                      : "3px solid transparent",
-                    transition: "background 0.15s",
-                  })}
-                >
-                  {({ isActive }) => (
-                    <>
-                      <Icon
-                        size={18}
-                        strokeWidth={isActive ? 2.5 : 2}
-                        color={
-                          isActive
-                            ? "var(--color-primary)"
-                            : "var(--text-muted)"
-                        }
-                      />
-                      {label}
-                    </>
-                  )}
-                </NavLink>
-              ))}
-              <div
-                style={{
-                  margin: "10px 24px",
-                  borderTop: "1px solid var(--glass-border)",
-                }}
-              />
               <a
                 href="https://t.me/OroPredictBot"
                 target="_blank"
@@ -323,24 +278,19 @@ function HamburgerMenu({ isMobile }: { isMobile: boolean }) {
                 style={{
                   display: "flex",
                   alignItems: "center",
-                  gap: 12,
-                  padding: "13px 24px",
+                  justifyContent: "center",
+                  gap: 10,
+                  padding: "14px",
                   textDecoration: "none",
                   color: "#fff",
                   background: "var(--grad-primary)",
-                  margin: "0 16px 10px",
-                  borderRadius: 12,
+                  borderRadius: 14,
                   fontSize: "0.95rem",
                   fontWeight: 800,
                   boxShadow: "0 4px 16px rgba(39,117,208,0.35)",
                 }}
               >
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z" />
                 </svg>
                 Open in Telegram
@@ -350,18 +300,17 @@ function HamburgerMenu({ isMobile }: { isMobile: boolean }) {
                 style={{
                   display: "flex",
                   alignItems: "center",
-                  gap: 12,
-                  width: "calc(100% - 32px)",
-                  margin: "0 16px 8px",
-                  padding: "13px 24px",
-                  borderRadius: 12,
+                  justifyContent: "center",
+                  gap: 10,
+                  width: "100%",
+                  padding: "14px",
+                  borderRadius: 14,
                   border: "1px solid rgba(239,68,68,0.25)",
                   background: "rgba(239,68,68,0.06)",
                   color: "#ef4444",
                   fontSize: "0.95rem",
                   fontWeight: 700,
                   cursor: "pointer",
-                  textAlign: "left",
                 }}
               >
                 <LogOut size={18} />
@@ -481,7 +430,7 @@ function PwaSearch({ compact = false, fullWidth = false }: { compact?: boolean, 
       />
       <input
         type="text"
-        placeholder={fullWidth ? "Search polymarkets..." : "Search markets…"}
+        placeholder={fullWidth ? "Search markets..." : "Search markets…"}
         value={searchQuery}
         onChange={(e) => setSearchQuery(e.target.value)}
         onFocus={() => setIsFocused(true)}
@@ -567,9 +516,9 @@ function PwaLayout() {
         {/* ROW 1: Logo, Search, Actions */}
         <div
           style={{
-            maxWidth: 1440,
+            maxWidth: 1240,
             margin: "0 auto",
-            padding: "0 20px",
+            padding: "0 var(--space-md)",
             height: 64,
             display: "flex",
             alignItems: "center",
@@ -582,19 +531,19 @@ function PwaLayout() {
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 8,
+              gap: 0,
               textDecoration: "none",
               flexShrink: 0,
             }}
           >
-            <OroLogo size={32} />
+            <OroLogo size={62} />
             <span
               style={{
-                fontWeight: 900,
-                fontSize: "1.2rem",
+                fontWeight: 600,
+                fontSize: "1.8rem",
                 color: "var(--text-main)",
                 letterSpacing: "-0.03em",
-                fontFamily: "var(--font-display)",
+                fontFamily: "uppercase",
               }}
             >
               Oro
@@ -646,9 +595,53 @@ function PwaLayout() {
           </div>
         </div>
 
-        {/* ROW 2: Sub-Nav Categories */}
-        {!isMobile && (
-          <div style={{ borderTop: "1px solid var(--glass-border)" }}>
+        {/* ROW 2: Sub-Nav — desktop text links / mobile search + category pills */}
+        <div style={{ borderTop: "1px solid var(--glass-border)" }}>
+          {isMobile ? (
+            /* ── Mobile: search bar + category pills ── */
+            <div style={{ padding: "10px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
+              {/* Search bar */}
+              <PwaSearch fullWidth />
+
+              {/* Category pills — only when categories exist */}
+              {availableCategories.length > 1 && (
+                <div style={{
+                  display: "flex", gap: 8, overflowX: "auto", paddingBottom: 2,
+                  scrollbarWidth: "none", msOverflowStyle: "none",
+                }}
+                  className="hide-scrollbar"
+                >
+                  <style>{`.hide-scrollbar::-webkit-scrollbar{display:none}`}</style>
+                  {availableCategories.map((cat) => {
+                    const isActive = selectedCategory === cat;
+                    return (
+                      <NavLink
+                        key={cat}
+                        to="/"
+                        onClick={() => setSelectedCategory(cat)}
+                        style={{
+                          flexShrink: 0,
+                          padding: "6px 14px",
+                          borderRadius: 20,
+                          fontSize: "0.78rem",
+                          fontWeight: 700,
+                          border: isActive ? "1.5px solid var(--color-primary)" : "1px solid var(--glass-border)",
+                          background: isActive ? "rgba(39,117,208,0.12)" : "var(--glass-bg)",
+                          color: isActive ? "var(--color-primary)" : "var(--text-muted)",
+                          textDecoration: "none",
+                          whiteSpace: "nowrap",
+                          transition: "all 0.15s",
+                        }}
+                      >
+                        {cat}
+                      </NavLink>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ) : (
+            /* ── Desktop: text links ── */
             <div
               style={{
                 maxWidth: 1240,
@@ -662,16 +655,13 @@ function PwaLayout() {
                 whiteSpace: "nowrap",
               }}
             >
-              {/* Trending — only when live markets exist */}
               {hasTrendingMarkets && (
                 <NavLink
                   to="/"
+                  onClick={() => setSelectedCategory("All")}
                   style={({ isActive }) => ({
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                    textDecoration: "none",
-                    fontSize: "0.88rem",
+                    display: "flex", alignItems: "center", gap: 6,
+                    textDecoration: "none", fontSize: "0.88rem",
                     fontWeight: isActive ? 800 : 600,
                     color: isActive ? "var(--text-main)" : "var(--text-muted)",
                   })}
@@ -684,52 +674,35 @@ function PwaLayout() {
                 </NavLink>
               )}
 
-              <NavLink
-                to="/markets"
-                onClick={() => setSelectedCategory("All")}
-                style={({ isActive }) => ({
-                  textDecoration: "none",
-                  fontSize: "0.88rem",
-                  fontWeight: isActive && selectedCategory === "All" ? 800 : 600,
-                  color: isActive && selectedCategory === "All" ? "var(--text-main)" : "var(--text-muted)",
-                })}
-              >
-                Markets
-              </NavLink>
-
-              {/* Separator + categories — only when categories exist */}
               {availableCategories.filter((cat) => cat !== "All").length > 0 && (
                 <>
                   <div style={{ width: 1, height: 16, background: "var(--glass-border)", margin: "0 -8px" }} />
-                  {availableCategories
-                    .filter((cat) => cat !== "All")
-                    .map((cat) => (
-                      <NavLink
-                        key={cat}
-                        to="/markets"
-                        onClick={() => setSelectedCategory(cat)}
-                        style={({ isActive }) => ({
-                          textDecoration: "none",
-                          fontSize: "0.88rem",
-                          fontWeight: isActive && selectedCategory === cat ? 800 : 600,
-                          color: isActive && selectedCategory === cat ? "var(--text-main)" : "var(--text-muted)",
-                          cursor: "pointer",
-                        })}
-                      >
-                        {cat}
-                      </NavLink>
-                    ))}
+                  {availableCategories.filter((cat) => cat !== "All").map((cat) => (
+                    <NavLink
+                      key={cat}
+                      to="/"
+                      onClick={() => setSelectedCategory(cat)}
+                      style={({ isActive }) => ({
+                        textDecoration: "none", fontSize: "0.88rem",
+                        fontWeight: isActive && selectedCategory === cat ? 800 : 600,
+                        color: isActive && selectedCategory === cat ? "var(--text-main)" : "var(--text-muted)",
+                        cursor: "pointer",
+                      })}
+                    >
+                      {cat}
+                    </NavLink>
+                  ))}
                 </>
               )}
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </header>
 
       <div style={{ paddingBottom: isMobile ? 80 : 20 }}>
         <Routes>
           <Route path="/" element={<PwaFeedPage />} />
-          <Route path="/markets" element={<PwaMarketsPage />} />
+          <Route path="/markets" element={<Navigate to="/" />} />
           <Route path="/market/:id" element={<PwaMarketDetailPage />} />
           <Route path="/payment-test" element={<PwaPaymentTestPage />} />
           <Route
