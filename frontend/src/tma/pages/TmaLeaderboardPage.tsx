@@ -132,8 +132,8 @@ function LeaderRow({
       style={{
         display: "flex",
         alignItems: "center",
-        gap: 12,
-        padding: "12px 16px",
+        gap: 8,
+        padding: "5px 12px",
         background: rankStyle
           ? rankStyle.bg
           : entry.isMe
@@ -153,12 +153,12 @@ function LeaderRow({
       {/* Rank */}
       <div
         style={{
-          width: 32,
+          width: 26,
           flexShrink: 0,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          fontSize: 13,
+          fontSize: 12,
           fontWeight: 900,
           color: "var(--text-subtle)",
         }}
@@ -169,8 +169,8 @@ function LeaderRow({
       {/* Avatar */}
       <div
         style={{
-          width: 38,
-          height: 38,
+          width: 26,
+          height: 26,
           borderRadius: "50%",
           flexShrink: 0,
           overflow: "hidden",
@@ -183,7 +183,7 @@ function LeaderRow({
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          fontSize: 15,
+          fontSize: 10,
           fontWeight: 800,
           color: "var(--text-muted)",
         }}
@@ -203,7 +203,7 @@ function LeaderRow({
       <div style={{ flex: 1, minWidth: 0 }}>
         <div
           style={{
-            fontSize: 13,
+            fontSize: 12,
             fontWeight: entry.isMe ? 800 : 600,
             color: "var(--text-main)",
             whiteSpace: "nowrap",
@@ -232,22 +232,22 @@ function LeaderRow({
           style={{
             display: "flex",
             alignItems: "center",
-            gap: 4,
-            marginTop: 2,
+            gap: 3,
+            marginTop: 1,
           }}
         >
-          {tierIcon(entry.reputationTier)}
+          {tierIcon(entry.reputationTier, 10)}
           <span
             style={{
-              fontSize: 10,
+              fontSize: 9,
               color: "var(--text-subtle)",
               fontWeight: 600,
             }}
           >
             {tierLabel(entry.reputationTier)}
           </span>
-          <span style={{ fontSize: 10, color: "var(--text-subtle)" }}>·</span>
-          <span style={{ fontSize: 10, color: "var(--text-subtle)" }}>
+          <span style={{ fontSize: 9, color: "var(--text-subtle)" }}>·</span>
+          <span style={{ fontSize: 9, color: "var(--text-subtle)" }}>
             {entry.totalPredictions} picks
           </span>
         </div>
@@ -257,7 +257,7 @@ function LeaderRow({
       <div style={{ textAlign: "right", flexShrink: 0 }}>
         <div
           style={{
-            fontSize: 15,
+            fontSize: 13,
             fontWeight: 900,
             color:
               entry.winRate >= 65
@@ -1386,7 +1386,9 @@ export const TmaLeaderboardPage: FC = () => {
   const lost = bets.filter((b) => b.status === "lost");
   const winRate =
     (me?.totalPredictions ?? 0) > 0
-      ? Math.round(((me?.correctPredictions ?? 0) / (me?.totalPredictions ?? 1)) * 100)
+      ? Math.round(
+          ((me?.correctPredictions ?? 0) / (me?.totalPredictions ?? 1)) * 100,
+        )
       : 0;
 
   const myEntry = lb?.board.find((r) => r.isMe);
@@ -1589,7 +1591,7 @@ export const TmaLeaderboardPage: FC = () => {
       <div
         ref={_listRef}
         style={{
-          padding: "8px 0",
+          padding: "8px 12px",
           paddingBottom: selfEntry ? 100 : 20,
           minHeight: "100vh",
         }}

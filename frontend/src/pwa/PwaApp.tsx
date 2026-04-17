@@ -1,11 +1,47 @@
 import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useState, lazy, Suspense } from "react";
+import { AppRoot } from "@telegram-apps/telegram-ui";
 import { PwaFeedPage } from "./pages/PwaFeedPage";
 import { PwaMarketsPage } from "./pages/PwaMarketsPage";
 import { PwaMarketDetailPage } from "./pages/PwaMarketDetailPage";
 import { PwaPaymentTestPage } from "./pages/PwaPaymentTestPage";
+import { PwaWalletPage } from "./pages/PwaWalletPage";
+import { PwaMyBetsPage } from "./pages/PwaMyBetsPage";
+import { PwaResultsPage } from "./pages/PwaResultsPage";
 import { PwaBottomNav } from "./components/PwaBottomNav";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+
+// Mark as PWA mode so TMA-specific SDK calls (backButton etc.) are skipped
+if (typeof window !== "undefined") {
+  (window as any).__PWA_MODE__ = true;
+}
+
+// Lazy-load the heavier TMA pages — they only need the JWT token to work in PWA
+const PwaLeaderboardPage = lazy(() =>
+  import("@/tma/pages/TmaLeaderboardPage").then((m) => ({
+    default: m.TmaLeaderboardPage,
+  })),
+);
+const PwaChallengesPage = lazy(() =>
+  import("@/tma/pages/TmaChallengesPage").then((m) => ({
+    default: m.TmaChallengesPage,
+  })),
+);
+const PwaProfilePage = lazy(() =>
+  import("@/tma/pages/TmaProfilePage").then((m) => ({
+    default: m.TmaProfilePage,
+  })),
+);
+const PwaSettingsPage = lazy(() =>
+  import("@/tma/pages/TmaSettingsPage").then((m) => ({
+    default: m.TmaSettingsPage,
+  })),
+);
+const PwaResolvedPage = lazy(() =>
+  import("@/tma/pages/ResolvedMarketsPage").then((m) => ({
+    default: m.ResolvedMarketsPage,
+  })),
+);
 
 import { TonConnectUIProvider } from "@tonconnect/ui-react";
 import { publicUrl } from "@/helpers/publicUrl.ts";
@@ -18,12 +54,15 @@ import { isTokenValid, clearToken } from "@/api/client";
 
 // ── Navbar Controls ──────────────────────────────────────────────────────────
 
-function NavbarControls({ isMobile, onShowHowItWorks }: { isMobile: boolean, onShowHowItWorks: () => void }) {
-  const {
-    selectedCategory,
-    setSelectedCategory,
-    availableCategories,
-  } = useFilter();
+function NavbarControls({
+  isMobile,
+  onShowHowItWorks,
+}: {
+  isMobile: boolean;
+  onShowHowItWorks: () => void;
+}) {
+  const { selectedCategory, setSelectedCategory, availableCategories } =
+    useFilter();
 
   if (isMobile) return null;
 
@@ -52,7 +91,9 @@ function NavbarControls({ isMobile, onShowHowItWorks }: { isMobile: boolean, onS
           transition: "all 0.2s ease",
         }}
         onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text-main)")}
-        onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-muted)")}
+        onMouseLeave={(e) =>
+          (e.currentTarget.style.color = "var(--text-muted)")
+        }
         onClick={onShowHowItWorks}
       >
         <CircleHelp size={16} />
@@ -78,8 +119,12 @@ function NavbarControls({ isMobile, onShowHowItWorks }: { isMobile: boolean, onS
             boxShadow: "var(--shadow-sm)",
             transition: "all 0.2s ease",
           }}
-          onMouseEnter={(e) => (e.currentTarget.style.borderColor = "var(--text-subtle)")}
-          onMouseLeave={(e) => (e.currentTarget.style.borderColor = "var(--glass-border)")}
+          onMouseEnter={(e) =>
+            (e.currentTarget.style.borderColor = "var(--text-subtle)")
+          }
+          onMouseLeave={(e) =>
+            (e.currentTarget.style.borderColor = "var(--glass-border)")
+          }
         >
           {availableCategories.map((cat) => (
             <option key={cat} value={cat}>
@@ -119,8 +164,16 @@ function NavbarControls({ isMobile, onShowHowItWorks }: { isMobile: boolean, onS
           transition: "all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)",
           flexShrink: 0,
         }}
-        onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = "0 12px 24px -6px rgba(39, 117, 208, 0.6)"; }}
-        onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "0 8px 20px -6px rgba(39, 117, 208, 0.5)"; }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.transform = "translateY(-2px)";
+          e.currentTarget.style.boxShadow =
+            "0 12px 24px -6px rgba(39, 117, 208, 0.6)";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.transform = "translateY(0)";
+          e.currentTarget.style.boxShadow =
+            "0 8px 20px -6px rgba(39, 117, 208, 0.5)";
+        }}
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
           <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z" />
@@ -171,7 +224,9 @@ function PwaSearch() {
         style={{
           width: "100%",
           background: isFocused ? "var(--bg-card)" : "var(--bg-secondary)",
-          border: isFocused ? "1.5px solid var(--color-primary)" : "1px solid var(--glass-border)",
+          border: isFocused
+            ? "1.5px solid var(--color-primary)"
+            : "1px solid var(--glass-border)",
           borderRadius: "var(--radius-full)",
           padding: "14px 20px 14px 52px",
           color: "var(--text-main)",
@@ -179,8 +234,8 @@ function PwaSearch() {
           fontWeight: 600,
           outline: "none",
           transition: "all 0.3s ease",
-          boxShadow: isFocused 
-            ? "0 12px 24px -8px rgba(39, 117, 208, 0.25)" 
+          boxShadow: isFocused
+            ? "0 12px 24px -8px rgba(39, 117, 208, 0.25)"
             : "var(--shadow-sm)",
         }}
       />
@@ -235,13 +290,38 @@ function PwaLayout() {
           }}
         >
           {/* Section 1: Branding (Flex 1) */}
-          <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 14 }}>
+          <div
+            style={{ flex: 1, display: "flex", alignItems: "center", gap: 14 }}
+          >
             <OroLogo size={58} />
-            <div style={{ display: "flex", flexDirection: "column", lineHeight: 1 }}>
-              <span style={{ fontWeight: 900, fontSize: "1.6rem", color: "var(--text-main)", letterSpacing: "-0.04em", fontFamily: "var(--font-display)" }}>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                lineHeight: 1,
+              }}
+            >
+              <span
+                style={{
+                  fontWeight: 900,
+                  fontSize: "1.6rem",
+                  color: "var(--text-main)",
+                  letterSpacing: "-0.04em",
+                  fontFamily: "var(--font-display)",
+                }}
+              >
                 Oro
               </span>
-              <span style={{ fontSize: "0.68rem", color: "var(--text-muted)", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", marginTop: 2 }}>
+              <span
+                style={{
+                  fontSize: "0.68rem",
+                  color: "var(--text-muted)",
+                  fontWeight: 800,
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                  marginTop: 2,
+                }}
+              >
                 Parimutuel Predictions
               </span>
             </div>
@@ -251,7 +331,10 @@ function PwaLayout() {
           {!isMobile && <PwaSearch />}
 
           {/* Section 3: Controls (Flex 1, Right Aligned) */}
-          <NavbarControls isMobile={isMobile} onShowHowItWorks={() => setShowHowItWorks(true)} />
+          <NavbarControls
+            isMobile={isMobile}
+            onShowHowItWorks={() => setShowHowItWorks(true)}
+          />
         </div>
       </header>
 
@@ -261,15 +344,118 @@ function PwaLayout() {
           <Route path="/markets" element={<PwaMarketsPage />} />
           <Route path="/market/:id" element={<PwaMarketDetailPage />} />
           <Route path="/payment-test" element={<PwaPaymentTestPage />} />
+          <Route path="/wallet" element={<PwaWalletPage />} />
+          <Route path="/my-bets" element={<PwaMyBetsPage />} />
+          <Route path="/results" element={<PwaResultsPage />} />
+          <Route
+            path="/leaderboard"
+            element={
+              <Suspense
+                fallback={
+                  <div
+                    style={{
+                      padding: 40,
+                      textAlign: "center",
+                      color: "var(--text-muted)",
+                    }}
+                  >
+                    Loading…
+                  </div>
+                }
+              >
+                <PwaLeaderboardPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/challenges"
+            element={
+              <Suspense
+                fallback={
+                  <div
+                    style={{
+                      padding: 40,
+                      textAlign: "center",
+                      color: "var(--text-muted)",
+                    }}
+                  >
+                    Loading…
+                  </div>
+                }
+              >
+                <PwaChallengesPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/profile"
+            element={
+              <Suspense
+                fallback={
+                  <div
+                    style={{
+                      padding: 40,
+                      textAlign: "center",
+                      color: "var(--text-muted)",
+                    }}
+                  >
+                    Loading…
+                  </div>
+                }
+              >
+                <PwaProfilePage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/settings"
+            element={
+              <Suspense
+                fallback={
+                  <div
+                    style={{
+                      padding: 40,
+                      textAlign: "center",
+                      color: "var(--text-muted)",
+                    }}
+                  >
+                    Loading…
+                  </div>
+                }
+              >
+                <PwaSettingsPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/resolved"
+            element={
+              <Suspense
+                fallback={
+                  <div
+                    style={{
+                      padding: 40,
+                      textAlign: "center",
+                      color: "var(--text-muted)",
+                    }}
+                  >
+                    Loading…
+                  </div>
+                }
+              >
+                <PwaResolvedPage />
+              </Suspense>
+            }
+          />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </div>
 
       <PwaBottomNav />
-      
-      <HowItWorksModal 
-        isOpen={showHowItWorks} 
-        onClose={() => setShowHowItWorks(false)} 
+
+      <HowItWorksModal
+        isOpen={showHowItWorks}
+        onClose={() => setShowHowItWorks(false)}
       />
     </div>
   );
@@ -279,10 +465,13 @@ function PwaLayout() {
 
 export function PwaApp() {
   const [authed, setAuthed] = useState(() => isTokenValid());
-
+  const isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
   // Listen for 401s from the API client — force back to login
   useEffect(() => {
-    const handler = () => { clearToken(); setAuthed(false); };
+    const handler = () => {
+      clearToken();
+      setAuthed(false);
+    };
     window.addEventListener("oro:unauthorized", handler);
     return () => window.removeEventListener("oro:unauthorized", handler);
   }, []);
@@ -290,7 +479,13 @@ export function PwaApp() {
   if (!authed) {
     return (
       <ThemeProvider>
-        <div style={{ minHeight: "100vh", background: "var(--bg-main)", color: "var(--text-main)" }}>
+        <div
+          style={{
+            minHeight: "100vh",
+            background: "var(--bg-main)",
+            color: "var(--text-main)",
+          }}
+        >
           <div className="mesh-bg" />
           <ProtectedRoute onLogin={() => setAuthed(true)} />
         </div>
@@ -300,13 +495,17 @@ export function PwaApp() {
 
   return (
     <ThemeProvider>
-      <TonConnectUIProvider manifestUrl={publicUrl("tonconnect-manifest.json")}>
-        <FilterProvider>
-          <HashRouter>
-            <PwaLayout />
-          </HashRouter>
-        </FilterProvider>
-      </TonConnectUIProvider>
+      <AppRoot appearance={isDark ? "dark" : "light"} platform="base">
+        <TonConnectUIProvider
+          manifestUrl={publicUrl("tonconnect-manifest.json")}
+        >
+          <FilterProvider>
+            <HashRouter>
+              <PwaLayout />
+            </HashRouter>
+          </FilterProvider>
+        </TonConnectUIProvider>
+      </AppRoot>
     </ThemeProvider>
   );
 }
