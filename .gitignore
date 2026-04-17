@@ -35,3 +35,6 @@ dist-ssr
 
 # Database schema (sensitive)
 docs/databaseschema/
+
+# Graphify output
+graphify-out/
