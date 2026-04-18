@@ -1304,12 +1304,112 @@ Good luck! 🍀
             `[Shield] Streak reset skipped for user ${user.id} on market ${market.id}`,
           );
         }
+
+        // Consecutive loss consolation — check after streak update so the
+        // user has the most up-to-date record before we query it.
+        await this.sendLosingStreakConsolation(userId, chatId, user.firstName).catch(() => {});
       }
     }
 
     this.logger.log(
       `[Notify] Settlement DMs sent for market ${market.id} to ${Object.keys(betsByUser).length} bettors (${bets.length} positions total)`,
     );
+  }
+
+  // ── Consecutive-loss consolation ──────────────────────────────────────────
+  private async sendLosingStreakConsolation(
+    userId: string,
+    chatId: number,
+    firstName: string | null | undefined,
+  ): Promise<void> {
+    // Aggregate positions by market: a market is a "win" if the user had at
+    // least one WON position, otherwise it's a "loss".
+    const recentMarkets = await this.dataSource
+      .getRepository(Position)
+      .createQueryBuilder("p")
+      .select("p.marketId", "marketId")
+      .addSelect("MAX(p.placedAt)", "lastPlaced")
+      .addSelect(
+        `CASE WHEN bool_or(p.status = 'won') THEN 'won' ELSE 'lost' END`,
+        "result",
+      )
+      .where("p.userId = :uid", { uid: userId })
+      .andWhere("p.status IN (:...statuses)", {
+        statuses: [PositionStatus.WON, PositionStatus.LOST],
+      })
+      .groupBy("p.marketId")
+      .orderBy('"lastPlaced"', "DESC")
+      .limit(3)
+      .getRawMany<{ marketId: string; lastPlaced: string; result: string }>();
+
+    if (recentMarkets.length < 2) return;
+
+    // Count how many consecutive losses from the most recent market
+    const firstWinIndex = recentMarkets.findIndex((r) => r.result !== "lost");
+    const lossCount =
+      firstWinIndex === -1 ? recentMarkets.length : firstWinIndex;
+
+    if (lossCount < 2) return;
+
+    const name = firstName?.trim() || "Predictor";
+
+    if (lossCount >= 3) {
+      // Find the most active open market as a "hot tip"
+      const openMarkets = await this.dataSource
+        .getRepository(Market)
+        .createQueryBuilder("m")
+        .where("m.status = :s", { s: MarketStatus.OPEN })
+        .andWhere("m.totalPool > 0")
+        .orderBy("m.totalPool", "DESC")
+        .limit(1)
+        .getOne();
+
+      const tipMsg = openMarkets
+        ? `${name}, 3 losses in a row is just variance. ` +
+          `The crowd is active on <b>${openMarkets.title}</b> right now — worth a look.`
+        : `${name}, 3 losses in a row happens to the best. Your next prediction turns it around.`;
+
+      await this.telegramSimple.sendMessage(chatId, tipMsg);
+    } else {
+      // 2 consecutive losses — credit Nu 5 comeback bonus
+      await this.dataSource.transaction(async (em) => {
+        const { balance: rawBefore } = await em
+          .getRepository(Transaction)
+          .createQueryBuilder("t")
+          .select("COALESCE(SUM(t.amount), 0)", "balance")
+          .where("t.userId = :userId", { userId })
+          .getRawOne();
+
+        const balanceBefore = Number(rawBefore);
+        const bonus = 5;
+
+        await em.save(
+          Transaction,
+          em.create(Transaction, {
+            type: TransactionType.FREE_CREDIT,
+            amount: bonus,
+            balanceBefore,
+            balanceAfter: balanceBefore + bonus,
+            userId,
+            isBonus: true,
+            note: "Comeback bonus after 2 consecutive losses",
+          }),
+        );
+
+        await em
+          .createQueryBuilder()
+          .update(User)
+          .set({ bonusBalance: () => `"bonusBalance" + ${bonus}` })
+          .where("id = :userId", { userId })
+          .execute();
+      });
+
+      await this.telegramSimple.sendMessage(
+        chatId,
+        `${name}, we've added <b>Nu 5 comeback credit</b> to your wallet. ` +
+          `Two losses won't define your record — the next prediction will.`,
+      );
+    }
   }
 
   // Cancel market: refund all bets

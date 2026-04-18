@@ -108,6 +108,36 @@ function makeAuditService() {
   };
 }
 
+function makeMarketRepo() {
+  return {
+    createQueryBuilder: jest.fn().mockReturnValue({
+      where: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
+      getOne: jest.fn().mockResolvedValue(null),
+    }),
+  };
+}
+
+function makePositionRepo() {
+  return {
+    createQueryBuilder: jest.fn().mockReturnValue({
+      innerJoinAndSelect: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
+      getOne: jest.fn().mockResolvedValue(null),
+    }),
+  };
+}
+
+function makeTelegramSimple() {
+  return {
+    sendMessage: jest.fn().mockResolvedValue(undefined),
+  };
+}
+
 // ─── validateTelegramInitData ─────────────────────────────────────────────────
 
 describe("AuthService.validateTelegramInitData", () => {
@@ -119,9 +149,12 @@ describe("AuthService.validateTelegramInitData", () => {
       makeUserRepo() as any,
       makeAuthMethodRepo() as any,
       makeTransactionRepo() as any,
+      makeMarketRepo() as any,
+      makePositionRepo() as any,
       makeJwtService(),
       makeDkGateway() as any,
       makeTelegramVerification() as any,
+      makeTelegramSimple() as any,
       makeAuditService() as any,
     );
   });
@@ -189,9 +222,12 @@ describe("AuthService.loginWithTelegram", () => {
       userRepo as any,
       authMethodRepo as any,
       makeTransactionRepo() as any,
+      makeMarketRepo() as any,
+      makePositionRepo() as any,
       makeJwtService(),
       makeDkGateway() as any,
       makeTelegramVerification() as any,
+      makeTelegramSimple() as any,
       makeAuditService() as any,
     );
   });
@@ -279,9 +315,12 @@ describe("AuthService.loginWithTelegram", () => {
       userRepo as any,
       authMethodRepo as any,
       txRepo as any,
+      makeMarketRepo() as any,
+      makePositionRepo() as any,
       makeJwtService(),
       makeDkGateway() as any,
       makeTelegramVerification() as any,
+      makeTelegramSimple() as any,
       makeAuditService() as any,
     );
 
@@ -311,9 +350,12 @@ describe("AuthService.loginWithTelegram", () => {
       userRepo as any,
       authMethodRepo as any,
       txRepo as any,
+      makeMarketRepo() as any,
+      makePositionRepo() as any,
       makeJwtService(),
       makeDkGateway() as any,
       makeTelegramVerification() as any,
+      makeTelegramSimple() as any,
       makeAuditService() as any,
     );
 
@@ -338,9 +380,12 @@ describe("AuthService.loginWithTelegram", () => {
       userRepo as any,
       authMethodRepo as any,
       txRepo as any,
+      makeMarketRepo() as any,
+      makePositionRepo() as any,
       makeJwtService(),
       makeDkGateway() as any,
       makeTelegramVerification() as any,
+      makeTelegramSimple() as any,
       makeAuditService() as any,
     );
 
@@ -409,9 +454,12 @@ describe("AuthService.loginWithDKBank", () => {
       userRepo as any,
       authMethodRepo as any,
       makeTransactionRepo() as any,
+      makeMarketRepo() as any,
+      makePositionRepo() as any,
       makeJwtService(),
       dkGateway as any,
       telegramVerification as any,
+      makeTelegramSimple() as any,
       makeAuditService() as any,
     );
   });

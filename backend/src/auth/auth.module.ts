@@ -12,6 +12,8 @@ import { Payment } from "../entities/payment.entity";
 import { Transaction } from "../entities/transaction.entity";
 import { DKGatewayAuthToken } from "../entities/dk-gateway-auth-token.entity";
 import { AuditLog } from "../entities/audit-log.entity";
+import { Market } from "../entities/market.entity";
+import { Position } from "../entities/position.entity";
 import { DKGatewayService } from "../payment/services/dk-gateway/dk-gateway.service";
 import { TelegramModule } from "../telegram/telegram.module";
 import { AuditService } from "../admin/audit.service";
@@ -24,7 +26,9 @@ import { AuditService } from "../admin/audit.service";
       Payment,
       Transaction,
       DKGatewayAuthToken,
-      AuditLog, // Add AuditLog entity
+      AuditLog,
+      Market,
+      Position,
     ]),
     PassportModule,
     JwtModule.registerAsync({

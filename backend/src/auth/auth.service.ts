@@ -7,8 +7,11 @@ import { Repository } from "typeorm";
 import { User } from "../entities/user.entity";
 import { AuthMethod, AuthProvider } from "../entities/auth-method.entity";
 import { Transaction, TransactionType } from "../entities/transaction.entity";
+import { Market, MarketStatus } from "../entities/market.entity";
+import { Position, PositionStatus } from "../entities/position.entity";
 import { DKGatewayService } from "../payment/services/dk-gateway/dk-gateway.service";
 import { TelegramVerificationService } from "../telegram/telegram-verification.service";
+import { TelegramSimpleService } from "../telegram/telegram.service.simple";
 import { AuditService } from "../admin/audit.service";
 import { AuditAction } from "../entities/audit-log.entity";
 
@@ -45,9 +48,12 @@ export class AuthService {
     private authMethodRepo: Repository<AuthMethod>,
     @InjectRepository(Transaction)
     private transactionRepo: Repository<Transaction>,
+    @InjectRepository(Market) private marketRepo: Repository<Market>,
+    @InjectRepository(Position) private positionRepo: Repository<Position>,
     private jwtService: JwtService,
     private dkGateway: DKGatewayService,
     private telegramVerification: TelegramVerificationService,
+    private telegramSimple: TelegramSimpleService,
     private auditService: AuditService,
   ) {}
 
@@ -167,6 +173,9 @@ export class AuthService {
           bonusBalance: 20,
         });
 
+        // Send welcome DM — fire and forget, never block registration
+        this.sendWelcomeDM(user, referredByUserId, tgUser.first_name).catch(() => {});
+
         // Dev-only extra seed credits on top of the welcome bonus
         if (process.env.NODE_ENV === "development") {
           await this.transactionRepo.save(
@@ -231,6 +240,72 @@ export class AuthService {
     });
 
     return { token, user: stripSensitiveFields(freshUser!) };
+  }
+
+  // ── First-session welcome DM ──────────────────────────────────────────────
+  private async sendWelcomeDM(
+    user: User,
+    referredByUserId: string | null,
+    firstName?: string,
+  ): Promise<void> {
+    const chatId = Number(user.telegramChatId ?? user.telegramId);
+    if (!chatId) return;
+
+    const name = firstName?.trim() || "Predictor";
+
+    // Find the most active open market to show in the welcome message
+    const topMarket = await this.marketRepo
+      .createQueryBuilder("m")
+      .where("m.status = :status", { status: MarketStatus.OPEN })
+      .orderBy("m.totalPool", "DESC")
+      .limit(1)
+      .getOne();
+
+    let msg =
+      `🎉 <b>Welcome to Oro, ${name}!</b>\n\n` +
+      `You've received <b>Nu 20 free credit</b> — no deposit needed to make your first prediction.\n\n`;
+
+    // Fix 3: referral context — show what the referrer is predicting
+    if (referredByUserId) {
+      const referrer = await this.userRepo.findOne({
+        where: { id: referredByUserId },
+        select: ["firstName", "username"],
+      });
+
+      const referrerPosition = await this.positionRepo
+        .createQueryBuilder("p")
+        .innerJoinAndSelect("p.market", "m")
+        .innerJoinAndSelect("p.outcome", "o")
+        .where("p.userId = :uid", { uid: referredByUserId })
+        .andWhere("p.status = :ps", { ps: PositionStatus.PENDING })
+        .andWhere("m.status = :ms", { ms: MarketStatus.OPEN })
+        .orderBy("p.placedAt", "DESC")
+        .limit(1)
+        .getOne();
+
+      const refName =
+        referrer?.firstName || referrer?.username || "A friend";
+
+      if (referrerPosition) {
+        const refMarket = (referrerPosition as any).market;
+        const refOutcome = (referrerPosition as any).outcome;
+        msg +=
+          `👥 <b>${refName}</b> invited you and is predicting <b>${refOutcome?.label}</b> on <b>${refMarket?.title}</b>. ` +
+          `Think they're wrong? Take the other side!\n\n`;
+      } else {
+        msg +=
+          `👥 <b>${refName}</b> invited you to Oro. ` +
+          `Make your first prediction to earn them a bonus!\n\n`;
+      }
+    }
+
+    if (topMarket) {
+      msg += `🔥 <b>Hot right now:</b> ${topMarket.title}\n\n`;
+    }
+
+    msg += `👉 Open Oro to start predicting!`;
+
+    await this.telegramSimple.sendMessage(chatId, msg);
   }
 
   // ── Dev-only: login and ensure isAdmin=true ───────────────────────────────
