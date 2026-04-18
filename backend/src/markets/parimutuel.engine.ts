@@ -1349,67 +1349,26 @@ Good luck! 🍀
     const lossCount =
       firstWinIndex === -1 ? recentMarkets.length : firstWinIndex;
 
-    if (lossCount < 2) return;
+    if (lossCount < 3) return;
 
     const name = firstName?.trim() || "Predictor";
 
-    if (lossCount >= 3) {
-      // Find the most active open market as a "hot tip"
-      const openMarkets = await this.dataSource
-        .getRepository(Market)
-        .createQueryBuilder("m")
-        .where("m.status = :s", { s: MarketStatus.OPEN })
-        .andWhere("m.totalPool > 0")
-        .orderBy("m.totalPool", "DESC")
-        .limit(1)
-        .getOne();
+    // Find the most active open market as a "hot tip"
+    const topMarket = await this.dataSource
+      .getRepository(Market)
+      .createQueryBuilder("m")
+      .where("m.status = :s", { s: MarketStatus.OPEN })
+      .andWhere("m.totalPool > 0")
+      .orderBy("m.totalPool", "DESC")
+      .limit(1)
+      .getOne();
 
-      const tipMsg = openMarkets
-        ? `${name}, 3 losses in a row is just variance. ` +
-          `The crowd is active on <b>${openMarkets.title}</b> right now — worth a look.`
-        : `${name}, 3 losses in a row happens to the best. Your next prediction turns it around.`;
+    const tipMsg = topMarket
+      ? `${name}, 3 losses in a row is just variance. ` +
+        `The crowd is active on <b>${topMarket.title}</b> right now — worth a look.`
+      : `${name}, 3 losses in a row happens to the best. Your next prediction turns it around.`;
 
-      await this.telegramSimple.sendMessage(chatId, tipMsg);
-    } else {
-      // 2 consecutive losses — credit Nu 5 comeback bonus
-      await this.dataSource.transaction(async (em) => {
-        const { balance: rawBefore } = await em
-          .getRepository(Transaction)
-          .createQueryBuilder("t")
-          .select("COALESCE(SUM(t.amount), 0)", "balance")
-          .where("t.userId = :userId", { userId })
-          .getRawOne();
-
-        const balanceBefore = Number(rawBefore);
-        const bonus = 5;
-
-        await em.save(
-          Transaction,
-          em.create(Transaction, {
-            type: TransactionType.FREE_CREDIT,
-            amount: bonus,
-            balanceBefore,
-            balanceAfter: balanceBefore + bonus,
-            userId,
-            isBonus: true,
-            note: "Comeback bonus after 2 consecutive losses",
-          }),
-        );
-
-        await em
-          .createQueryBuilder()
-          .update(User)
-          .set({ bonusBalance: () => `"bonusBalance" + ${bonus}` })
-          .where("id = :userId", { userId })
-          .execute();
-      });
-
-      await this.telegramSimple.sendMessage(
-        chatId,
-        `${name}, we've added <b>Nu 5 comeback credit</b> to your wallet. ` +
-          `Two losses won't define your record — the next prediction will.`,
-      );
-    }
+    await this.telegramSimple.sendMessage(chatId, tipMsg);
   }
 
   // Cancel market: refund all bets

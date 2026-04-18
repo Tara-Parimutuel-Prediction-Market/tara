@@ -3,6 +3,7 @@ import { Cron } from "@nestjs/schedule";
 import { InjectRepository, InjectDataSource } from "@nestjs/typeorm";
 import { Repository, DataSource, Not, IsNull, MoreThan, Between } from "typeorm";
 import { User } from "../entities/user.entity";
+import { Market, MarketStatus } from "../entities/market.entity";
 import { Transaction, TransactionType } from "../entities/transaction.entity";
 import { TelegramSimpleService } from "../telegram/telegram.service.simple";
 
@@ -18,6 +19,7 @@ export class EngagementJob {
 
   constructor(
     @InjectRepository(User) private userRepo: Repository<User>,
+    @InjectRepository(Market) private marketRepo: Repository<Market>,
     @InjectRepository(Transaction) private txRepo: Repository<Transaction>,
     @InjectDataSource() private dataSource: DataSource,
     private readonly telegram: TelegramSimpleService,
@@ -25,11 +27,9 @@ export class EngagementJob {
 
   /**
    * Re-engagement cron — runs 3:00 AM UTC daily.
-   * Finds users who went silent at exactly the 2, 7, 14, or 30-day mark.
+   * Finds users who went silent at exactly the 14 or 30-day mark.
    * Uses a 1-day window per milestone so each user is messaged exactly once.
    *
-   * 2 days  → urgency DM with a market closing soon (if any)
-   * 7 days  → reputation decay warning
    * 14 days → Nu 15 comeback credit + DM
    * 30 days → Nu 20 "we miss you" credit + DM
    */
@@ -39,6 +39,60 @@ export class EngagementJob {
       this.messageWindow(14),
       this.messageWindow(30),
     ]);
+  }
+
+  /**
+   * Streak at-risk cron — runs 3:00 PM UTC daily (≈ 9 PM Bhutan time).
+   * Warns users whose bet streak will break at midnight if they don't predict today.
+   */
+  @Cron("0 15 * * *")
+  async warnStreakAtRisk(): Promise<void> {
+    const yesterday = new Date();
+    yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+    const yesterdayStr = yesterday.toISOString().slice(0, 10); // "YYYY-MM-DD"
+
+    const users = await this.userRepo.find({
+      where: {
+        betStreakLastAt: yesterdayStr as any,
+        betStreakCount: MoreThan(0),
+        telegramChatId: Not(IsNull()),
+      },
+      select: ["id", "telegramChatId", "firstName", "betStreakCount"],
+    });
+
+    if (users.length === 0) return;
+
+    this.logger.log(`[StreakAtRisk] Notifying ${users.length} users`);
+
+    const topMarket = await this.marketRepo
+      .createQueryBuilder("m")
+      .where("m.status = :s", { s: MarketStatus.OPEN })
+      .andWhere("m.totalPool > 0")
+      .orderBy("m.totalPool", "DESC")
+      .limit(1)
+      .getOne();
+
+    for (const user of users) {
+      try {
+        const chatId = Number(user.telegramChatId);
+        if (!chatId) continue;
+
+        const name = user.firstName?.trim() || "Predictor";
+        const streak = user.betStreakCount;
+
+        const msg = topMarket
+          ? `${name}, your <b>${streak}-day streak</b> breaks at midnight. ` +
+            `Open Oro and predict on <b>${topMarket.title}</b> to save it.`
+          : `${name}, your <b>${streak}-day streak</b> breaks at midnight. ` +
+            `One prediction keeps it alive — open Oro now.`;
+
+        await this.telegram.sendMessage(chatId, msg);
+      } catch (err: any) {
+        this.logger.error(
+          `[StreakAtRisk] Failed for user ${user.id}: ${err.message}`,
+        );
+      }
+    }
   }
 
   private async messageWindow(daysMissed: number): Promise<void> {
@@ -73,7 +127,7 @@ export class EngagementJob {
         if (!chatId) continue;
 
         const name = user.firstName ?? "Predictor";
-        const msg = this.buildMessage(name, daysMissed, creditAmount, user.reputationTier);
+        const msg = this.buildMessage(name, daysMissed, creditAmount);
 
         if (creditAmount > 0) {
           await this.creditUser(
@@ -96,7 +150,6 @@ export class EngagementJob {
     name: string,
     daysMissed: number,
     creditAmount: number,
-    tier: string,
   ): string {
     if (daysMissed === 14) {
       return (
