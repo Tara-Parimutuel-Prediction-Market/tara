@@ -1,6 +1,8 @@
 import { Module } from "@nestjs/common";
+import { APP_GUARD } from "@nestjs/core";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { ScheduleModule } from "@nestjs/schedule";
+import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { BullModule } from "@nestjs/bullmq";
 import { AuthModule } from "./auth/auth.module";
@@ -34,6 +36,7 @@ import { LeaguesModule } from "./leagues/leagues.module";
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]), // 120 req/min global default
     ScheduleModule.forRoot(),
     RedisModule,
     BullModule.forRootAsync({
@@ -110,5 +113,6 @@ import { LeaguesModule } from "./leagues/leagues.module";
     ChallengesModule,
     LeaguesModule,
   ],
+  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
 export class AppModule {}

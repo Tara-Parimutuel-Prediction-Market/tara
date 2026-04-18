@@ -20,6 +20,7 @@ import {
 import { createHmac, timingSafeEqual } from "crypto";
 import { IsNumber, IsString, IsOptional, MinLength as MinLengthValidator } from "class-validator";
 import { ApiProperty } from "@nestjs/swagger";
+import { Throttle, SkipThrottle } from "@nestjs/throttler";
 import { AuthService } from "./auth.service";
 import { Public, JwtAuthGuard } from "./guards";
 import { TelegramAuthDto } from "./dto/telegram-auth.dto";
@@ -70,6 +71,7 @@ class VerifyPhoneTmaDto {
 
 @ApiTags("auth")
 @Controller("auth")
+@Throttle({ default: { limit: 10, ttl: 60_000 } }) // 10 req/min per IP on all auth endpoints
 export class AuthController {
   constructor(
     private authService: AuthService,
@@ -218,6 +220,7 @@ export class AuthController {
    */
   @Get("dev/mock-init-data")
   @Public()
+  @SkipThrottle()
   @ApiOperation({
     summary: "[DEV] Generate a valid signed initData for testing",
   })
@@ -281,6 +284,7 @@ export class AuthController {
    */
   @Get("dev/admin-token")
   @Public()
+  @SkipThrottle()
   @ApiOperation({ summary: "[DEV] Get admin JWT in one request" })
   @ApiQuery({
     name: "secret",

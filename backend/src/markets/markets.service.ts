@@ -148,7 +148,6 @@ export class MarketsService {
       });
 
       const saved = await this.marketRepo.save(market);
-      console.log(`✅ Market created successfully: ${saved.id}`);
       await this.invalidateMarketCache();
       const full = await this.findOne(saved.id);
       this.telegram
