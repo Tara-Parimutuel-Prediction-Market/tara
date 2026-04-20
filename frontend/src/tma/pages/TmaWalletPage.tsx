@@ -611,11 +611,28 @@ export const TmaWalletPage: FC = () => {
           from { opacity: 0; transform: translateY(12px); }
           to   { opacity: 1; transform: translateY(0); }
         }
+
+        /* Desktop layout */
+        @media (min-width: 640px) {
+          .wallet-hero-card {
+            border-radius: var(--radius-xl) !important;
+            margin: 20px 0 0 !important;
+          }
+          .wallet-actions {
+            padding: 0 !important;
+          }
+          .wallet-card-section {
+            margin: 0 !important;
+          }
+          .wallet-tx-section {
+            padding: 0 !important;
+          }
+        }
       `}</style>
 
       <div
         style={{
-          maxWidth: 480,
+          maxWidth: 760,
           margin: "0 auto",
           padding: "0 0 100px",
           display: "flex",
@@ -624,7 +641,7 @@ export const TmaWalletPage: FC = () => {
         }}
       >
         {/* ── Balance Hero Card ─────────────────────────────── */}
-        <div style={balanceCard}>
+        <div className="wallet-hero-card" style={balanceCard}>
           <div
             style={{
               fontSize: 11,
@@ -1397,7 +1414,7 @@ export const TmaWalletPage: FC = () => {
         )}
 
         {/* ── Transaction History ───────────────────────────── */}
-        <div style={{ padding: "0 16px", marginBottom: 20 }}>
+        <div className="wallet-tx-section" style={{ padding: "0 16px", marginBottom: 20 }}>
           <div
             style={{
               display: "flex",

@@ -278,11 +278,50 @@ export const TmaProfilePage: FC = () => {
           from { opacity: 0; transform: translateY(10px); }
           to   { opacity: 1; transform: translateY(0); }
         }
+
+        /* Desktop layout */
+        @media (min-width: 640px) {
+          .profile-hero-card {
+            border-radius: var(--radius-xl) !important;
+            margin: 20px 0 0 !important;
+          }
+          .profile-hero-inner {
+            padding: 24px 28px 24px !important;
+          }
+          .profile-avatar {
+            width: 72px !important;
+            height: 72px !important;
+          }
+          .profile-name {
+            font-size: 20px !important;
+          }
+          .profile-stats-val {
+            font-size: 18px !important;
+          }
+          .profile-two-col {
+            display: grid !important;
+            grid-template-columns: 1fr 1fr !important;
+            gap: 12px !important;
+            padding: 0 !important;
+          }
+          .profile-two-col > * {
+            margin: 0 !important;
+          }
+          .profile-full-width {
+            padding: 0 !important;
+          }
+          .profile-full-width > * {
+            margin: 0 !important;
+          }
+          .profile-card-margin {
+            margin: 0 !important;
+          }
+        }
       `}</style>
 
       <div
         style={{
-          maxWidth: 480,
+          maxWidth: 760,
           margin: "0 auto",
           padding: "0 0 100px",
           display: "flex",
@@ -291,7 +330,7 @@ export const TmaProfilePage: FC = () => {
         }}
       >
         {/* ── Hero Card ────────────────────────────────────────── */}
-        <div style={heroCard}>
+        <div className="profile-hero-card" style={heroCard}>
           {/* Top row: avatar + name + settings */}
           <div
             style={{
@@ -535,6 +574,8 @@ export const TmaProfilePage: FC = () => {
           </div>
         </div>
 
+        {/* ── Cards grid: streak + tier progress (two-col on desktop) ─── */}
+        <div className="profile-two-col" style={{ display: "contents" }}>
         {/* ── Streak Status ─────────────────────────────────────── */}
         {(user?.betStreakCount ?? 0) > 0 && (
           <button
@@ -697,6 +738,10 @@ export const TmaProfilePage: FC = () => {
           </div>
         ) : null}
 
+        </div>{/* close profile-two-col (streak + tier) */}
+
+        {/* ── Collectibles + Wallet shortcut: two-col on desktop ─── */}
+        <div className="profile-two-col" style={{ display: "contents" }}>
         {/* ── Collectibles row (tappable) ───────────────────────── */}
         <button
           onClick={() => setCollectiblesOpen(true)}
@@ -804,8 +849,10 @@ export const TmaProfilePage: FC = () => {
           <ChevronRight size={16} color="var(--text-muted)" />
         </button>
 
+        </div>{/* close profile-two-col (collectibles + wallet) */}
+
         {/* ── Invite & Referral ─────────────────────────────────── */}
-        <div style={{ padding: "0 16px" }}>
+        <div className="profile-full-width" style={{ padding: "0 16px" }}>
           <div
             style={{
               background:

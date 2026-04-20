@@ -322,6 +322,7 @@ const CARD_MILESTONES_UI: Record<CardType, number> = {
 function CardInventoryStrip({ inventory }: { inventory: CardInventory }) {
   return (
     <div
+      className="card-inventory-strip"
       style={{
         margin: "0 16px 14px",
         padding: "14px",
@@ -723,6 +724,7 @@ function CreateChallengeCard({
   if (created && link) {
     return (
       <div
+        className="create-challenge-card"
         style={{
           margin: "0 16px 16px",
           padding: "20px",
@@ -880,6 +882,7 @@ function CreateChallengeCard({
 
   return (
     <div
+      className="create-challenge-card"
       style={{
         margin: "0 16px 16px",
         padding: "20px",
@@ -1421,112 +1424,122 @@ function MyDuelsTab({
   const hiddenCount = challenges.length - DUEL_PREVIEW;
 
   return (
-    <>
-      <CardInventoryStrip inventory={cardInventory} />
-      <CreateChallengeCard
-        markets={markets}
-        userName={userName}
-        myBetMarketIds={myBetMarketIds}
-        cardInventory={cardInventory}
-        onCreated={onChallengeCreated}
-      />
-      <div
-        style={{
-          padding: "4px 16px 10px",
-          fontSize: "0.65rem",
-          fontWeight: 700,
-          color: "var(--text-muted)",
-          textTransform: "uppercase",
-          letterSpacing: "0.06em",
-        }}
-      >
-        Active Duels
+    <div className="duels-mine-grid" style={{ display: "block" }}>
+      {/* Left column: card inventory + create form */}
+      <div className="duels-mine-left">
+        <CardInventoryStrip inventory={cardInventory} />
+        <CreateChallengeCard
+          markets={markets}
+          userName={userName}
+          myBetMarketIds={myBetMarketIds}
+          cardInventory={cardInventory}
+          onCreated={onChallengeCreated}
+        />
       </div>
-      {challenges.length === 0 ? (
+
+      {/* Right column: active duels list */}
+      <div className="duels-mine-right">
         <div
+          className="active-duels-label"
           style={{
-            margin: "0 16px",
-            padding: "28px 20px",
-            borderRadius: 16,
-            background: "var(--bg-card)",
-            border: "1px solid var(--glass-border)",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            textAlign: "center",
-            gap: 8,
+            padding: "4px 16px 10px",
+            fontSize: "0.65rem",
+            fontWeight: 700,
+            color: "var(--text-muted)",
+            textTransform: "uppercase",
+            letterSpacing: "0.06em",
           }}
         >
-          <Swords size={22} color="#f59e0b" />
-          <div
-            style={{
-              fontSize: "0.8rem",
-              fontWeight: 700,
-              color: "var(--text-main)",
-            }}
-          >
-            No active duels yet
-          </div>
-          <div
-            style={{
-              fontSize: "0.75rem",
-              color: "var(--text-muted)",
-              lineHeight: 1.5,
-              maxWidth: 240,
-            }}
-          >
-            Create a duel above or accept one from the Open Feed.
-          </div>
+          Active Duels
         </div>
-      ) : (
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: 10,
-            margin: "0 16px",
-          }}
-        >
-          {visibleChallenges.map((c) => (
-            <ChallengeCard
-              key={c.id}
-              challenge={c}
-              currentUserId={currentUserId}
-              onJoin={onChallengeJoined}
-            />
-          ))}
-          {challenges.length > DUEL_PREVIEW && (
-            <button
-              onClick={() => setShowAllDuels((v) => !v)}
+        {challenges.length === 0 ? (
+          <div
+            className="active-duels-empty"
+            style={{
+              margin: "0 16px",
+              padding: "28px 20px",
+              borderRadius: 16,
+              background: "var(--bg-card)",
+              border: "1px solid var(--glass-border)",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              textAlign: "center",
+              gap: 8,
+            }}
+          >
+            <Swords size={22} color="#f59e0b" />
+            <div
               style={{
-                width: "100%",
-                padding: "10px",
-                borderRadius: 10,
-                background: "var(--bg-card)",
-                border: "1px solid var(--glass-border)",
-                color: "var(--text-muted)",
-                fontSize: "0.75rem",
+                fontSize: "0.8rem",
                 fontWeight: 700,
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 6,
+                color: "var(--text-main)",
               }}
             >
-              {showAllDuels ? (
-                "▲ Show less"
-              ) : (
-                <>
-                  <Swords size={13} />
-                  View {hiddenCount} more duel{hiddenCount !== 1 ? "s" : ""}
-                </>
-              )}
-            </button>
-          )}
-        </div>
-      )}
-    </>
+              No active duels yet
+            </div>
+            <div
+              style={{
+                fontSize: "0.75rem",
+                color: "var(--text-muted)",
+                lineHeight: 1.5,
+                maxWidth: 240,
+              }}
+            >
+              Create a duel above or accept one from the Open Feed.
+            </div>
+          </div>
+        ) : (
+          <div
+            className="active-duels-list"
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 10,
+              margin: "0 16px",
+            }}
+          >
+            {visibleChallenges.map((c) => (
+              <ChallengeCard
+                key={c.id}
+                challenge={c}
+                currentUserId={currentUserId}
+                onJoin={onChallengeJoined}
+              />
+            ))}
+            {challenges.length > DUEL_PREVIEW && (
+              <button
+                onClick={() => setShowAllDuels((v) => !v)}
+                style={{
+                  width: "100%",
+                  padding: "10px",
+                  borderRadius: 10,
+                  background: "var(--bg-card)",
+                  border: "1px solid var(--glass-border)",
+                  color: "var(--text-muted)",
+                  fontSize: "0.75rem",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 6,
+                }}
+              >
+                {showAllDuels ? (
+                  "▲ Show less"
+                ) : (
+                  <>
+                    <Swords size={13} />
+                    View {hiddenCount} more duel{hiddenCount !== 1 ? "s" : ""}
+                  </>
+                )}
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -1599,6 +1612,7 @@ function OpenFeedTab({
 
   return (
     <div
+      className="open-feed-container"
       style={{
         display: "flex",
         flexDirection: "column",
@@ -1691,6 +1705,7 @@ function LeaderboardTab({
 
   return (
     <div
+      className="leaderboard-container"
       style={{
         display: "flex",
         flexDirection: "column",
@@ -1915,10 +1930,81 @@ export const TmaChallengesPage: FC = () => {
           25% { transform: rotate(-12deg); }
           75% { transform: rotate(12deg); }
         }
+
+        .duels-outer-wrap {
+          max-width: 880px;
+          margin: 0 auto;
+          width: 100%;
+        }
+
+        @media (min-width: 640px) {
+          .duels-header {
+            padding: 24px 24px 0 !important;
+            gap: 16px !important;
+          }
+          .duels-header-icon {
+            width: 56px !important;
+            height: 56px !important;
+            border-radius: 16px !important;
+            margin-top: 0 !important;
+          }
+          .duels-header-title {
+            font-size: 30px !important;
+          }
+          .duels-header-sub {
+            font-size: 0.82rem !important;
+            margin-top: 5px !important;
+          }
+          .duels-tabs-bar {
+            margin: 20px 24px 18px !important;
+            padding: 5px !important;
+            border-radius: 12px !important;
+          }
+          .duels-tab-btn {
+            padding: 10px 0 !important;
+            font-size: 0.82rem !important;
+            border-radius: 10px !important;
+          }
+          .duels-mine-grid {
+            display: grid !important;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+            gap: 0 20px !important;
+            padding: 0 24px !important;
+            align-items: start !important;
+          }
+          .card-inventory-strip {
+            margin: 0 0 14px !important;
+          }
+          .create-challenge-card {
+            margin: 0 0 16px !important;
+            padding: 22px !important;
+          }
+          .active-duels-label {
+            padding-left: 0 !important;
+          }
+          .active-duels-empty {
+            margin: 0 !important;
+          }
+          .active-duels-list {
+            margin: 0 !important;
+          }
+          .open-feed-container {
+            margin: 0 24px !important;
+          }
+          .leaderboard-container {
+            margin: 0 24px !important;
+          }
+          .eligibility-gate-wrap {
+            margin: 24px auto !important;
+            max-width: 520px !important;
+          }
+        }
       `}</style>
 
+      <div className="duels-outer-wrap">
       {/* Header */}
       <div
+        className="duels-header"
         style={{
           padding: "9px 16px 0",
           display: "flex",
@@ -1927,6 +2013,7 @@ export const TmaChallengesPage: FC = () => {
         }}
       >
         <div
+          className="duels-header-icon"
           style={{
             width: 40,
             height: 40,
@@ -1945,6 +2032,7 @@ export const TmaChallengesPage: FC = () => {
         </div>
         <div style={{ marginTop: -5 }}>
           <h1
+            className="duels-header-title"
             style={{
               fontSize: "22px",
               fontWeight: 900,
@@ -1958,6 +2046,7 @@ export const TmaChallengesPage: FC = () => {
             Prediction Duels
           </h1>
           <div
+            className="duels-header-sub"
             style={{
               fontSize: "0.7rem",
               color: "var(--text-muted)",
@@ -1982,11 +2071,14 @@ export const TmaChallengesPage: FC = () => {
           Loading…
         </div>
       ) : !isEligible ? (
-        <EligibilityGate totalPredictions={totalBetCount} />
+        <div className="eligibility-gate-wrap">
+          <EligibilityGate totalPredictions={totalBetCount} />
+        </div>
       ) : (
         <>
           {/* Tabs */}
           <div
+            className="duels-tabs-bar"
             style={{
               display: "flex",
               gap: 4,
@@ -1999,6 +2091,7 @@ export const TmaChallengesPage: FC = () => {
             {TABS.map((t) => (
               <button
                 key={t.key}
+                className="duels-tab-btn"
                 onClick={() => setTab(t.key)}
                 style={{
                   flex: 1,
@@ -2050,6 +2143,7 @@ export const TmaChallengesPage: FC = () => {
           <div style={{ height: 100 }} />
         </>
       )}
+      </div>
 
       {/* Card unlock toast */}
       {cardToast && (

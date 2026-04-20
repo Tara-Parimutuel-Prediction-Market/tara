@@ -1172,6 +1172,7 @@ function PinnedSelfRow({
 
   return (
     <div
+      className="lb-pinned-self"
       onClick={onTap}
       style={{
         position: "fixed",
@@ -1469,6 +1470,27 @@ export const TmaLeaderboardPage: FC = () => {
           from { opacity: 0; transform: scale(0.93); }
           to   { opacity: 1; transform: scale(1); }
         }
+
+        /* Desktop layout */
+        .lb-max-wrap { max-width: 880px; margin: 0 auto; width: 100%; }
+
+        @media (min-width: 640px) {
+          .lb-top-inner { padding: 20px 24px 12px !important; }
+          .lb-title { font-size: 26px !important; }
+          .lb-subtitle { font-size: 0.8rem !important; margin-top: 4px !important; }
+          .lb-percentile-banner { margin: 0 24px 12px !important; padding: 9px 16px !important; font-size: 12px !important; border-radius: 12px !important; }
+          .lb-period-pills { padding: 0 24px 14px !important; gap: 10px !important; }
+          .lb-period-pill { padding: 7px 18px !important; font-size: 13px !important; }
+          .lb-list { padding: 12px 24px !important; }
+          .lb-show-more { width: 100% !important; margin: 10px 0 0 !important; }
+          .lb-pinned-self {
+            left: 50% !important;
+            right: auto !important;
+            transform: translateX(-50%) !important;
+            width: min(860px, calc(100vw - 24px)) !important;
+            margin: 0 !important;
+          }
+        }
       `}</style>
 
       {/* ── Sticky top bar ── */}
@@ -1481,114 +1503,123 @@ export const TmaLeaderboardPage: FC = () => {
           borderBottom: "1px solid var(--glass-border)",
         }}
       >
-        {/* Title row */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "16px 16px 10px",
-          }}
-        >
-          <div>
-            <h1
-              style={{
-                fontSize: 22,
-                fontWeight: 900,
-                color: "var(--text-main)",
-                margin: 0,
-                letterSpacing: "-0.02em",
-                fontFamily: "var(--font-display)",
-              }}
-            >
-              Leaderboard
-            </h1>
-            <p
-              style={{
-                fontSize: 11,
-                color: "var(--text-muted)",
-                margin: "2px 0 0",
-                fontWeight: 600,
-              }}
-            >
-              {lb?.totalRanked ?? 0} ranked · {PERIOD_LABELS[period]}
-            </p>
-          </div>
-
-          <button
-            onClick={() => setShowSeasons(true)}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 5,
-              padding: "7px 12px",
-              borderRadius: 10,
-              border: "1px solid var(--glass-border)",
-              background: "var(--bg-card)",
-              color: "var(--text-muted)",
-              fontSize: 12,
-              fontWeight: 700,
-              cursor: "pointer",
-            }}
-          >
-            <CalendarDays size={13} /> Seasons
-          </button>
-        </div>
-
-        {/* Percentile banner */}
-        {percentile && (
+        <div className="lb-max-wrap">
+          {/* Title row */}
           <div
+            className="lb-top-inner"
             style={{
-              margin: "0 16px 10px",
-              padding: "7px 12px",
-              background: `${percentile.color}15`,
-              border: `1px solid ${percentile.color}30`,
-              borderRadius: 10,
               display: "flex",
               alignItems: "center",
-              gap: 8,
+              justifyContent: "space-between",
+              padding: "16px 16px 10px",
             }}
           >
-            <Medal size={13} color={percentile.color} />
-            <span
-              style={{ fontSize: 11, fontWeight: 700, color: percentile.color }}
-            >
-              {percentile.text}
-            </span>
-          </div>
-        )}
+            <div>
+              <h1
+                className="lb-title"
+                style={{
+                  fontSize: 22,
+                  fontWeight: 900,
+                  color: "var(--text-main)",
+                  margin: 0,
+                  letterSpacing: "-0.02em",
+                  fontFamily: "var(--font-display)",
+                }}
+              >
+                Leaderboard
+              </h1>
+              <p
+                className="lb-subtitle"
+                style={{
+                  fontSize: 11,
+                  color: "var(--text-muted)",
+                  margin: "2px 0 0",
+                  fontWeight: 600,
+                }}
+              >
+                {lb?.totalRanked ?? 0} ranked · {PERIOD_LABELS[period]}
+              </p>
+            </div>
 
-        {/* Period filter pills */}
-        <div style={{ display: "flex", gap: 6, padding: "0 16px 12px" }}>
-          {(["all", "week", "month"] as Period[]).map((p) => (
             <button
-              key={p}
-              onClick={() => setPeriod(p)}
+              onClick={() => setShowSeasons(true)}
               style={{
-                padding: "6px 14px",
-                borderRadius: 99,
-                border:
-                  period === p
-                    ? "1.5px solid #3b82f6"
-                    : "1.5px solid var(--glass-border)",
-                background:
-                  period === p ? "rgba(59,130,246,0.15)" : "transparent",
-                color: period === p ? "#3b82f6" : "var(--text-muted)",
+                display: "flex",
+                alignItems: "center",
+                gap: 5,
+                padding: "7px 12px",
+                borderRadius: 10,
+                border: "1px solid var(--glass-border)",
+                background: "var(--bg-card)",
+                color: "var(--text-muted)",
                 fontSize: 12,
-                fontWeight: period === p ? 800 : 600,
+                fontWeight: 700,
                 cursor: "pointer",
-                transition: "all 0.15s",
-                whiteSpace: "nowrap",
               }}
             >
-              {PERIOD_LABELS[p]}
+              <CalendarDays size={13} /> Seasons
             </button>
-          ))}
+          </div>
+
+          {/* Percentile banner */}
+          {percentile && (
+            <div
+              className="lb-percentile-banner"
+              style={{
+                margin: "0 16px 10px",
+                padding: "7px 12px",
+                background: `${percentile.color}15`,
+                border: `1px solid ${percentile.color}30`,
+                borderRadius: 10,
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <Medal size={13} color={percentile.color} />
+              <span
+                style={{ fontSize: 11, fontWeight: 700, color: percentile.color }}
+              >
+                {percentile.text}
+              </span>
+            </div>
+          )}
+
+          {/* Period filter pills */}
+          <div className="lb-period-pills" style={{ display: "flex", gap: 6, padding: "0 16px 12px" }}>
+            {(["all", "week", "month"] as Period[]).map((p) => (
+              <button
+                key={p}
+                className="lb-period-pill"
+                onClick={() => setPeriod(p)}
+                style={{
+                  padding: "6px 14px",
+                  borderRadius: 99,
+                  border:
+                    period === p
+                      ? "1.5px solid #3b82f6"
+                      : "1.5px solid var(--glass-border)",
+                  background:
+                    period === p ? "rgba(59,130,246,0.15)" : "transparent",
+                  color: period === p ? "#3b82f6" : "var(--text-muted)",
+                  fontSize: 12,
+                  fontWeight: period === p ? 800 : 600,
+                  cursor: "pointer",
+                  transition: "all 0.15s",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {PERIOD_LABELS[p]}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
       {/* ── Scrollable list ── */}
+      <div className="lb-max-wrap">
       <div
+        className="lb-list"
         ref={_listRef}
         style={{
           padding: "8px 12px",
@@ -1641,6 +1672,7 @@ export const TmaLeaderboardPage: FC = () => {
             {/* Show more */}
             {visibleCount < board.length && (
               <button
+                className="lb-show-more"
                 onClick={() =>
                   setVisibleCount((c) => Math.min(c + 20, board.length))
                 }
@@ -1667,6 +1699,7 @@ export const TmaLeaderboardPage: FC = () => {
             )}
           </>
         )}
+      </div>
       </div>
 
       {/* ── Pinned self row (hidden when sheet is open) ── */}
