@@ -51,8 +51,8 @@ export enum AuditAction {
   TRANSACTION_REVIEW = "transaction.review",
 
   // Security events
-  AUTH_FAIL_DKBANK = "auth.fail.dkbank",  // wrong CID/password
-  AUTH_FAIL_PWA = "auth.fail.pwa",        // wrong PWA password
+  AUTH_FAIL_DKBANK = "auth.fail.dkbank", // wrong CID/password
+  AUTH_FAIL_PWA = "auth.fail.pwa", // wrong PWA password
   AUTH_FAIL_TELEGRAM = "auth.fail.telegram", // tampered initData
   AUTH_TOKEN_REVOKED = "auth.token_revoked",
 }

@@ -17,9 +17,12 @@ export class TelegramChannelService {
     private readonly telegramService: TelegramService,
   ) {
     this.botToken = this.configService.get<string>("TELEGRAM_BOT_TOKEN") || "";
-    this.channelId = this.configService.get<string>("TELEGRAM_CHANNEL_ID") || "";
-    this.miniAppUrl = this.configService.get<string>("TELEGRAM_MINI_APP_URL") || "";
-    this.botUsername = this.configService.get<string>("TELEGRAM_BOT_USERNAME") || "";
+    this.channelId =
+      this.configService.get<string>("TELEGRAM_CHANNEL_ID") || "";
+    this.miniAppUrl =
+      this.configService.get<string>("TELEGRAM_MINI_APP_URL") || "";
+    this.botUsername =
+      this.configService.get<string>("TELEGRAM_BOT_USERNAME") || "";
   }
 
   async initializeChannel(): Promise<void> {
@@ -40,7 +43,6 @@ export class TelegramChannelService {
       this.logger.error("Error initializing Telegram Channel", error);
     }
   }
-
   async sendMarketAnnouncement(market: Market): Promise<void> {
     try {
       const message = this.formatChannelMarketAnnouncement(market);

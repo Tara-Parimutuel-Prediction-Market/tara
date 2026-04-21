@@ -1,6 +1,11 @@
 import { createHmac, timingSafeEqual, randomUUID } from "crypto";
 import * as bcrypt from "bcryptjs";
-import { Injectable, Logger, UnauthorizedException, BadRequestException } from "@nestjs/common";
+import {
+  Injectable,
+  Logger,
+  UnauthorizedException,
+  BadRequestException,
+} from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
@@ -18,7 +23,10 @@ import { RedisService } from "../redis/redis.service";
 
 function stripSensitiveFields(
   user: User,
-): Omit<User, "dkPhoneHash" | "telegramPhoneHash" | "phoneNumber" | "pwaPasswordHash"> {
+): Omit<
+  User,
+  "dkPhoneHash" | "telegramPhoneHash" | "phoneNumber" | "pwaPasswordHash"
+> {
   const {
     dkPhoneHash: _a,
     telegramPhoneHash: _b,
@@ -177,7 +185,9 @@ export class AuthService {
         });
 
         // Send welcome DM — fire and forget, never block registration
-        this.sendWelcomeDM(user, referredByUserId, tgUser.first_name).catch(() => {});
+        this.sendWelcomeDM(user, referredByUserId, tgUser.first_name).catch(
+          () => {},
+        );
 
         // Dev-only extra seed credits on top of the welcome bonus
         if (process.env.NODE_ENV === "development") {
@@ -287,8 +297,7 @@ export class AuthService {
         .limit(1)
         .getOne();
 
-      const refName =
-        referrer?.firstName || referrer?.username || "A friend";
+      const refName = referrer?.firstName || referrer?.username || "A friend";
 
       if (referrerPosition) {
         const refMarket = (referrerPosition as any).market;
@@ -337,7 +346,7 @@ export class AuthService {
       where: { dkCid: cid },
       select: ["pwaPasswordHash"],
     });
-    return { hasPassword: !!(user?.pwaPasswordHash) };
+    return { hasPassword: !!user?.pwaPasswordHash };
   }
 
   // ── Set / Change PWA password (called from TMA, requires valid JWT) ────────
@@ -522,9 +531,14 @@ export class AuthService {
             );
           }
           if (!password) {
-            throw new UnauthorizedException("This account requires a PWA password.");
+            throw new UnauthorizedException(
+              "This account requires a PWA password.",
+            );
           }
-          const valid = await bcrypt.compare(password, freshUser!.pwaPasswordHash);
+          const valid = await bcrypt.compare(
+            password,
+            freshUser!.pwaPasswordHash,
+          );
           if (!valid) {
             throw new UnauthorizedException("Incorrect password.");
           }
@@ -614,7 +628,9 @@ export class AuthService {
         );
       }
       if (!password) {
-        throw new UnauthorizedException("This account requires a PWA password.");
+        throw new UnauthorizedException(
+          "This account requires a PWA password.",
+        );
       }
       const valid = await bcrypt.compare(password, freshUser!.pwaPasswordHash);
       if (!valid) {
@@ -646,7 +662,9 @@ export class AuthService {
     // Validate CID with DK Bank first
     const account = await this.dkGateway.lookupAccountByCID(cid);
     if (!account.phoneNumber) {
-      throw new UnauthorizedException("DK Bank account has no phone number registered");
+      throw new UnauthorizedException(
+        "DK Bank account has no phone number registered",
+      );
     }
 
     // Generate 6-digit OTP
@@ -677,27 +695,49 @@ export class AuthService {
     cid: string,
     otp: string,
     phoneNumber: string,
-  ): Promise<{ token: string; user: Omit<User, "dkPhoneHash" | "telegramPhoneHash" | "phoneNumber" | "pwaPasswordHash"> }> {
+  ): Promise<{
+    token: string;
+    user: Omit<
+      User,
+      "dkPhoneHash" | "telegramPhoneHash" | "phoneNumber" | "pwaPasswordHash"
+    >;
+  }> {
     // Retrieve and validate OTP from Redis
     const redisKey = `manual_login_otp:${telegramId}`;
-    const stored = await this.redis.getJson<{ otp: string; cid: string; dkPhoneHash: string; attempts: number }>(redisKey);
+    const stored = await this.redis.getJson<{
+      otp: string;
+      cid: string;
+      dkPhoneHash: string;
+      attempts: number;
+    }>(redisKey);
 
     if (!stored) {
-      throw new UnauthorizedException("OTP expired or not found. Please request a new OTP.");
+      throw new UnauthorizedException(
+        "OTP expired or not found. Please request a new OTP.",
+      );
     }
 
     if (stored.cid !== cid) {
-      throw new UnauthorizedException("CID mismatch. Please start the login process again.");
+      throw new UnauthorizedException(
+        "CID mismatch. Please start the login process again.",
+      );
     }
 
     if (stored.otp !== otp) {
       stored.attempts++;
       if (stored.attempts >= 3) {
         await this.redis.del(redisKey);
-        throw new UnauthorizedException("Too many failed attempts. Please request a new OTP.");
+        throw new UnauthorizedException(
+          "Too many failed attempts. Please request a new OTP.",
+        );
       }
-      await this.redis.setJsonEx(redisKey, 300, { ...stored, attempts: stored.attempts });
-      throw new UnauthorizedException(`Invalid OTP. ${3 - stored.attempts} attempts remaining.`);
+      await this.redis.setJsonEx(redisKey, 300, {
+        ...stored,
+        attempts: stored.attempts,
+      });
+      throw new UnauthorizedException(
+        `Invalid OTP. ${3 - stored.attempts} attempts remaining.`,
+      );
     }
 
     // OTP is valid - now verify phone number matches DK Bank
@@ -706,7 +746,7 @@ export class AuthService {
       await this.redis.del(redisKey);
       throw new UnauthorizedException(
         "Phone number does not match DK Bank registered number. " +
-        "Please use the phone number linked to your DK Bank account."
+          "Please use the phone number linked to your DK Bank account.",
       );
     }
 
@@ -723,7 +763,9 @@ export class AuthService {
       if (user) {
         // Bind Telegram ID to existing DK-only account
         if (user.telegramId && user.telegramId !== telegramId) {
-          throw new UnauthorizedException("This DK Bank account is already linked to a different Telegram account.");
+          throw new UnauthorizedException(
+            "This DK Bank account is already linked to a different Telegram account.",
+          );
         }
         await this.userRepo.update(user.id, { telegramId });
         user.telegramId = telegramId;
@@ -745,7 +787,10 @@ export class AuthService {
       dkAccountName: account.accountName,
       phoneNumber: account.phoneNumber || null,
     });
-    await this.telegramVerification.storeDKPhoneHash(user.id, account.phoneNumber);
+    await this.telegramVerification.storeDKPhoneHash(
+      user.id,
+      account.phoneNumber,
+    );
 
     // Create/update auth method for Telegram
     let tgAuthMethod = await this.authMethodRepo.findOne({
@@ -766,7 +811,10 @@ export class AuthService {
 
     // Create/update auth method for DK Bank
     let dkAuthMethod = await this.authMethodRepo.findOne({
-      where: { provider: AuthProvider.DKBANK, providerId: account.accountNumber },
+      where: {
+        provider: AuthProvider.DKBANK,
+        providerId: account.accountNumber,
+      },
       relations: ["user"],
     });
 
@@ -815,7 +863,9 @@ export class AuthService {
       },
     });
 
-    this.logger.log(`[ManualLogin] User ${freshUser.id} logged in successfully via manual flow`);
+    this.logger.log(
+      `[ManualLogin] User ${freshUser.id} logged in successfully via manual flow`,
+    );
 
     return { token, user: stripSensitiveFields(freshUser) };
   }
