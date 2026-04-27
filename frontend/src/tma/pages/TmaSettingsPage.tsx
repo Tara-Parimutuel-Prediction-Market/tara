@@ -44,7 +44,7 @@ const STEPS = [
   {
     emoji: <Building2 />,
     title: "Link your DK Bank account",
-    desc: "Go to Profile → Enter your 11-digit CID. This links your real bank account so you can deposit and withdraw Ngultrum.",
+    desc: "Go to Profile → Enter your 11-digit CID. This links your real bank account so you can deposit and withdraw real money.",
   },
   {
     emoji: <Coins />,
@@ -54,7 +54,7 @@ const STEPS = [
   {
     emoji: <Target />,
     title: "Pick a market & predict",
-    desc: 'Browse the Feed, tap a market, choose an outcome (e.g. "Argentina wins"), and enter your amount. Your prediction is locked in immediately.',
+    desc: 'Browse the Feed, tap a market, choose an outcome (e.g. "X team wins"), and enter your amount. Your prediction is locked in immediately.',
   },
   {
     emoji: <BarChart2 />,

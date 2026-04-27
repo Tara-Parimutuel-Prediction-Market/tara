@@ -787,6 +787,153 @@ export class AdminController {
     };
   }
 
+  // ── Reconciliation ────────────────────────────────────────────────────────
+  @Get("reconciliation")
+  @ApiOperation({ summary: "Financial reconciliation snapshot" })
+  async getReconciliation() {
+    const em = this.dataSource.manager;
+
+    const depositRow = await em
+      .getRepository(Payment)
+      .createQueryBuilder("p")
+      .select("COALESCE(SUM(p.amount), 0)", "total")
+      .addSelect("COUNT(*)", "count")
+      .where("p.type = :type AND p.status = :status", {
+        type: "deposit",
+        status: "success",
+      })
+      .getRawOne();
+
+    const withdrawalRow = await em
+      .getRepository(Payment)
+      .createQueryBuilder("p")
+      .select("COALESCE(SUM(p.amount), 0)", "total")
+      .addSelect("COUNT(*)", "count")
+      .where("p.type = :type AND p.status = :status", {
+        type: "withdrawal",
+        status: "success",
+      })
+      .getRawOne();
+
+    const pendingDepositRow = await em
+      .getRepository(Payment)
+      .createQueryBuilder("p")
+      .select("COALESCE(SUM(p.amount), 0)", "total")
+      .addSelect("COUNT(*)", "count")
+      .where("p.type = :type AND p.status = :status", {
+        type: "deposit",
+        status: "pending",
+      })
+      .getRawOne();
+
+    const realBalanceRow = await em
+      .getRepository(Transaction)
+      .createQueryBuilder("t")
+      .select("COALESCE(SUM(t.amount), 0)", "total")
+      .where("t.isBonus = :isBonus", { isBonus: false })
+      .getRawOne();
+
+    const bonusBalanceRow = await em
+      .getRepository(Transaction)
+      .createQueryBuilder("t")
+      .select("COALESCE(SUM(t.amount), 0)", "total")
+      .where("t.isBonus = :isBonus", { isBonus: true })
+      .getRawOne();
+
+    const txBreakdown = await em
+      .getRepository(Transaction)
+      .createQueryBuilder("t")
+      .select("t.type", "type")
+      .addSelect("COALESCE(SUM(t.amount), 0)", "total")
+      .addSelect("COUNT(*)", "count")
+      .groupBy("t.type")
+      .orderBy("t.type")
+      .getRawMany();
+
+    const settlementRow = await em
+      .getRepository(Settlement)
+      .createQueryBuilder("s")
+      .select("COALESCE(SUM(s.totalPool), 0)", "totalPool")
+      .addSelect("COALESCE(SUM(s.houseAmount), 0)", "houseAmount")
+      .addSelect("COALESCE(SUM(s.payoutPool), 0)", "payoutPool")
+      .addSelect("COALESCE(SUM(s.totalPaidOut), 0)", "totalPaidOut")
+      .addSelect("COUNT(*)", "count")
+      .getRawOne();
+
+    const pendingBetsRow = await em
+      .getRepository(Position)
+      .createQueryBuilder("pos")
+      .select("COALESCE(SUM(pos.amount), 0)", "total")
+      .addSelect("COUNT(*)", "count")
+      .where("pos.status = :status", { status: "pending" })
+      .getRawOne();
+
+    const totalDeposits = Number(depositRow.total);
+    const depositCount = Number(depositRow.count);
+    const totalWithdrawals = Number(withdrawalRow.total);
+    const withdrawalCount = Number(withdrawalRow.count);
+    const pendingDeposits = Number(pendingDepositRow.total);
+    const pendingDepositCount = Number(pendingDepositRow.count);
+    const totalRealBalance = Number(realBalanceRow.total);
+    const totalBonusBalance = Number(bonusBalanceRow.total);
+    const totalPool = Number(settlementRow.totalPool);
+    const houseEarnings = Number(settlementRow.houseAmount);
+    const payoutPool = Number(settlementRow.payoutPool);
+    const totalPaidOut = Number(settlementRow.totalPaidOut);
+    const settlementCount = Number(settlementRow.count);
+    const breakage = payoutPool - totalPaidOut;
+    const pendingBetsAmount = Number(pendingBetsRow.total);
+    const pendingBetsCount = Number(pendingBetsRow.count);
+
+    const netExternalFlow = totalDeposits - totalWithdrawals;
+    // deposits received − withdrawals paid − house cut − breakage = what users should hold
+    const expectedUserBalances = netExternalFlow - houseEarnings - breakage;
+    const discrepancy = totalRealBalance - expectedUserBalances;
+
+    return {
+      snapshot: new Date().toISOString(),
+      externalFlow: {
+        totalDeposits,
+        depositCount,
+        totalWithdrawals,
+        withdrawalCount,
+        pendingDeposits,
+        pendingDepositCount,
+        netExternalFlow,
+      },
+      settlements: {
+        count: settlementCount,
+        totalPool,
+        houseEarnings,
+        payoutPool,
+        totalPaidOut,
+        breakage,
+      },
+      userWallets: {
+        totalRealBalance,
+        totalBonusBalance,
+      },
+      activeBets: {
+        pendingCount: pendingBetsCount,
+        pendingAmount: pendingBetsAmount,
+      },
+      reconciliation: {
+        netExternalFlow,
+        houseEarnings,
+        breakage,
+        expectedUserBalances,
+        actualUserBalances: totalRealBalance,
+        discrepancy,
+        isBalanced: Math.abs(discrepancy) < 0.01,
+      },
+      transactionBreakdown: txBreakdown.map((r) => ({
+        type: r.type,
+        total: Number(r.total),
+        count: Number(r.count),
+      })),
+    };
+  }
+
   // ── Payments ───────────────────────────────────────────────────────────────
   @Get("payments")
   @ApiOperation({ summary: "List all payments (admin view)" })
