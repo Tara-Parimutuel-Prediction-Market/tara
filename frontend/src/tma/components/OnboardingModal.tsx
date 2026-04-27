@@ -151,7 +151,7 @@ export function OnboardingModal({ onDone }: { onDone: () => void }) {
 
         {/* CTA */}
         <button
-          onClick={() => (isLast ? finish() : setStep((s) => s + 1))}
+          onClick={() => (isLast ? finish() : setStep((n) => n + 1))}
           style={{
             width: "100%",
             padding: "14px",
