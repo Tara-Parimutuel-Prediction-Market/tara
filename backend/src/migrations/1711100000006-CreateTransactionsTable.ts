@@ -34,7 +34,7 @@ export class CreateTransactionsTable1711100000006 implements MigrationInterface 
         "amount"        numeric(20,9)              NOT NULL,
         "balanceBefore" numeric(20,9)              NOT NULL,
         "balanceAfter"  numeric(20,9)              NOT NULL,
-        "paymentId"     uuid,
+        "paymentId"     uuid                       UNIQUE,
         "positionId"    uuid,
         "isBonus"       boolean                    NOT NULL DEFAULT false,
         "note"          character varying,
