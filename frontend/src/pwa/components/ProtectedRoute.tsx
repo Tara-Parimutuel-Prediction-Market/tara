@@ -246,7 +246,7 @@ export function ProtectedRoute({ onLogin }: Props) {
             padding: "11px",
             borderRadius: 10,
             border: "none",
-            background: "blue",
+            background: "linear-gradient(135deg, #2563eb, #1d4ed8)",
             color: "#fff",
             fontWeight: 700,
             fontSize: "0.9rem",

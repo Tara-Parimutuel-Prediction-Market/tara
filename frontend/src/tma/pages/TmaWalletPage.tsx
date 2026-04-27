@@ -1816,11 +1816,36 @@ export const TmaWalletPage: FC = () => {
                     fontSize: 13,
                     color: "var(--text-muted)",
                     fontWeight: 500,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
                   }}
                 >
-                  {paymentModal === "deposit"
-                    ? "Top-up amount (BTN)"
-                    : "Cash out amount (BTN)"}
+                  <span>
+                    {paymentModal === "deposit"
+                      ? "Top-up amount (BTN)"
+                      : "Cash out amount (BTN)"}
+                  </span>
+                  {paymentModal === "withdraw" && (
+                    <button
+                      onClick={() => {
+                        const max = Math.floor(freshUser?.creditsBalance ?? user?.creditsBalance ?? 0);
+                        if (max > 0) { setPayAmountStr(String(max)); setPayError(""); }
+                      }}
+                      style={{
+                        background: "rgba(39,117,208,0.15)",
+                        color: "#2775d0",
+                        border: "1px solid rgba(39,117,208,0.3)",
+                        borderRadius: 6,
+                        padding: "3px 9px",
+                        fontSize: 11,
+                        fontWeight: 700,
+                        cursor: "pointer",
+                      }}
+                    >
+                      Max
+                    </button>
+                  )}
                 </p>
                 <input
                   style={{

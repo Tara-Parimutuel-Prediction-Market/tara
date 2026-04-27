@@ -12,6 +12,7 @@ import { useAuth } from "@/tma/hooks/useAuth";
 import { TmaBetModal } from "@/tma/components/TmaBetModal";
 import { Link } from "@/tma/components/Link/Link";
 import { Flame, X, Sparkles } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { BetShareCard } from "@/components/BetShareCard";
 import { getCategoryVisual } from "@/helpers/visuals";
 import { OracleOrbit } from "@/tma/components/OracleOrbit";
@@ -842,6 +843,7 @@ interface ActiveBet {
 
 export const TmaFeedPage: FC = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [markets, setMarkets] = useState<Market[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeBet, setActiveBet] = useState<ActiveBet | null>(null);
@@ -879,18 +881,13 @@ export const TmaFeedPage: FC = () => {
     setVisibleCount(PAGE_SIZE);
   }, [searchQuery, selectedCategory]);
 
+  const ACTIVE_STATUSES = ["open", "resolving", "upcoming"] as const;
+  const filterActive = (d: Market[]) =>
+    d.filter((m) => ACTIVE_STATUSES.includes(m.status as any));
+
   useEffect(() => {
     getMarkets()
-      .then((d) => {
-        setMarkets(
-          d.filter(
-            (m) =>
-              m.status === "open" ||
-              m.status === "resolving" ||
-              m.status === "upcoming",
-          ),
-        );
-      })
+      .then((d) => setMarkets(filterActive(d)))
       .catch(console.error)
       .finally(() => setLoading(false));
 
@@ -902,6 +899,16 @@ export const TmaFeedPage: FC = () => {
         })
         .catch(() => {});
     }
+  }, []);
+
+  // Auto-refresh market data every 30 seconds so odds/pool stay current
+  useEffect(() => {
+    const id = setInterval(() => {
+      getMarkets()
+        .then((d) => setMarkets(filterActive(d)))
+        .catch(() => {});
+    }, 30_000);
+    return () => clearInterval(id);
   }, []);
 
   const handlePaymentSuccess = async () => {
@@ -1503,6 +1510,7 @@ export const TmaFeedPage: FC = () => {
           outcomeId={activeBet.outcomeId}
           onSuccess={handlePaymentSuccess}
           onFailure={(e: string) => console.error(e)}
+          onGoToWallet={() => navigate("/wallet")}
         />
       )}
 

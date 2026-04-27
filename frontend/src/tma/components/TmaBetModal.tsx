@@ -21,6 +21,7 @@ interface TmaBetModalProps {
   initialAmount?: number;
   onSuccess?: () => void;
   onFailure?: (error: string) => void;
+  onGoToWallet?: () => void;
 }
 
 type Status = "idle" | "processing" | "success" | "failed";
@@ -33,6 +34,7 @@ export function TmaBetModal({
   initialAmount,
   onSuccess,
   onFailure,
+  onGoToWallet,
 }: TmaBetModalProps) {
   const [amountStr, setAmountStr] = useState(() =>
     initialAmount ? String(initialAmount) : "100",
@@ -678,9 +680,31 @@ export function TmaBetModal({
                     fontSize: 13,
                     fontWeight: 600,
                     marginBottom: 12,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 8,
                   }}
                 >
-                  ⚠️ Insufficient balance. Please top up first.
+                  <span>⚠️ Insufficient balance.</span>
+                  {onGoToWallet && (
+                    <button
+                      onClick={() => { onClose(); onGoToWallet(); }}
+                      style={{
+                        background: "#ef4444",
+                        color: "#fff",
+                        border: "none",
+                        borderRadius: 7,
+                        padding: "5px 10px",
+                        fontSize: 12,
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      Top up →
+                    </button>
+                  )}
                 </div>
               )}
 
@@ -728,6 +752,32 @@ export function TmaBetModal({
                     {q}
                   </button>
                 ))}
+                {creditsBalance !== null && creditsBalance > 0 && (
+                  <button
+                    onClick={() => setAmountStr(Math.floor(creditsBalance).toString())}
+                    className="tma-outcome-btn"
+                    style={{
+                      padding: "10px 12px",
+                      borderRadius: 12,
+                      border: amountStr === Math.floor(creditsBalance).toString()
+                        ? "2px solid #10b981"
+                        : "1px solid var(--border)",
+                      borderBottomWidth: 2,
+                      background: amountStr === Math.floor(creditsBalance).toString()
+                        ? "rgba(16,185,129,0.1)"
+                        : "var(--bg-secondary)",
+                      color: amountStr === Math.floor(creditsBalance).toString()
+                        ? "#10b981"
+                        : "var(--text-subtle)",
+                      fontSize: 12,
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    Max
+                  </button>
+                )}
               </div>
               <div style={{ position: "relative", marginBottom: 16 }}>
                 <span

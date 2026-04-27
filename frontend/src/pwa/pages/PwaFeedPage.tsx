@@ -8,6 +8,7 @@ import {
 import { TmaBetModal } from "@/tma/components/TmaBetModal";
 import { PwaMarketCard } from "../components/PwaMarketCard";
 import { PwaMarketGrid } from "../components/PwaMarketGrid";
+import { PwaSetupChecklist } from "../components/PwaSetupChecklist";
 import { Flame } from "lucide-react";
 import { useFilter } from "@/contexts/FilterContext";
 
@@ -331,6 +332,8 @@ export function PwaFeedPage() {
         @media (max-width: 767px) { .section-title { display: none; } }
       `}</style>
       <div className="mesh-bg" />
+
+      <PwaSetupChecklist />
 
       {openMarkets.length > 0 && (
         <section style={{ marginBottom: "var(--space-xl)" }}>

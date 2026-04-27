@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { Navigate, Route, Routes, HashRouter } from 'react-router-dom';
 import { useLaunchParams } from '@tma.js/sdk-react';
 import { AppRoot } from '@telegram-apps/telegram-ui';
@@ -23,10 +23,12 @@ export function App() {
     >
       <HashRouter>
         <div style={{ paddingBottom: 80, minHeight: '100vh', position: 'relative' }}>
-          <Routes>
-            {routes.map((route) => <Route key={route.path} {...route} />)}
-            <Route path="*" element={<Navigate to="/"/>}/>
-          </Routes>
+          <Suspense fallback={<div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "50vh", color: "var(--text-muted, #94a3b8)" }}>Loading…</div>}>
+            <Routes>
+              {routes.map((route) => <Route key={route.path} {...route} />)}
+              <Route path="*" element={<Navigate to="/"/>}/>
+            </Routes>
+          </Suspense>
         </div>
         <PwaBottomNav />
         {showOnboarding && <OnboardingModal onDone={() => setShowOnboarding(false)} />}

@@ -1,13 +1,19 @@
 import { useState } from "react";
-import { TrendingUp, Target, Trophy, ChevronRight, X } from "lucide-react";
+import { TrendingUp, Target, Trophy, Wallet, ChevronRight, X } from "lucide-react";
 
 const STORAGE_KEY = "oro_onboarding_done";
 
 const STEPS = [
   {
+    icon: <Wallet size={40} color="#a78bfa" />,
+    title: "Set up your wallet",
+    body: "Link your DK Bank account in the Wallet tab, deposit funds, and you're ready to predict. Takes under 2 minutes.",
+    highlight: "Wallet → Link DK Bank → Deposit",
+  },
+  {
     icon: <TrendingUp size={40} color="#3b82f6" />,
     title: "Predict markets",
-    body: "Predict on real-world outcomes — sports, politics, crypto, and more. Earn Nu when you're right.",
+    body: "Pick outcomes on real-world events — sports, politics, crypto, and more. Earn Nu when you're right.",
   },
   {
     icon: <Target size={40} color="#22c55e" />,
@@ -116,12 +122,32 @@ export function OnboardingModal({ onDone }: { onDone: () => void }) {
             fontSize: 14,
             color: "var(--text-muted, #94a3b8)",
             lineHeight: 1.6,
-            margin: "0 0 28px",
+            margin: "0 0 12px",
             fontWeight: 500,
           }}
         >
           {s.body}
         </p>
+        {"highlight" in s && s.highlight && (
+          <div
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 4,
+              background: "rgba(167,139,250,0.1)",
+              border: "1px solid rgba(167,139,250,0.3)",
+              borderRadius: 8,
+              padding: "6px 12px",
+              fontSize: 12,
+              fontWeight: 700,
+              color: "#a78bfa",
+              marginBottom: 16,
+              letterSpacing: "0.01em",
+            }}
+          >
+            {s.highlight}
+          </div>
+        )}
 
         {/* CTA */}
         <button

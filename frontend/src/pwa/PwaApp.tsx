@@ -1,4 +1,4 @@
-import { HashRouter, Routes, Route, Navigate, NavLink } from "react-router-dom";
+import { HashRouter, Routes, Route, Navigate, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useState, lazy, Suspense } from "react";
 import { AppRoot } from "@telegram-apps/telegram-ui";
 import { PwaFeedPage } from "./pages/PwaFeedPage";
@@ -62,9 +62,75 @@ import {
   Menu,
   X as XIcon,
   LogOut,
+  ArrowLeft,
 } from "lucide-react";
 import { HowItWorksModal } from "./components/HowItWorksModal";
 import { isTokenValid, clearToken } from "@/api/client";
+
+// ── Page title map ───────────────────────────────────────────────────────────
+
+const PAGE_TITLES: Record<string, string> = {
+  "/leaderboard": "Leaderboard",
+  "/profile": "Profile",
+  "/challenges": "Duels",
+  "/settings": "Settings",
+  "/resolved": "Resolution Record",
+  "/wallet": "Wallet",
+  "/my-bets": "My Positions",
+  "/results": "Results",
+};
+
+function PageTitleBar() {
+  const { pathname } = useLocation();
+  const navigate = useNavigate();
+  const title = PAGE_TITLES[pathname];
+  if (!title) return null;
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        padding: "20px var(--space-md) 0",
+        maxWidth: 1240,
+        margin: "0 auto",
+      }}
+    >
+      <button
+        onClick={() => navigate(-1)}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: 36,
+          height: 36,
+          borderRadius: 10,
+          background: "var(--bg-secondary)",
+          border: "1px solid var(--glass-border)",
+          color: "var(--text-main)",
+          cursor: "pointer",
+          flexShrink: 0,
+        }}
+        aria-label="Go back"
+      >
+        <ArrowLeft size={18} />
+      </button>
+      <h1
+        style={{
+          margin: 0,
+          fontSize: "1.5rem",
+          fontWeight: 900,
+          color: "var(--text-main)",
+          letterSpacing: "-0.03em",
+          fontFamily: "var(--font-display)",
+        }}
+      >
+        {title}
+      </h1>
+    </div>
+  );
+}
 
 // ── Nav items ────────────────────────────────────────────────────────────────
 
@@ -726,6 +792,7 @@ function PwaLayout() {
       </header>
 
       <div style={{ paddingBottom: isMobile ? 80 : 20 }}>
+        <PageTitleBar />
         <Routes>
           <Route path="/" element={<PwaFeedPage />} />
           <Route path="/markets" element={<Navigate to="/" />} />
