@@ -1,6 +1,11 @@
 import { createHmac, timingSafeEqual, randomUUID } from "crypto";
 import * as bcrypt from "bcryptjs";
-import { Injectable, Logger, UnauthorizedException, BadRequestException } from "@nestjs/common";
+import {
+  Injectable,
+  Logger,
+  UnauthorizedException,
+  BadRequestException,
+} from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
@@ -18,7 +23,10 @@ import { RedisService } from "../redis/redis.service";
 
 function stripSensitiveFields(
   user: User,
-): Omit<User, "dkPhoneHash" | "telegramPhoneHash" | "phoneNumber" | "pwaPasswordHash"> {
+): Omit<
+  User,
+  "dkPhoneHash" | "telegramPhoneHash" | "phoneNumber" | "pwaPasswordHash"
+> {
   const {
     dkPhoneHash: _a,
     telegramPhoneHash: _b,
@@ -177,7 +185,9 @@ export class AuthService {
         });
 
         // Send welcome DM — fire and forget, never block registration
-        this.sendWelcomeDM(user, referredByUserId, tgUser.first_name).catch(() => {});
+        this.sendWelcomeDM(user, referredByUserId, tgUser.first_name).catch(
+          () => {},
+        );
 
         // Dev-only extra seed credits on top of the welcome bonus
         if (process.env.NODE_ENV === "development") {
@@ -287,8 +297,7 @@ export class AuthService {
         .limit(1)
         .getOne();
 
-      const refName =
-        referrer?.firstName || referrer?.username || "A friend";
+      const refName = referrer?.firstName || referrer?.username || "A friend";
 
       if (referrerPosition) {
         const refMarket = (referrerPosition as any).market;
@@ -337,7 +346,7 @@ export class AuthService {
       where: { dkCid: cid },
       select: ["pwaPasswordHash"],
     });
-    return { hasPassword: !!(user?.pwaPasswordHash) };
+    return { hasPassword: !!user?.pwaPasswordHash };
   }
 
   // ── Set / Change PWA password (called from TMA, requires valid JWT) ────────
@@ -522,9 +531,14 @@ export class AuthService {
             );
           }
           if (!password) {
-            throw new UnauthorizedException("This account requires a PWA password.");
+            throw new UnauthorizedException(
+              "This account requires a PWA password.",
+            );
           }
-          const valid = await bcrypt.compare(password, freshUser!.pwaPasswordHash);
+          const valid = await bcrypt.compare(
+            password,
+            freshUser!.pwaPasswordHash,
+          );
           if (!valid) {
             throw new UnauthorizedException("Incorrect password.");
           }
@@ -614,7 +628,9 @@ export class AuthService {
         );
       }
       if (!password) {
-        throw new UnauthorizedException("This account requires a PWA password.");
+        throw new UnauthorizedException(
+          "This account requires a PWA password.",
+        );
       }
       const valid = await bcrypt.compare(password, freshUser!.pwaPasswordHash);
       if (!valid) {
@@ -634,6 +650,224 @@ export class AuthService {
       user: stripSensitiveFields(freshUser!),
       dkAccount: safeDkAccount3,
     };
+  }
+
+  // ── Manual Login (Fallback when Telegram initData fails) ───────────────────
+
+  /**
+   * Step 1: Request OTP for manual login
+   * Sends a 6-digit OTP to the user's Telegram ID via bot
+   */
+  async requestManualLoginOtp(telegramId: string, cid: string): Promise<void> {
+    // Validate CID with DK Bank first
+    const account = await this.dkGateway.lookupAccountByCID(cid);
+    if (!account.phoneNumber) {
+      throw new UnauthorizedException(
+        "DK Bank account has no phone number registered",
+      );
+    }
+
+    // Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Store OTP in Redis with 5-minute expiry
+    const redisKey = `manual_login_otp:${telegramId}`;
+    await this.redis.setJsonEx(redisKey, 300, {
+      otp,
+      cid,
+      dkPhoneHash: this.telegramVerification.hashPhone(account.phoneNumber),
+      attempts: 0,
+    });
+
+    // Send OTP to user's Telegram
+    const message = `🔐 <b>Tara Manual Login</b>\n\nYour OTP: <code>${otp}</code>\n\nValid for 5 minutes. Do not share this code.\n\nIf you didn't request this, ignore this message.`;
+    await this.telegramSimple.sendMessage(Number(telegramId), message);
+
+    this.logger.log(`[ManualLogin] OTP sent to Telegram ID ${telegramId}`);
+  }
+
+  /**
+   * Step 2: Verify OTP and complete manual login
+   * Validates OTP and checks phone number matches DK Bank
+   */
+  async verifyManualLogin(
+    telegramId: string,
+    cid: string,
+    otp: string,
+    phoneNumber: string,
+  ): Promise<{
+    token: string;
+    user: Omit<
+      User,
+      "dkPhoneHash" | "telegramPhoneHash" | "phoneNumber" | "pwaPasswordHash"
+    >;
+  }> {
+    // Retrieve and validate OTP from Redis
+    const redisKey = `manual_login_otp:${telegramId}`;
+    const stored = await this.redis.getJson<{
+      otp: string;
+      cid: string;
+      dkPhoneHash: string;
+      attempts: number;
+    }>(redisKey);
+
+    if (!stored) {
+      throw new UnauthorizedException(
+        "OTP expired or not found. Please request a new OTP.",
+      );
+    }
+
+    if (stored.cid !== cid) {
+      throw new UnauthorizedException(
+        "CID mismatch. Please start the login process again.",
+      );
+    }
+
+    if (stored.otp !== otp) {
+      stored.attempts++;
+      if (stored.attempts >= 3) {
+        await this.redis.del(redisKey);
+        throw new UnauthorizedException(
+          "Too many failed attempts. Please request a new OTP.",
+        );
+      }
+      await this.redis.setJsonEx(redisKey, 300, {
+        ...stored,
+        attempts: stored.attempts,
+      });
+      throw new UnauthorizedException(
+        `Invalid OTP. ${3 - stored.attempts} attempts remaining.`,
+      );
+    }
+
+    // OTP is valid - now verify phone number matches DK Bank
+    const providedPhoneHash = this.telegramVerification.hashPhone(phoneNumber);
+    if (providedPhoneHash !== stored.dkPhoneHash) {
+      await this.redis.del(redisKey);
+      throw new UnauthorizedException(
+        "Phone number does not match DK Bank registered number. " +
+          "Please use the phone number linked to your DK Bank account.",
+      );
+    }
+
+    // Delete OTP from Redis (one-time use)
+    await this.redis.del(redisKey);
+
+    // Find or create user
+    let user = await this.userRepo.findOneBy({ telegramId });
+
+    if (!user) {
+      // Check if there's an existing DK Bank user with matching phone hash
+      user = await this.userRepo.findOneBy({ dkPhoneHash: stored.dkPhoneHash });
+
+      if (user) {
+        // Bind Telegram ID to existing DK-only account
+        if (user.telegramId && user.telegramId !== telegramId) {
+          throw new UnauthorizedException(
+            "This DK Bank account is already linked to a different Telegram account.",
+          );
+        }
+        await this.userRepo.update(user.id, { telegramId });
+        user.telegramId = telegramId;
+      } else {
+        // Create new user with Telegram ID
+        user = this.userRepo.create({
+          telegramId,
+          dkCid: cid,
+        });
+        await this.userRepo.save(user);
+      }
+    }
+
+    // Ensure DK fields are synced
+    const account = await this.dkGateway.lookupAccountByCID(cid);
+    await this.userRepo.update(user.id, {
+      dkCid: cid,
+      dkAccountNumber: account.accountNumber,
+      dkAccountName: account.accountName,
+      phoneNumber: account.phoneNumber || null,
+    });
+    await this.telegramVerification.storeDKPhoneHash(
+      user.id,
+      account.phoneNumber,
+    );
+
+    // Create/update auth method for Telegram
+    let tgAuthMethod = await this.authMethodRepo.findOne({
+      where: { provider: AuthProvider.TELEGRAM, providerId: telegramId },
+      relations: ["user"],
+    });
+
+    if (!tgAuthMethod) {
+      tgAuthMethod = this.authMethodRepo.create({
+        provider: AuthProvider.TELEGRAM,
+        providerId: telegramId,
+        metadata: { manualLogin: true },
+        user,
+        userId: user.id,
+      });
+      await this.authMethodRepo.save(tgAuthMethod);
+    }
+
+    // Create/update auth method for DK Bank
+    let dkAuthMethod = await this.authMethodRepo.findOne({
+      where: {
+        provider: AuthProvider.DKBANK,
+        providerId: account.accountNumber,
+      },
+      relations: ["user"],
+    });
+
+    if (!dkAuthMethod) {
+      dkAuthMethod = this.authMethodRepo.create({
+        provider: AuthProvider.DKBANK,
+        providerId: account.accountNumber,
+        metadata: { cid, accountName: account.accountName },
+        user,
+        userId: user.id,
+      });
+      await this.authMethodRepo.save(dkAuthMethod);
+    }
+
+    // Store phone hashes for verification
+    await this.userRepo.update(user.id, {
+      telegramPhoneHash: providedPhoneHash,
+      telegramChatId: telegramId,
+      telegramLinkedAt: new Date(),
+    });
+
+    const freshUser = await this.userRepo.findOneBy({ id: user.id });
+    if (!freshUser) {
+      throw new UnauthorizedException("User creation failed");
+    }
+
+    // Generate JWT
+    const token = this.jwtService.sign({
+      sub: freshUser.id,
+      isAdmin: freshUser.isAdmin,
+      jti: randomUUID(),
+    });
+
+    // Log the login
+    await this.auditService.log({
+      adminId: freshUser.id,
+      username: freshUser.username || freshUser.firstName || telegramId,
+      isAdmin: freshUser.isAdmin,
+      action: AuditAction.USER_LOGIN,
+      entityType: "user",
+      entityId: freshUser.id,
+      meta: {
+        provider: "manual",
+        telegramId,
+        cid,
+      },
+    });
+
+    this.logger.log(
+      `[ManualLogin] User ${freshUser.id} logged in successfully via manual flow`,
+    );
+
+    return { token, user: stripSensitiveFields(freshUser) };
   }
 
   // ── JWT revocation ────────────────────────────────────────────────────────

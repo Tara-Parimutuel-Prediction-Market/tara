@@ -32,6 +32,9 @@ import { TelegramGroup } from "./entities/telegram-group.entity";
 import { GroupMembership } from "./entities/group-membership.entity";
 import { ChallengesModule } from "./challenges/challenges.module";
 import { LeaguesModule } from "./leagues/leagues.module";
+import { ReportingModule } from "./reporting/reporting.module";
+import { ReconciliationModule } from "./reconciliation/reconciliation.module";
+import { Reconciliation } from "./entities/reconciliation.entity";
 
 @Module({
   imports: [
@@ -92,6 +95,7 @@ import { LeaguesModule } from "./leagues/leagues.module";
           Season,
           TelegramGroup,
           GroupMembership,
+          Reconciliation,
         ],
         synchronize: false,
         logging: false,
@@ -112,6 +116,8 @@ import { LeaguesModule } from "./leagues/leagues.module";
     PaymentModule,
     ChallengesModule,
     LeaguesModule,
+    ReportingModule,
+    ReconciliationModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

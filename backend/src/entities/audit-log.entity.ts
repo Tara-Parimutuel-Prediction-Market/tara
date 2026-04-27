@@ -35,9 +35,24 @@ export enum AuditAction {
   USER_LOGIN = "user.login",
   USER_LOGOUT = "user.logout",
 
+  // Malpractice & Dispute resolution (GMC Authority)
+  MALPRACTICE_VOTE_CREATE = "malpractice.vote.create",
+  MALPRACTICE_VOTE_VALIDATE = "malpractice.vote.validate",
+  MALPRACTICE_VOTE_REFUND = "malpractice.vote.refund",
+  DISPUTE_RESOLUTION_CREATE = "dispute.resolution.create",
+  DISPUTE_RESOLUTION_UPDATE = "dispute.resolution.update",
+  DISPUTE_RESOLUTION_RESOLVE = "dispute.resolution.resolve",
+  ADMIN_PENALTY_APPLY = "admin.penalty.apply",
+  ADMIN_PENALTY_REVOKE = "admin.penalty.revoke",
+
+  // Transaction audit actions
+  TRANSACTION_VERIFY = "transaction.verify",
+  TRANSACTION_FLAG = "transaction.flag",
+  TRANSACTION_REVIEW = "transaction.review",
+
   // Security events
-  AUTH_FAIL_DKBANK = "auth.fail.dkbank",  // wrong CID/password
-  AUTH_FAIL_PWA = "auth.fail.pwa",        // wrong PWA password
+  AUTH_FAIL_DKBANK = "auth.fail.dkbank", // wrong CID/password
+  AUTH_FAIL_PWA = "auth.fail.pwa", // wrong PWA password
   AUTH_FAIL_TELEGRAM = "auth.fail.telegram", // tampered initData
   AUTH_TOKEN_REVOKED = "auth.token_revoked",
 }
